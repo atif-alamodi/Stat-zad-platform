@@ -2308,6 +2308,11 @@ body {
     overflow-x: hidden;
   }
 
+  /* Extra breathing room at bottom for bottom nav */
+  #section-lesson {
+    padding-bottom: 20px !important;
+  }
+
   /* ── Key terms / cards inside lessons ── */
   .lesson-content-wrap > div,
   #lesson-content > div,
@@ -3299,6 +3304,11 @@ function showPage(id) {
 }
 
 function showSection(name) {
+  // Restore mobile toggle when leaving lesson
+  if (name !== 'lesson') {
+    const mobileToggle = document.querySelector('.mobile-toggle');
+    if (mobileToggle) mobileToggle.style.display = '';
+  }
   // Persist location (skip transient sections)
   if (APP.student.email && !['subject-detail','lesson'].includes(name)) {
     saveLocation({ type: 'section', section: name });
@@ -3686,8 +3696,12 @@ function openLesson(subjectId, lessonId) {
     </div>
   `;
 
+  // Hide floating mobile toggle (it overlaps the bottom nav)
+  const mobileToggle = document.querySelector('.mobile-toggle');
+  if (mobileToggle) mobileToggle.style.display = 'none';
+
   // Scroll to top and animate
-  container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  window.scrollTo({ top: 0, behavior: 'smooth' });
   setTimeout(animateSteps, 300);
 }
 

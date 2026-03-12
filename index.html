@@ -2536,6 +2536,12 @@ body {
       <span class="nav-icon">📈</span> تقدمي ونتائجي
     </div>
 
+    <div class="nav-section-title">التطبيق العملي</div>
+    <div class="nav-item" onclick="showSection('lab')">
+      <span class="nav-icon">🧪</span> المختبر التفاعلي
+      <span class="nav-badge" style="background:#00BFA5;">NEW</span>
+    </div>
+
     <div style="margin-top: auto; padding: 20px 25px; border-top: 1px solid var(--border);">
       <div style="font-size: 0.8rem; color: var(--text-muted); text-align: center;">
         <div id="motivational-quote" style="font-style: italic;"></div>
@@ -2661,6 +2667,193 @@ body {
     <div id="section-lesson" style="display:none">
       <div id="lesson-content"></div>
     </div>
+
+    <!-- ====== LAB SECTION ====== -->
+    <div id="section-lab" style="display:none">
+      <div class="section-title">🧪 المختبر التفاعلي</div>
+
+      <!-- Tab Switcher -->
+      <div style="display:flex;gap:12px;margin-bottom:24px;flex-wrap:wrap;">
+        <button id="lab-tab-python" onclick="switchLab('python')" style="
+          padding:12px 28px;border-radius:14px;border:2px solid #3776AB;
+          background:rgba(55,118,171,0.2);color:#6ab0e8;font-size:1rem;
+          font-weight:700;cursor:pointer;font-family:var(--font);transition:all 0.2s;
+          display:flex;align-items:center;gap:8px;
+        ">🐍 بيئة Python</button>
+        <button id="lab-tab-excel" onclick="switchLab('excel')" style="
+          padding:12px 28px;border-radius:14px;border:2px solid rgba(255,255,255,0.15);
+          background:rgba(255,255,255,0.05);color:var(--text-muted);font-size:1rem;
+          font-weight:700;cursor:pointer;font-family:var(--font);transition:all 0.2s;
+          display:flex;align-items:center;gap:8px;
+        ">📊 بيئة Excel</button>
+      </div>
+
+      <!-- ═══════════════════ PYTHON LAB ═══════════════════ -->
+      <div id="lab-python" style="display:block">
+        <!-- Status bar -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div id="py-status-dot" style="width:10px;height:10px;border-radius:50%;background:#555;transition:all 0.3s;"></div>
+            <span id="py-status-text" style="font-size:0.82rem;color:var(--text-muted);">جاري تحميل Python...</span>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <select id="py-template" onchange="loadPyTemplate()" style="
+              background:var(--surface);border:1px solid var(--border);color:var(--text);
+              padding:6px 12px;border-radius:8px;font-family:var(--font);font-size:0.82rem;cursor:pointer;
+            ">
+              <option value="">📋 قوالب جاهزة...</option>
+              <option value="hello">مرحبا بالعالم</option>
+              <option value="mean">حساب المتوسط</option>
+              <option value="median">الوسيط والمنوال</option>
+              <option value="variance">التباين والانحراف</option>
+              <option value="zscore">القيمة المعيارية Z-Score</option>
+              <option value="scatter">مخطط التشتت</option>
+              <option value="histogram">المدرج التكراري</option>
+              <option value="correlation">معامل الارتباط</option>
+              <option value="regression">خط الانحدار</option>
+              <option value="countif">محاكاة COUNTIF</option>
+            </select>
+            <button onclick="clearPyEditor()" style="
+              padding:6px 14px;border-radius:8px;border:1px solid var(--border);
+              background:rgba(255,255,255,0.05);color:var(--text-muted);
+              font-family:var(--font);font-size:0.82rem;cursor:pointer;
+            ">🗑️ مسح</button>
+            <button onclick="runPython()" id="run-btn" style="
+              padding:8px 20px;border-radius:10px;border:none;
+              background:linear-gradient(135deg,#3776AB,#1a4a7a);
+              color:white;font-weight:700;font-size:0.9rem;
+              cursor:pointer;font-family:var(--font);transition:all 0.2s;
+              display:flex;align-items:center;gap:6px;
+            ">▶ تشغيل</button>
+          </div>
+        </div>
+
+        <!-- Editor + Output -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;" id="py-grid">
+          <!-- Code Editor -->
+          <div style="background:#1e1e2e;border-radius:16px;overflow:hidden;border:1px solid rgba(55,118,171,0.3);">
+            <div style="background:#2d2d3e;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.08);">
+              <span style="font-size:0.8rem;color:#6ab0e8;font-weight:600;">🐍 المحرر — اكتب كودك هنا</span>
+              <div style="display:flex;gap:6px;">
+                <div style="width:10px;height:10px;border-radius:50%;background:#FF5F57;"></div>
+                <div style="width:10px;height:10px;border-radius:50%;background:#FFBD2E;"></div>
+                <div style="width:10px;height:10px;border-radius:50%;background:#28CA41;"></div>
+              </div>
+            </div>
+            <div style="position:relative;">
+              <div id="py-line-nums" style="
+                position:absolute;left:0;top:0;width:40px;
+                background:#1a1a2a;padding:14px 0;text-align:center;
+                font-size:0.78rem;color:#555;line-height:1.6;font-family:monospace;
+                pointer-events:none;user-select:none;min-height:380px;
+              ">1</div>
+              <textarea id="py-editor" spellcheck="false" style="
+                width:100%;min-height:380px;background:transparent;
+                border:none;outline:none;color:#cdd6f4;
+                font-family:'Fira Code','Courier New',monospace;font-size:0.88rem;
+                line-height:1.6;padding:14px 14px 14px 54px;
+                resize:vertical;box-sizing:border-box;tab-size:4;
+                direction:ltr;text-align:left;
+              " placeholder="# اكتب كود Python هنا..." oninput="updateLineNums()" onkeydown="handleTabKey(event)"></textarea>
+            </div>
+          </div>
+
+          <!-- Output -->
+          <div style="background:#0d1117;border-radius:16px;overflow:hidden;border:1px solid rgba(55,118,171,0.2);">
+            <div style="background:#161b22;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.06);">
+              <span style="font-size:0.8rem;color:#8b949e;font-weight:600;">📟 النتيجة</span>
+              <button onclick="clearOutput()" style="background:none;border:none;color:#555;cursor:pointer;font-size:0.75rem;">✕ مسح</button>
+            </div>
+            <div id="py-output" style="
+              padding:14px;min-height:380px;font-family:'Fira Code','Courier New',monospace;
+              font-size:0.85rem;color:#e6edf3;white-space:pre-wrap;overflow-y:auto;
+              line-height:1.6;direction:ltr;text-align:left;
+            ">
+              <span style="color:#555;">// اضغط ▶ تشغيل لتنفيذ الكود</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Chart output -->
+        <div id="py-chart-area" style="display:none;margin-top:16px;background:white;border-radius:16px;padding:16px;text-align:center;">
+          <canvas id="py-chart" style="max-width:100%;max-height:400px;"></canvas>
+        </div>
+
+        <!-- Hint bar -->
+        <div style="margin-top:14px;padding:12px 16px;background:rgba(55,118,171,0.08);border-radius:12px;border:1px solid rgba(55,118,171,0.2);">
+          <span style="font-size:0.8rem;color:#6ab0e8;">💡 <strong>نصيحة:</strong> يمكنك استخدام: print(), numpy, pandas, statistics, matplotlib (للرسوم). اضغط Tab للمسافة البادئة.</span>
+        </div>
+      </div>
+
+      <!-- ═══════════════════ EXCEL LAB ═══════════════════ -->
+      <div id="lab-excel" style="display:none">
+
+        <!-- Toolbar -->
+        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
+          <select id="xl-template" onchange="loadXlTemplate()" style="
+            background:var(--surface);border:1px solid var(--border);color:var(--text);
+            padding:7px 12px;border-radius:8px;font-family:var(--font);font-size:0.82rem;cursor:pointer;
+          ">
+            <option value="">📋 قوالب جاهزة...</option>
+            <option value="blank">جدول فارغ</option>
+            <option value="grades">درجات الطلاب</option>
+            <option value="sales">بيانات المبيعات</option>
+            <option value="employees">موظفون ورواتب</option>
+            <option value="stats">تحليل إحصائي</option>
+          </select>
+
+          <div style="display:flex;gap:4px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:4px;">
+            <button onclick="xlFormat('bold')" title="Bold" style="padding:5px 10px;border:none;background:none;color:var(--text);cursor:pointer;font-weight:900;font-size:0.9rem;border-radius:6px;" onmouseenter="this.style.background='rgba(255,255,255,0.1)'" onmouseleave="this.style.background='none'">B</button>
+            <button onclick="xlFormat('color','#E8A020')" title="ذهبي" style="padding:5px 10px;border:none;background:none;cursor:pointer;font-size:0.9rem;border-radius:6px;" onmouseenter="this.style.background='rgba(255,255,255,0.1)'" onmouseleave="this.style.background='none'">🟡</button>
+            <button onclick="xlFormat('color','#00BFA5')" title="أخضر" style="padding:5px 10px;border:none;background:none;cursor:pointer;font-size:0.9rem;border-radius:6px;" onmouseenter="this.style.background='rgba(255,255,255,0.1)'" onmouseleave="this.style.background='none'">🟢</button>
+            <button onclick="xlFormat('color','#FF5252')" title="أحمر" style="padding:5px 10px;border:none;background:none;cursor:pointer;font-size:0.9rem;border-radius:6px;" onmouseenter="this.style.background='rgba(255,255,255,0.1)'" onmouseleave="this.style.background='none'">🔴</button>
+            <button onclick="xlFormat('align','center')" title="توسيط" style="padding:5px 10px;border:none;background:none;color:var(--text);cursor:pointer;font-size:0.9rem;border-radius:6px;" onmouseenter="this.style.background='rgba(255,255,255,0.1)'" onmouseleave="this.style.background='none'">≡</button>
+          </div>
+
+          <button onclick="addXlRow()" style="padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text);font-family:var(--font);font-size:0.82rem;cursor:pointer;">+ صف</button>
+          <button onclick="addXlCol()" style="padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text);font-family:var(--font);font-size:0.82rem;cursor:pointer;">+ عمود</button>
+          <button onclick="xlChart()" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(232,160,32,0.4);background:rgba(232,160,32,0.1);color:#E8A020;font-family:var(--font);font-size:0.82rem;cursor:pointer;font-weight:600;">📊 رسم بياني</button>
+          <button onclick="clearXl()" style="padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:rgba(255,82,82,0.07);color:#FF5252;font-family:var(--font);font-size:0.82rem;cursor:pointer;">🗑️ مسح</button>
+        </div>
+
+        <!-- Formula bar -->
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px 14px;">
+          <span id="xl-cell-ref" style="font-size:0.85rem;color:var(--primary);font-weight:700;min-width:40px;">A1</span>
+          <div style="width:1px;height:20px;background:var(--border);"></div>
+          <span style="font-size:0.85rem;color:var(--text-muted);">fx</span>
+          <input id="xl-formula-bar" type="text" placeholder="اكتب قيمة أو معادلة مثل =AVERAGE(B2:B6)" style="
+            flex:1;background:transparent;border:none;outline:none;
+            color:var(--text);font-family:'Fira Code',monospace;font-size:0.88rem;
+            direction:ltr;text-align:left;
+          " oninput="xlFormulaBarInput()" onkeydown="if(event.key==='Enter'){xlFormulaBarCommit();event.preventDefault();}">
+        </div>
+
+        <!-- Grid wrapper -->
+        <div style="border-radius:14px;overflow:auto;border:1px solid rgba(255,255,255,0.1);background:#1a1a2a;max-height:420px;">
+          <div id="xl-grid-wrap">
+            <!-- Grid built by JS -->
+          </div>
+        </div>
+
+        <!-- Results panel -->
+        <div id="xl-results" style="margin-top:14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;"></div>
+
+        <!-- Chart canvas -->
+        <div id="xl-chart-area" style="display:none;margin-top:16px;background:white;border-radius:16px;padding:20px;">
+          <canvas id="xl-chart" style="max-width:100%;max-height:350px;"></canvas>
+        </div>
+
+        <!-- Functions reference -->
+        <div style="margin-top:14px;padding:14px 16px;background:rgba(232,160,32,0.06);border-radius:12px;border:1px solid rgba(232,160,32,0.2);">
+          <div style="font-size:0.8rem;color:#E8A020;font-weight:700;margin-bottom:8px;">📖 الدوال المتاحة:</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;">
+            <span id="xlref" style=""></span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
 
   </div>
 </div>
@@ -3000,7 +3193,7 @@ function showPage(id) {
 }
 
 function showSection(name) {
-  ['dashboard', 'subjects', 'progress', 'subject-detail', 'lesson', 'exam-generator'].forEach(s => {
+  ['dashboard', 'subjects', 'progress', 'subject-detail', 'lesson', 'exam-generator', 'lab'].forEach(s => {
     const el = document.getElementById(`section-${s}`);
     if (el) el.style.display = 'none';
   });
@@ -3267,43 +3460,123 @@ function openLesson(subjectId, lessonId) {
   const subject = CURRICULUM[subjectId];
   let lesson = null;
   let chapter = null;
+
+  // Build flat list of all lessons for prev/next navigation
+  const allLessons = [];
   subject.chapters.forEach(ch => {
     ch.lessons.forEach(l => {
-      if (l.id === lessonId) { lesson = l; chapter = ch; }
+      allLessons.push({ lesson: l, chapter: ch });
     });
   });
-  
-  if (!lesson) return;
+
+  const currentIdx = allLessons.findIndex(e => e.lesson.id === lessonId);
+  if (currentIdx === -1) return;
+
+  lesson = allLessons[currentIdx].lesson;
+  chapter = allLessons[currentIdx].chapter;
+
+  const prevEntry = currentIdx > 0 ? allLessons[currentIdx - 1] : null;
+  const nextEntry = currentIdx < allLessons.length - 1 ? allLessons[currentIdx + 1] : null;
+  const lessonNum = currentIdx + 1;
+  const totalLessons = allLessons.length;
+
   APP.currentLesson = lesson;
-  
+
   showSection('lesson');
   const container = document.getElementById('lesson-content');
-  
+
   // Update progress
   APP.progress.lessons++;
-  APP.progress.subjectProgress[subjectId] = Math.min(100, 
+  APP.progress.subjectProgress[subjectId] = Math.min(100,
     (APP.progress.subjectProgress[subjectId] || 0) + 10);
   saveProgress();
   updateStats();
   addActivity(subject.icon + ' ' + lesson.title);
-  
+
+  // Progress bar width
+  const progressPct = Math.round((lessonNum / totalLessons) * 100);
+
   container.innerHTML = `
-    <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 25px; flex-wrap: wrap;">
-      <button class="back-btn" onclick="showSubject('${subjectId}')">←</button>
-      <div style="flex: 1;">
-        <div style="font-size: 0.85rem; color: var(--text-muted);">
-          ${subject.title} → ${chapter.title}
+    <!-- Top nav bar -->
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
+      <button class="back-btn" onclick="showSubject('${subjectId}')" title="العودة للمادة">←</button>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:3px;">
+          ${subject.icon} ${subject.title} &rsaquo; ${chapter.title}
         </div>
-        <div style="font-size: 1.5rem; font-weight: 800;">${lesson.title}</div>
+        <div style="font-size:1.4rem;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${lesson.title}</div>
+      </div>
+      <div style="font-size:0.78rem;color:var(--text-muted);background:rgba(255,255,255,0.06);padding:4px 10px;border-radius:20px;white-space:nowrap;">
+        ${lessonNum} / ${totalLessons}
       </div>
     </div>
-    
+
+    <!-- Progress bar -->
+    <div style="height:5px;background:rgba(255,255,255,0.07);border-radius:10px;margin-bottom:24px;overflow:hidden;">
+      <div style="height:100%;width:${progressPct}%;background:linear-gradient(90deg,var(--primary),var(--secondary));border-radius:10px;transition:width 0.5s ease;"></div>
+    </div>
+
     ${buildLessonBody(lesson, subject)}
-    
+
     ${lesson.quiz ? buildInlineQuiz(lesson.quiz, lesson.title, chapter.pages) : ''}
+
+    <!-- Bottom navigation -->
+    <div style="display:flex;align-items:stretch;gap:12px;margin-top:32px;padding-top:20px;border-top:1px solid var(--border);">
+      ${prevEntry ? `
+        <button onclick="openLesson('${subjectId}','${prevEntry.lesson.id}')" style="
+          flex:1;display:flex;align-items:center;gap:10px;
+          padding:14px 18px;border-radius:14px;border:1px solid var(--border);
+          background:rgba(255,255,255,0.04);color:var(--text);cursor:pointer;
+          font-family:var(--font);font-size:0.9rem;font-weight:600;
+          transition:all 0.2s;text-align:right;
+        " onmouseenter="this.style.background='rgba(255,255,255,0.08)'" onmouseleave="this.style.background='rgba(255,255,255,0.04)'">
+          <span style="font-size:1.3rem;">→</span>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:2px;">الدرس السابق</div>
+            <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${prevEntry.lesson.title}</div>
+          </div>
+        </button>
+      ` : `<div style="flex:1;"></div>`}
+
+      <button onclick="showSubject('${subjectId}')" style="
+        padding:14px 16px;border-radius:14px;border:1px solid var(--border);
+        background:rgba(255,255,255,0.04);color:var(--text-muted);cursor:pointer;
+        font-family:var(--font);font-size:1.2rem;transition:all 0.2s;flex-shrink:0;
+      " title="قائمة الدروس"
+      onmouseenter="this.style.background='rgba(255,255,255,0.08)'" onmouseleave="this.style.background='rgba(255,255,255,0.04)'">☰</button>
+
+      ${nextEntry ? `
+        <button onclick="openLesson('${subjectId}','${nextEntry.lesson.id}')" style="
+          flex:1;display:flex;align-items:center;gap:10px;
+          padding:14px 18px;border-radius:14px;border:none;
+          background:linear-gradient(135deg,var(--primary),var(--secondary));
+          color:white;cursor:pointer;font-family:var(--font);font-size:0.9rem;
+          font-weight:700;transition:all 0.2s;text-align:left;
+          box-shadow:0 4px 15px rgba(108,99,255,0.3);
+        " onmouseenter="this.style.transform='translateY(-2px)'" onmouseleave="this.style.transform='translateY(0)'">
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:0.7rem;opacity:0.8;margin-bottom:2px;">الدرس التالي</div>
+            <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${nextEntry.lesson.title}</div>
+          </div>
+          <span style="font-size:1.3rem;">←</span>
+        </button>
+      ` : `
+        <button onclick="showSubject('${subjectId}')" style="
+          flex:1;display:flex;align-items:center;justify-content:center;gap:10px;
+          padding:14px 18px;border-radius:14px;border:none;
+          background:linear-gradient(135deg,#00BFA5,#00897B);
+          color:white;cursor:pointer;font-family:var(--font);font-size:0.95rem;
+          font-weight:700;transition:all 0.2s;
+          box-shadow:0 4px 15px rgba(0,191,165,0.3);
+        " onmouseenter="this.style.transform='translateY(-2px)'" onmouseleave="this.style.transform='translateY(0)'">
+          🎉 أنهيت جميع الدروس!
+        </button>
+      `}
+    </div>
   `;
-  
-  // Animate steps
+
+  // Scroll to top and animate
+  container.scrollIntoView({ behavior: 'smooth', block: 'start' });
   setTimeout(animateSteps, 300);
 }
 
@@ -4711,6 +4984,1047 @@ document.addEventListener('visibilitychange', () => {
 setInterval(() => {
   if (APP.student.email) saveCurrentStudent();
 }, 120000);
+
+
+
+// ══════════════════════════════════════════════════
+// 🧪 INTERACTIVE LAB — Python + Excel Environments
+// ══════════════════════════════════════════════════
+
+// ─── Lab Tab Switcher ───
+function switchLab(tab) {
+  document.getElementById('lab-python').style.display = tab === 'python' ? 'block' : 'none';
+  document.getElementById('lab-excel').style.display = tab === 'excel' ? 'block' : 'none';
+
+  const pyBtn = document.getElementById('lab-tab-python');
+  const xlBtn = document.getElementById('lab-tab-excel');
+
+  if (tab === 'python') {
+    pyBtn.style.borderColor = '#3776AB';
+    pyBtn.style.background = 'rgba(55,118,171,0.2)';
+    pyBtn.style.color = '#6ab0e8';
+    xlBtn.style.borderColor = 'rgba(255,255,255,0.15)';
+    xlBtn.style.background = 'rgba(255,255,255,0.05)';
+    xlBtn.style.color = 'var(--text-muted)';
+  } else {
+    xlBtn.style.borderColor = '#217346';
+    xlBtn.style.background = 'rgba(33,115,70,0.2)';
+    xlBtn.style.color = '#5cb888';
+    pyBtn.style.borderColor = 'rgba(255,255,255,0.15)';
+    pyBtn.style.background = 'rgba(255,255,255,0.05)';
+    pyBtn.style.color = 'var(--text-muted)';
+    if (!xlInitialized) initExcel();
+  }
+}
+
+// ══════════════════════════════════════════════════
+// 🐍 PYTHON ENVIRONMENT (Pyodide)
+// ══════════════════════════════════════════════════
+let pyodide = null;
+let pyReady = false;
+
+async function initPyodide() {
+  const dot = document.getElementById('py-status-dot');
+  const txt = document.getElementById('py-status-text');
+  if (!dot || !txt) return;
+
+  dot.style.background = '#FFD600';
+  txt.textContent = 'جاري تحميل محرك Python (Pyodide)...';
+
+  try {
+    pyodide = await loadPyodide({ indexURL: "https://cdn.jsdelivr.net/pyodide/v0.25.1/full/" });
+    await pyodide.loadPackage(['numpy', 'micropip']);
+    await pyodide.runPythonAsync(`
+import micropip
+await micropip.install('matplotlib')
+    `);
+    // Redirect stdout
+    pyodide.runPython(`
+import sys, io
+class OutputCapture:
+    def __init__(self): self.data = []
+    def write(self, s): self.data.append(s)
+    def flush(self): pass
+    def getvalue(self): return ''.join(self.data)
+_capture = OutputCapture()
+sys.stdout = _capture
+sys.stderr = _capture
+    `);
+    pyReady = true;
+    dot.style.background = '#28CA41';
+    txt.textContent = 'Python جاهز ✓';
+    setTimeout(() => { txt.textContent = 'Python جاهز ✓'; }, 2000);
+  } catch (e) {
+    dot.style.background = '#FF5252';
+    txt.textContent = 'تعذّر تحميل Pyodide — جاري استخدام المحاكي';
+    pyReady = false;
+  }
+}
+
+// Python templates
+const PY_TEMPLATES = {
+  hello: `# مرحباً بالعالم
+print("مرحباً يا عاطف! 👋")
+print("Python يعمل في المتصفح")
+x = 10
+y = 20
+print(f"مجموع {x} + {y} = {x+y}")`,
+
+  mean: `# حساب المتوسط الحسابي
+import statistics
+
+درجات = [85, 90, 78, 92, 88, 76, 95, 82]
+print("درجات الطلاب:", درجات)
+print(f"عدد الطلاب: {len(درجات)}")
+print(f"المجموع: {sum(درجات)}")
+print(f"المتوسط (Mean): {statistics.mean(درجات):.2f}")
+print(f"أعلى درجة: {max(درجات)}")
+print(f"أدنى درجة: {min(درجات)}")`,
+
+  median: `# الوسيط والمنوال
+import statistics
+
+بيانات = [7, 3, 7, 9, 7, 12, 5, 7, 3, 9]
+print("البيانات:", بيانات)
+print("مرتبة:", sorted(بيانات))
+print(f"الوسيط (Median): {statistics.median(بيانات)}")
+print(f"المنوال (Mode): {statistics.mode(بيانات)}")
+
+# تعدد المنوالات
+from collections import Counter
+counts = Counter(بيانات)
+print("تكرار كل قيمة:", dict(counts))`,
+
+  variance: `# التباين والانحراف المعياري
+import statistics
+
+درجات = [96, 92, 90, 88, 85, 82, 78, 74]
+print("درجات 8 طلاب:", درجات)
+mean = statistics.mean(درجات)
+print(f"المتوسط (x̄): {mean:.2f}")
+
+# حساب الانحرافات يدوياً
+انحرافات = [x - mean for x in درجات]
+مربعات = [d**2 for d in انحرافات]
+print(f"الانحرافات: {[round(d,1) for d in انحرافات]}")
+print(f"مربعات الانحرافات: {[round(m,1) for m in مربعات]}")
+
+تباين = statistics.variance(درجات)
+انحراف = statistics.stdev(درجات)
+print(f"التباين (S²): {تباين:.2f}")
+print(f"الانحراف المعياري (S): {انحراف:.2f}")
+print(f"المدى (Range): {max(درجات) - min(درجات)}")`,
+
+  zscore: `# القيمة المعيارية Z-Score
+import statistics
+
+درجات = [70, 75, 80, 85, 90, 95, 60, 88]
+mean = statistics.mean(درجات)
+std = statistics.stdev(درجات)
+print(f"المتوسط: {mean:.2f}")
+print(f"الانحراف المعياري: {std:.2f}")
+print()
+print("القيم المعيارية Z لكل طالب:")
+for i, d in enumerate(درجات):
+    z = (d - mean) / std
+    تفسير = ""
+    if abs(z) > 3: تفسير = "⚠️ شاذ بقوة"
+    elif abs(z) > 2: تفسير = "⚠️ متطرف"
+    elif z > 0: تفسير = "↑ فوق المتوسط"
+    else: تفسير = "↓ دون المتوسط"
+    print(f"  طالب {i+1}: درجة={d}, Z={z:.2f} {تفسير}")`,
+
+  scatter: `# مخطط التشتت
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+import numpy as np
+
+# بيانات: ساعات الدراسة والدرجات
+ساعات = [2, 4, 6, 8, 10, 3, 5, 7, 9, 1]
+درجات = [65, 75, 85, 90, 95, 70, 78, 88, 92, 60]
+
+plt.figure(figsize=(8, 5))
+plt.scatter(ساعات, درجات, color='#6C63FF', s=100, alpha=0.8, edgecolors='white')
+plt.xlabel('ساعات الدراسة', fontsize=12)
+plt.ylabel('الدرجة', fontsize=12)
+plt.title('العلاقة بين ساعات الدراسة والدرجات', fontsize=14)
+plt.grid(True, alpha=0.3)
+
+# خط الاتجاه
+z = np.polyfit(ساعات, درجات, 1)
+p = np.poly1d(z)
+x_line = np.linspace(min(ساعات), max(ساعات), 100)
+plt.plot(x_line, p(x_line), 'r--', alpha=0.8, label='خط الاتجاه')
+plt.legend()
+plt.tight_layout()
+plt.savefig('/tmp/chart.png', dpi=100, bbox_inches='tight')
+plt.close()
+print("تم رسم مخطط التشتت!")
+print(f"عدد النقاط: {len(ساعات)}")`,
+
+  histogram: `# المدرج التكراري
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+import numpy as np
+
+درجات = [55, 60, 62, 65, 68, 70, 72, 75, 75, 78,
+         80, 82, 85, 85, 88, 90, 90, 92, 95, 98]
+
+plt.figure(figsize=(8, 5))
+plt.hist(درجات, bins=6, color='#6C63FF', edgecolor='white', alpha=0.85)
+plt.xlabel('الدرجة', fontsize=12)
+plt.ylabel('عدد الطلاب', fontsize=12)
+plt.title('توزيع درجات الطلاب (Histogram)', fontsize=14)
+plt.grid(axis='y', alpha=0.3)
+plt.tight_layout()
+plt.savefig('/tmp/chart.png', dpi=100, bbox_inches='tight')
+plt.close()
+print(f"عدد الطلاب: {len(درجات)}")
+print(f"المتوسط: {sum(درجات)/len(درجات):.1f}")
+print(f"أعلى: {max(درجات)} | أدنى: {min(درجات)}")`,
+
+  correlation: `# معامل ارتباط بيرسون
+import statistics, math
+
+X = [2, 4, 6, 8, 10]  # ساعات الدراسة
+Y = [65, 75, 85, 90, 95]  # الدرجات
+
+x_mean = statistics.mean(X)
+y_mean = statistics.mean(Y)
+
+بسط = sum((xi - x_mean)*(yi - y_mean) for xi,yi in zip(X,Y))
+مقام_x = sum((xi - x_mean)**2 for xi in X)
+مقام_y = sum((yi - y_mean)**2 for yi in Y)
+
+r = بسط / math.sqrt(مقام_x * مقام_y)
+
+print("بيانات الدراسة:")
+print(f"  X (ساعات): {X}")
+print(f"  Y (درجات): {Y}")
+print(f"  x̄ = {x_mean:.1f}, ȳ = {y_mean:.1f}")
+print(f"\nمعامل ارتباط بيرسون r = {r:.4f}")
+if r > 0.8: print("✅ ارتباط إيجابي قوي جداً")
+elif r > 0.6: print("✅ ارتباط إيجابي قوي")
+elif r > 0.4: print("⚠️ ارتباط إيجابي متوسط")
+else: print("❌ ارتباط ضعيف")`,
+
+  regression: `# معادلة الانحدار الخطي Y = a + bX
+import statistics
+
+X = [2, 4, 6, 8, 10]
+Y = [65, 75, 85, 90, 95]
+
+x_mean = statistics.mean(X)
+y_mean = statistics.mean(Y)
+
+b = sum((xi - x_mean)*(yi - y_mean) for xi,yi in zip(X,Y)) / \
+    sum((xi - x_mean)**2 for xi in X)
+a = y_mean - b * x_mean
+
+print(f"المتوسطات: x̄={x_mean:.1f}, ȳ={y_mean:.1f}")
+print(f"الميل b = {b:.4f}")
+print(f"الثابت a = {a:.4f}")
+print(f"\n📐 معادلة الانحدار: Y = {a:.2f} + {b:.2f}X")
+
+print("\nالتنبؤات:")
+for h in [3, 5, 7, 11]:
+    y_pred = a + b * h
+    print(f"  {h} ساعات → درجة متوقعة = {y_pred:.1f}")`,
+
+  countif: `# محاكاة دوال Excel الشرطية
+# COUNTIF / SUMIF / AVERAGEIF
+
+بيانات = [
+  {"اسم": "أحمد",  "قسم": "حاسب",   "درجة": 85, "جنس": "ذكر"},
+  {"اسم": "سارة",  "قسم": "إحصاء",  "درجة": 92, "جنس": "أنثى"},
+  {"اسم": "محمد",  "قسم": "حاسب",   "درجة": 78, "جنس": "ذكر"},
+  {"اسم": "نورة",  "قسم": "حاسب",   "درجة": 95, "جنس": "أنثى"},
+  {"اسم": "خالد",  "قسم": "إحصاء",  "درجة": 70, "جنس": "ذكر"},
+  {"اسم": "لمى",   "قسم": "إحصاء",  "درجة": 88, "جنس": "أنثى"},
+]
+
+# COUNTIF: عدد طلاب الحاسب
+countif = sum(1 for r in بيانات if r["قسم"]=="حاسب")
+print(f"COUNTIF (قسم الحاسب): {countif}")
+
+# SUMIF: مجموع درجات الذكور
+sumif = sum(r["درجة"] for r in بيانات if r["جنس"]=="ذكر")
+print(f"SUMIF (مجموع درجات الذكور): {sumif}")
+
+# AVERAGEIF: متوسط درجات الإناث
+إناث = [r["درجة"] for r in بيانات if r["جنس"]=="أنثى"]
+avgif = sum(إناث)/len(إناث)
+print(f"AVERAGEIF (متوسط درجات الإناث): {avgif:.2f}")
+
+# COUNTIFS: ذكور درجتهم > 75
+countifs = sum(1 for r in بيانات if r["جنس"]=="ذكر" and r["درجة"]>75)
+print(f"COUNTIFS (ذكور درجتهم >75): {countifs}")`,
+};
+
+function loadPyTemplate() {
+  const sel = document.getElementById('py-template');
+  const val = sel.value;
+  if (!val) return;
+  document.getElementById('py-editor').value = PY_TEMPLATES[val] || '';
+  updateLineNums();
+  document.getElementById('py-output').innerHTML = '<span style="color:#555;">// اضغط ▶ تشغيل لتنفيذ الكود</span>';
+  document.getElementById('py-chart-area').style.display = 'none';
+  sel.value = '';
+}
+
+function updateLineNums() {
+  const ta = document.getElementById('py-editor');
+  const nums = document.getElementById('py-line-nums');
+  if (!ta || !nums) return;
+  const lines = ta.value.split('\n').length;
+  nums.innerHTML = Array.from({length: lines}, (_, i) => i+1).join('<br>');
+}
+
+function handleTabKey(e) {
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    const ta = e.target;
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    ta.value = ta.value.slice(0,start) + '    ' + ta.value.slice(end);
+    ta.selectionStart = ta.selectionEnd = start + 4;
+    updateLineNums();
+  }
+}
+
+function clearPyEditor() {
+  document.getElementById('py-editor').value = '';
+  document.getElementById('py-output').innerHTML = '<span style="color:#555;">// اضغط ▶ تشغيل لتنفيذ الكود</span>';
+  document.getElementById('py-chart-area').style.display = 'none';
+  updateLineNums();
+}
+function clearOutput() {
+  document.getElementById('py-output').innerHTML = '<span style="color:#555;">// تم المسح</span>';
+  document.getElementById('py-chart-area').style.display = 'none';
+}
+
+async function runPython() {
+  const code = document.getElementById('py-editor').value.trim();
+  if (!code) return;
+
+  const out = document.getElementById('py-output');
+  const btn = document.getElementById('run-btn');
+  btn.textContent = '⏳ جاري التنفيذ...';
+  btn.disabled = true;
+  out.innerHTML = '<span style="color:#FFD600;">⏳ جاري التنفيذ...</span>';
+
+  if (!pyReady || !pyodide) {
+    // Fallback: JS-based simple eval for basic print/math
+    btn.textContent = '▶ تشغيل';
+    btn.disabled = false;
+    out.innerHTML = runJsFallback(code);
+    return;
+  }
+
+  try {
+    // Reset capture
+    pyodide.runPython(`
+_capture.data = []
+import sys
+sys.stdout = _capture
+sys.stderr = _capture
+import os
+try: os.remove('/tmp/chart.png')
+except: pass
+    `);
+
+    await pyodide.runPythonAsync(code);
+
+    const output = pyodide.runPython(`_capture.getvalue()`);
+    out.innerHTML = output
+      ? colorizeOutput(output)
+      : '<span style="color:#28CA41;">✓ تم التنفيذ بنجاح (لا يوجد مخرجات)</span>';
+
+    // Check for chart
+    try {
+      const hasChart = pyodide.runPython(`import os; os.path.exists('/tmp/chart.png')`);
+      if (hasChart) {
+        const chartData = pyodide.runPython(`
+import base64
+with open('/tmp/chart.png','rb') as f:
+    data = base64.b64encode(f.read()).decode()
+data
+        `);
+        const area = document.getElementById('py-chart-area');
+        const canvas = document.getElementById('py-chart');
+        area.style.display = 'block';
+        const img = new Image();
+        img.onload = () => {
+          const ctx = canvas.getContext('2d');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          ctx.drawImage(img, 0, 0);
+        };
+        img.src = 'data:image/png;base64,' + chartData;
+      }
+    } catch(e) {}
+
+  } catch(e) {
+    out.innerHTML = `<span style="color:#FF5252;">❌ خطأ:\n${e.message}</span>`;
+  }
+
+  btn.textContent = '▶ تشغيل';
+  btn.disabled = false;
+}
+
+function colorizeOutput(text) {
+  return text
+    .replace(/✅/g, '<span style="color:#28CA41;">✅</span>')
+    .replace(/❌/g, '<span style="color:#FF5252;">❌</span>')
+    .replace(/⚠️/g, '<span style="color:#FFD600;">⚠️</span>')
+    .replace(/(\d+\.\d+)/g, '<span style="color:#79c0ff;">$1</span>')
+    .replace(/(r\s*=\s*[\d.\-]+)/g, '<span style="color:#FFD600;">$1</span>')
+    .replace(/\n/g, '\n');
+}
+
+// Fallback JS evaluator for when Pyodide fails to load
+function runJsFallback(code) {
+  const lines = code.split('\n');
+  const prints = [];
+  for (const line of lines) {
+    const m = line.match(/^print\(f?['"](.*?)['"]\)/);
+    if (m) prints.push(m[1]);
+    const m2 = line.match(/^print\((.+)\)/);
+    if (m2 && !m) {
+      try {
+        const val = Function(`"use strict"; return (${m2[1]})`)();
+        prints.push(String(val));
+      } catch(e) { prints.push(`[${m2[1]}]`); }
+    }
+  }
+  if (prints.length) return prints.join('\n') || '<span style="color:#28CA41;">✓ تم</span>';
+  return '<span style="color:#aaa;">⚠️ Pyodide لم يُحمَّل — الكود بحاجة لاتصال إنترنت لتحميل محرك Python</span>';
+}
+
+// ══════════════════════════════════════════════════
+// 📊 EXCEL-LIKE ENVIRONMENT
+// ══════════════════════════════════════════════════
+let xlCols = 8, xlRows = 12;
+let xlData = {};        // {r_c: value}
+let xlStyles = {};      // {r_c: {bold,color,align}}
+let xlSelected = {r:1, c:1};
+let xlInitialized = false;
+let xlChartInstance = null;
+
+const COL_LETTERS = 'ABCDEFGHIJKLMNOP'.split('');
+
+const XL_TEMPLATES = {
+  blank: { cols: 8, rows: 12, data: {}, label: 'جدول فارغ' },
+  grades: {
+    cols: 5, rows: 9,
+    label: 'درجات الطلاب',
+    data: {
+      '1_1':'الاسم','1_2':'المادة','1_3':'الدرجة','1_4':'الوسيط','1_5':'الحالة',
+      '2_1':'أحمد','2_2':'إحصاء','2_3':85,
+      '3_1':'سارة','3_2':'إحصاء','3_3':92,
+      '4_1':'محمد','4_2':'إحصاء','4_3':78,
+      '5_1':'نورة','5_2':'إحصاء','5_3':95,
+      '6_1':'خالد','6_2':'إحصاء','6_3':70,
+      '7_1':'لمى','7_2':'إحصاء','7_3':88,
+      '8_1':'المتوسط','8_3':'=AVERAGE(C2:C7)',
+      '9_1':'الأعلى','9_3':'=MAX(C2:C7)',
+    },
+    header_row: 1
+  },
+  sales: {
+    cols: 5, rows: 8,
+    label: 'بيانات المبيعات',
+    data: {
+      '1_1':'المنطقة','1_2':'المبيعات','1_3':'الهدف','1_4':'الفرق','1_5':'النسبة%',
+      '2_1':'الرياض','2_2':45000,'2_3':40000,
+      '3_1':'جدة','3_2':38000,'3_3':35000,
+      '4_1':'الدمام','4_2':29000,'4_3':30000,
+      '5_1':'مكة','5_2':22000,'5_3':25000,
+      '6_1':'المدينة','6_2':18000,'6_3':20000,
+      '7_1':'المجموع','7_2':'=SUM(B2:B6)','7_3':'=SUM(C2:C6)',
+      '8_1':'المتوسط','8_2':'=AVERAGE(B2:B6)',
+    },
+    header_row: 1
+  },
+  employees: {
+    cols: 5, rows: 9,
+    label: 'موظفون ورواتب',
+    data: {
+      '1_1':'الاسم','1_2':'القسم','1_3':'الراتب','1_4':'سنوات الخدمة','1_5':'تقييم',
+      '2_1':'سلمى','2_2':'IT','2_3':12000,'2_4':5,
+      '3_1':'فهد','3_2':'HR','3_3':9500,'3_4':3,
+      '4_1':'مريم','4_2':'IT','4_3':14000,'4_4':8,
+      '5_1':'عمر','5_2':'مالية','5_3':11000,'5_4':6,
+      '6_1':'دانة','6_2':'HR','6_3':8500,'6_4':2,
+      '7_1':'عدد','7_3':'=COUNT(C2:C6)',
+      '8_1':'متوسط الراتب','8_3':'=AVERAGE(C2:C6)',
+      '9_1':'أعلى راتب','9_3':'=MAX(C2:C6)',
+    },
+    header_row: 1
+  },
+  stats: {
+    cols: 4, rows: 11,
+    label: 'تحليل إحصائي',
+    data: {
+      '1_1':'القيمة','1_2':'الانحراف عن المتوسط','1_3':'مربع الانحراف','1_4':'Z-Score',
+      '2_1':80,'3_1':75,'4_1':90,'5_1':85,'6_1':70,'7_1':95,'8_1':78,'9_1':88,
+      '10_1':'المتوسط','10_2':'=AVERAGE(A2:A9)',
+      '11_1':'الانحراف','11_2':'=STDEV(A2:A9)',
+    },
+    header_row: 1
+  }
+};
+
+function initExcel() {
+  xlInitialized = true;
+  loadXlTemplate('grades');
+  buildXlFuncRef();
+}
+
+function loadXlTemplate(name) {
+  const sel = document.getElementById('xl-template');
+  if (!name) { name = sel ? sel.value : 'blank'; }
+  if (!name) name = 'blank';
+  const tmpl = XL_TEMPLATES[name] || XL_TEMPLATES.blank;
+
+  xlCols = tmpl.cols || 8;
+  xlRows = tmpl.rows || 12;
+  xlData = Object.assign({}, tmpl.data || {});
+  xlStyles = {};
+
+  // Style header row
+  if (tmpl.header_row) {
+    for (let c = 1; c <= xlCols; c++) {
+      xlStyles[`1_${c}`] = { bold: true, bg: '#2d2d4e', color: '#E8A020' };
+    }
+  }
+
+  if (sel) sel.value = '';
+  renderXl();
+  computeAll();
+}
+
+function renderXl() {
+  const wrap = document.getElementById('xl-grid-wrap');
+  if (!wrap) return;
+
+  let html = '<table style="border-collapse:collapse;min-width:100%;font-family:Fira Code,monospace;font-size:0.82rem;">';
+
+  // Header row (col letters)
+  html += '<thead><tr>';
+  html += '<th style="width:42px;background:#1a1a2a;border:1px solid #333;padding:6px;color:#555;position:sticky;top:0;left:0;z-index:3;"></th>';
+  for (let c = 1; c <= xlCols; c++) {
+    html += `<th style="background:#1a1a2a;border:1px solid #333;padding:6px 14px;color:#888;min-width:110px;position:sticky;top:0;z-index:2;font-weight:600;">${COL_LETTERS[c-1]}</th>`;
+  }
+  html += '</tr></thead><tbody>';
+
+  // Data rows
+  for (let r = 1; r <= xlRows; r++) {
+    html += `<tr>`;
+    html += `<td style="background:#1a1a2a;border:1px solid #333;padding:4px 8px;color:#555;text-align:center;position:sticky;left:0;z-index:1;font-weight:600;">${r}</td>`;
+    for (let c = 1; c <= xlCols; c++) {
+      const key = `${r}_${c}`;
+      const style = xlStyles[key] || {};
+      const rawVal = xlData[key];
+      const dispVal = xlDisplayVal(rawVal);
+      const isActive = (xlSelected.r === r && xlSelected.c === c);
+
+      let cellStyle = `border:1px solid #333;padding:0;min-width:110px;`;
+      if (style.bg) cellStyle += `background:${style.bg};`;
+      else if (isActive) cellStyle += `background:rgba(108,99,255,0.15);`;
+      else cellStyle += `background:#1e1e2e;`;
+      if (isActive) cellStyle += `outline:2px solid #6C63FF;outline-offset:-2px;`;
+
+      let inputStyle = `width:100%;background:transparent;border:none;outline:none;padding:6px 10px;color:`;
+      if (style.color) inputStyle += style.color;
+      else inputStyle += '#e0e0e0';
+      inputStyle += `;font-weight:${style.bold ? '700' : '400'};font-family:inherit;font-size:inherit;`;
+      inputStyle += `text-align:${style.align || 'left'};direction:auto;`;
+
+      html += `<td style="${cellStyle}" onclick="xlSelectCell(${r},${c})">
+        <input data-key="${key}" value="${escHtml(String(dispVal ?? ''))}" 
+          style="${inputStyle}"
+          onchange="xlCellChange(event,'${key}')"
+          onfocus="xlFocus(${r},${c})"
+          onkeydown="xlKeyNav(event,${r},${c})"
+        />
+      </td>`;
+    }
+    html += '</tr>';
+  }
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+  updateXlResults();
+}
+
+function escHtml(s) { return s.replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function xlDisplayVal(val) {
+  if (val === undefined || val === null || val === '') return '';
+  if (typeof val === 'number') return val;
+  if (typeof val === 'string' && val.startsWith('=')) {
+    const computed = xlCompute(val);
+    return computed;
+  }
+  return val;
+}
+
+function xlCellChange(e, key) {
+  const val = e.target.value;
+  xlData[key] = isNaN(val) || val === '' ? val : Number(val);
+  computeAll();
+  updateXlResults();
+}
+
+function xlFocus(r, c) {
+  xlSelected = {r, c};
+  const key = `${r}_${c}`;
+  const val = xlData[key];
+  const ref = document.getElementById('xl-cell-ref');
+  const bar = document.getElementById('xl-formula-bar');
+  if (ref) ref.textContent = `${COL_LETTERS[c-1]}${r}`;
+  if (bar) bar.value = (val !== undefined && val !== null) ? String(val) : '';
+  // Update selection styling without full re-render
+  document.querySelectorAll('#xl-grid-wrap td').forEach(td => {
+    td.style.outline = '';
+    td.style.outlineOffset = '';
+    td.style.background = td.style.background.replace('rgba(108,99,255,0.15)', '');
+  });
+}
+
+function xlSelectCell(r, c) {
+  xlSelected = {r, c};
+}
+
+function xlKeyNav(e, r, c) {
+  const moves = {ArrowRight:[0,1],ArrowLeft:[0,-1],ArrowDown:[1,0],ArrowUp:[-1,0],Enter:[1,0],Tab:[0,1]};
+  if (moves[e.key]) {
+    e.preventDefault();
+    const [dr, dc] = moves[e.key];
+    const nr = Math.max(1, Math.min(xlRows, r+dr));
+    const nc = Math.max(1, Math.min(xlCols, c+dc));
+    const input = document.querySelector(`input[data-key="${nr}_${nc}"]`);
+    if (input) input.focus();
+  }
+}
+
+function xlFormulaBarInput() {
+  const bar = document.getElementById('xl-formula-bar');
+  if (!bar) return;
+  const key = `${xlSelected.r}_${xlSelected.c}`;
+  const val = bar.value;
+  xlData[key] = isNaN(val) || val === '' || val.startsWith('=') ? val : Number(val);
+  const input = document.querySelector(`input[data-key="${key}"]`);
+  if (input) {
+    if (val.startsWith('=')) {
+      input.value = String(xlDisplayVal(val) ?? '');
+    } else {
+      input.value = val;
+    }
+  }
+}
+
+function xlFormulaBarCommit() {
+  computeAll();
+  updateXlResults();
+}
+
+// Parse cell ref like "B3" → {r:3,c:2}
+function parseCellRef(ref) {
+  const m = ref.trim().match(/^([A-Z]+)(\d+)$/i);
+  if (!m) return null;
+  const c = COL_LETTERS.indexOf(m[1].toUpperCase()) + 1;
+  const r = parseInt(m[2]);
+  return { r, c };
+}
+
+// Parse range "B2:B6" → array of values
+function parseRange(range) {
+  const m = range.trim().match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/i);
+  if (!m) return [];
+  const c1 = COL_LETTERS.indexOf(m[1].toUpperCase()) + 1;
+  const r1 = parseInt(m[2]);
+  const c2 = COL_LETTERS.indexOf(m[3].toUpperCase()) + 1;
+  const r2 = parseInt(m[4]);
+  const vals = [];
+  for (let r = r1; r <= r2; r++) {
+    for (let c = c1; c <= c2; c++) {
+      const v = xlGetNum(`${r}_${c}`);
+      if (v !== null) vals.push(v);
+    }
+  }
+  return vals;
+}
+
+function xlGetNum(key) {
+  const v = xlData[key];
+  if (v === undefined || v === null || v === '') return null;
+  if (typeof v === 'number') return v;
+  if (typeof v === 'string' && v.startsWith('=')) {
+    const c = xlCompute(v);
+    return typeof c === 'number' ? c : null;
+  }
+  const n = parseFloat(v);
+  return isNaN(n) ? null : n;
+}
+
+function xlCompute(formula) {
+  if (!formula || !formula.startsWith('=')) return formula;
+  let expr = formula.slice(1).trim().toUpperCase();
+
+  try {
+    // Replace cell refs (e.g. C3) with values
+    expr = expr.replace(/([A-Z]+)(\d+):([A-Z]+)(\d+)/g, (_, c1,r1,c2,r2) => {
+      // Handle ranges inside functions — do not replace here, handled per function
+      return `${c1}${r1}:${c2}${r2}`;
+    });
+
+    // Functions
+    const FNS = {
+      'SUM': (r) => r.reduce((a,b)=>a+b,0),
+      'AVERAGE': (r) => r.reduce((a,b)=>a+b,0)/r.length,
+      'MAX': (r) => Math.max(...r),
+      'MIN': (r) => Math.min(...r),
+      'COUNT': (r) => r.length,
+      'STDEV': (r) => {
+        const m = r.reduce((a,b)=>a+b,0)/r.length;
+        return Math.sqrt(r.reduce((s,x)=>s+(x-m)**2,0)/(r.length-1));
+      },
+      'VAR': (r) => {
+        const m = r.reduce((a,b)=>a+b,0)/r.length;
+        return r.reduce((s,x)=>s+(x-m)**2,0)/(r.length-1);
+      },
+      'MEDIAN': (r) => {
+        const s = [...r].sort((a,b)=>a-b);
+        const mid = Math.floor(s.length/2);
+        return s.length%2 ? s[mid] : (s[mid-1]+s[mid])/2;
+      },
+      'COUNTA': (r) => r.length,
+      'ROUND': (r) => Math.round(r[0] * 10**r[1]) / 10**r[1],
+    };
+
+    // Match function calls
+    const fnMatch = expr.match(/^(\w+)\((.+)\)$/);
+    if (fnMatch) {
+      const fn = fnMatch[1];
+      const args = fnMatch[2];
+
+      if (FNS[fn]) {
+        // Parse range arg
+        const rangeMatch = args.match(/([A-Z]+\d+:[A-Z]+\d+)/i);
+        if (rangeMatch) {
+          const vals = parseRange(rangeMatch[1]);
+          if (vals.length === 0) return 0;
+          const result = FNS[fn](vals);
+          return typeof result === 'number' ? Math.round(result * 100) / 100 : result;
+        }
+        // Comma-separated args
+        const parts = args.split(',').map(a => {
+          const cellRef = parseCellRef(a.trim());
+          if (cellRef) return xlGetNum(`${cellRef.r}_${cellRef.c}`) || 0;
+          return parseFloat(a.trim()) || 0;
+        });
+        const result = FNS[fn](parts);
+        return typeof result === 'number' ? Math.round(result * 100) / 100 : result;
+      }
+    }
+
+    // IF function
+    if (expr.startsWith('IF(')) {
+      return computeIF(expr);
+    }
+
+    // COUNTIF / SUMIF / AVERAGEIF
+    if (expr.startsWith('COUNTIF(') || expr.startsWith('SUMIF(') || expr.startsWith('AVERAGEIF(')) {
+      return computeCondFunc(expr);
+    }
+
+    // Simple cell ref
+    const cellRef = parseCellRef(expr);
+    if (cellRef) {
+      return xlGetNum(`${cellRef.r}_${cellRef.c}`) || 0;
+    }
+
+    // Arithmetic — replace cell refs first
+    const withVals = expr.replace(/([A-Z]+)(\d+)/gi, (_, col, row) => {
+      const c = COL_LETTERS.indexOf(col.toUpperCase()) + 1;
+      const v = xlGetNum(`${row}_${c}`);
+      return v !== null ? v : 0;
+    });
+    const result = Function(`"use strict"; return (${withVals})`)();
+    return typeof result === 'number' ? Math.round(result * 100) / 100 : result;
+
+  } catch(e) {
+    return '#خطأ!';
+  }
+}
+
+function computeIF(expr) {
+  // IF(condition, true_val, false_val)
+  const inner = expr.slice(3, -1);
+  // Simple: IF(A1>60,"ناجح","راسب")
+  const m = inner.match(/^([A-Z]+\d+)\s*([><=!]+)\s*([^,]+),(.+),(.+)$/i);
+  if (!m) return '#IF!';
+  const cellRef = parseCellRef(m[1]);
+  const cellVal = cellRef ? (xlGetNum(`${cellRef.r}_${cellRef.c}`) || 0) : 0;
+  const op = m[2], cmp = parseFloat(m[3]);
+  const ops = {'>':a=>a>cmp,'<':a=>a<cmp,'>=':a=>a>=cmp,'<=':a=>a<=cmp,'=':a=>a===cmp,'<>':a=>a!==cmp};
+  const cond = ops[op] ? ops[op](cellVal) : false;
+  const trueVal = m[4].trim().replace(/['"]/g,'');
+  const falseVal = m[5].trim().replace(/['"]/g,'');
+  return cond ? trueVal : falseVal;
+}
+
+function computeCondFunc(expr) {
+  if (expr.startsWith('COUNTIF(')) {
+    const inner = expr.slice(8, -1);
+    const [rangeStr, criteriaStr] = inner.split(',');
+    const vals = parseRange(rangeStr.trim());
+    const crit = parseFloat(criteriaStr);
+    if (isNaN(crit)) return vals.length;
+    // Simple: count > crit
+    const m = criteriaStr.trim().match(/^"?([><=!]+)(\d+)"?$/);
+    if (m) {
+      const op=m[1], v=parseFloat(m[2]);
+      const fns={'>':x=>x>v,'<':x=>x<v,'>=':x=>x>=v,'<=':x=>x<=v};
+      return vals.filter(fns[op]||(() => false)).length;
+    }
+    return vals.filter(x=>x===crit).length;
+  }
+  if (expr.startsWith('SUMIF(')) {
+    const inner = expr.slice(6, -1);
+    const parts = inner.split(',');
+    const vals = parseRange(parts[0].trim());
+    return vals.reduce((a,b)=>a+b,0);
+  }
+  if (expr.startsWith('AVERAGEIF(')) {
+    const inner = expr.slice(10, -1);
+    const parts = inner.split(',');
+    const vals = parseRange(parts[0].trim());
+    return vals.length ? Math.round(vals.reduce((a,b)=>a+b,0)/vals.length*100)/100 : 0;
+  }
+  return '#N/A';
+}
+
+function computeAll() {
+  // Re-render formula cells
+  Object.keys(xlData).forEach(key => {
+    const v = xlData[key];
+    if (typeof v === 'string' && v.startsWith('=')) {
+      const input = document.querySelector(`input[data-key="${key}"]`);
+      if (input) {
+        const computed = xlCompute(v);
+        input.value = computed !== undefined ? String(computed) : '';
+      }
+    }
+  });
+  updateXlResults();
+}
+
+function updateXlResults() {
+  const panel = document.getElementById('xl-results');
+  if (!panel) return;
+
+  // Collect all numeric values
+  const nums = [];
+  for (let r = 2; r <= xlRows; r++) {
+    for (let c = 1; c <= xlCols; c++) {
+      const v = xlGetNum(`${r}_${c}`);
+      if (v !== null && v > 0) nums.push(v);
+    }
+  }
+  if (nums.length < 2) { panel.innerHTML = ''; return; }
+
+  const mean = nums.reduce((a,b)=>a+b,0)/nums.length;
+  const sorted = [...nums].sort((a,b)=>a-b);
+  const mid = Math.floor(sorted.length/2);
+  const median = sorted.length%2 ? sorted[mid] : (sorted[mid-1]+sorted[mid])/2;
+  const variance = nums.reduce((s,x)=>s+(x-mean)**2,0)/(nums.length-1);
+  const stdev = Math.sqrt(variance);
+  const sum = nums.reduce((a,b)=>a+b,0);
+
+  const stats = [
+    { label: '∑ المجموع', val: Math.round(sum), icon: '➕', color: '#6C63FF' },
+    { label: 'x̄ المتوسط', val: mean.toFixed(2), icon: '📊', color: '#00BFA5' },
+    { label: '↕ الوسيط', val: median.toFixed(2), icon: '↕️', color: '#FFD600' },
+    { label: 'σ الانحراف', val: stdev.toFixed(2), icon: '📐', color: '#FF7043' },
+    { label: '⬆ الأعلى', val: Math.max(...nums), icon: '🔺', color: '#28CA41' },
+    { label: '⬇ الأدنى', val: Math.min(...nums), icon: '🔻', color: '#FF5252' },
+  ];
+
+  panel.innerHTML = stats.map(s => `
+    <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);
+      border-radius:12px;padding:12px;text-align:center;transition:all 0.2s;"
+      onmouseenter="this.style.background='rgba(255,255,255,0.08)'"
+      onmouseleave="this.style.background='rgba(255,255,255,0.04)'">
+      <div style="font-size:1.2rem;margin-bottom:4px;">${s.icon}</div>
+      <div style="font-size:1.1rem;font-weight:700;color:${s.color};">${s.val}</div>
+      <div style="font-size:0.72rem;color:var(--text-muted);margin-top:2px;">${s.label}</div>
+    </div>
+  `).join('');
+}
+
+function xlFormat(prop, val) {
+  const key = `${xlSelected.r}_${xlSelected.c}`;
+  if (!xlStyles[key]) xlStyles[key] = {};
+  if (prop === 'bold') xlStyles[key].bold = !xlStyles[key].bold;
+  else if (prop === 'color') xlStyles[key].color = val;
+  else if (prop === 'align') xlStyles[key].align = val;
+  renderXl();
+  computeAll();
+}
+
+function addXlRow() {
+  xlRows++;
+  renderXl();
+  computeAll();
+}
+
+function addXlCol() {
+  if (xlCols < COL_LETTERS.length) { xlCols++; renderXl(); computeAll(); }
+}
+
+function clearXl() {
+  xlData = {};
+  xlStyles = {};
+  renderXl();
+  document.getElementById('xl-results').innerHTML = '';
+  document.getElementById('xl-chart-area').style.display = 'none';
+}
+
+function xlChart() {
+  // Collect column data
+  const headers = [];
+  const values = [];
+  for (let c = 1; c <= xlCols; c++) {
+    const h = xlData[`1_${c}`];
+    if (h && typeof h === 'string' && !h.startsWith('=')) headers.push(h);
+  }
+  // Find first numeric column
+  let numCol = -1;
+  for (let c = 1; c <= xlCols; c++) {
+    if (xlGetNum(`2_${c}`) !== null) { numCol = c; break; }
+  }
+  // Label column (first text column)
+  let lblCol = -1;
+  for (let c = 1; c <= xlCols; c++) {
+    const v = xlData[`2_${c}`];
+    if (v && typeof v === 'string' && !v.startsWith('=') && isNaN(v)) { lblCol = c; break; }
+  }
+  const labels = [];
+  const data = [];
+  for (let r = 2; r <= xlRows; r++) {
+    const lbl = lblCol >= 1 ? (xlData[`${r}_${lblCol}`] || `صف ${r}`) : `صف ${r}`;
+    const val = numCol >= 1 ? xlGetNum(`${r}_${numCol}`) : null;
+    if (val !== null && lbl) { labels.push(String(lbl)); data.push(val); }
+  }
+  if (data.length === 0) return;
+
+  const area = document.getElementById('xl-chart-area');
+  const canvas = document.getElementById('xl-chart');
+  area.style.display = 'block';
+
+  if (xlChartInstance) { xlChartInstance.destroy(); xlChartInstance = null; }
+
+  const ctx = canvas.getContext('2d');
+  xlChartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: headers[numCol-1] || 'القيم',
+        data,
+        backgroundColor: ['#6C63FF','#00BFA5','#FF7043','#FFD600','#FF5252','#28CA41','#3776AB'].slice(0, data.length),
+        borderRadius: 8,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        title: { display: true, text: 'الرسم البياني', font: { size: 16 } }
+      },
+      scales: { y: { beginAtZero: true } }
+    }
+  });
+}
+
+function buildXlFuncRef() {
+  const span = document.getElementById('xlref');
+  if (!span) return;
+  const fns = [
+    ['=SUM(A1:A5)', 'الجمع'],
+    ['=AVERAGE(A1:A5)', 'المتوسط'],
+    ['=MAX(A1:A5)', 'الأعلى'],
+    ['=MIN(A1:A5)', 'الأدنى'],
+    ['=COUNT(A1:A5)', 'العد'],
+    ['=MEDIAN(A1:A5)', 'الوسيط'],
+    ['=STDEV(A1:A5)', 'الانحراف المعياري'],
+    ['=VAR(A1:A5)', 'التباين'],
+    ['=IF(A1>60,"ناجح","راسب")', 'IF شرطية'],
+    ['=COUNTIF(A1:A5,">70")', 'COUNTIF'],
+    ['=SUMIF(A1:A5,">0",B1:B5)', 'SUMIF'],
+    ['=ROUND(A1,2)', 'تقريب'],
+  ];
+  span.innerHTML = fns.map(([f,l]) =>
+    `<span onclick="pasteXlFn('${f.replace(/'/g,"\\'")}')" style="
+      background:rgba(232,160,32,0.1);border:1px solid rgba(232,160,32,0.25);
+      border-radius:6px;padding:3px 8px;font-size:0.75rem;color:#E8A020;
+      cursor:pointer;font-family:Fira Code,monospace;white-space:nowrap;
+    " title="${l}" onmouseenter="this.style.background='rgba(232,160,32,0.2)'" 
+    onmouseleave="this.style.background='rgba(232,160,32,0.1)'">${f}</span>`
+  ).join('');
+}
+
+function pasteXlFn(fn) {
+  const key = `${xlSelected.r}_${xlSelected.c}`;
+  const input = document.querySelector(`input[data-key="${key}"]`);
+  if (input) {
+    input.value = fn;
+    input.focus();
+    xlData[key] = fn;
+    const bar = document.getElementById('xl-formula-bar');
+    if (bar) bar.value = fn;
+    computeAll();
+  }
+}
+
+// Initialize when lab section is shown
+const _origShowSection = window.showSection;
+window.showSection = function(name) {
+  if (typeof _origShowSection === 'function') _origShowSection(name);
+  if (name === 'lab') {
+    updateLineNums();
+    // Load Pyodide
+    if (!pyReady && !pyodide) {
+      if (typeof loadPyodide !== 'undefined') {
+        initPyodide();
+      } else {
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/pyodide/v0.25.1/full/pyodide.js';
+        s.onload = () => initPyodide();
+        s.onerror = () => {
+          const dot = document.getElementById('py-status-dot');
+          const txt = document.getElementById('py-status-text');
+          if (dot) dot.style.background = '#FF5252';
+          if (txt) txt.textContent = 'استخدام المحاكي (بدون إنترنت)';
+        };
+        document.head.appendChild(s);
+      }
+    }
+  }
+};
+
+// Load Chart.js if not present
+if (typeof Chart === 'undefined') {
+  const s = document.createElement('script');
+  s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
+  document.head.appendChild(s);
+}
+
+
 </script>
 </body>
 </html>

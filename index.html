@@ -1217,6 +1217,7 @@ async function elabRunPy() {
   if (inputPrompts.length > 0) {
     out.innerHTML = '<span style="color:#FFD600">⌨️ انتظار مدخلات المستخدم...</span>';
     const values = await collectInputs(inputPrompts);
+    const inputValues = values || [];
     if (values === null) {
       out.innerHTML = '<span style="color:#888">⚠️ تم إلغاء الإدخال</span>';
       return;
@@ -1228,6 +1229,16 @@ async function elabRunPy() {
   out.innerHTML = '<span style="color:#FFD600">⏳ جاري التنفيذ...</span>';
 
   try {
+    // Try instant engine first
+    const inputValues = [];
+    const instantRes = runJsFallback(code, _iv);
+    if (instantRes !== null) {
+      out.innerHTML = instantRes || '<span style="color:#28CA41">✓ تم بنجاح</span>';
+      if (btn) { btn.textContent = '▶ تشغيل'; btn.disabled = false; }
+      return;
+    }
+
+    // Needs Pyodide (numpy/matplotlib)
     _elabPyodide.runPython(`_cap.d=[]\nimport sys\nsys.stdout=_cap\nsys.stderr=_cap\nimport os\ntry: os.remove('/tmp/elab_chart.png')\nexcept: pass`);
     const patched = code.replace(/plt\.savefig\(['"][^'"]*['"]/g, "plt.savefig('/tmp/elab_chart.png'");
     await _elabPyodide.runPythonAsync(patched);
@@ -6024,6 +6035,7 @@ async function runPython() {
   if (inputPrompts.length > 0) {
     out.innerHTML = '<span style="color:#FFD600;">⌨️ انتظار مدخلات المستخدم...</span>';
     const values = await collectInputs(inputPrompts);
+    const inputValues = values || [];
     if (values === null) {
       out.innerHTML = '<span style="color:#888;">⚠️ تم إلغاء الإدخال</span>';
       return;
@@ -6046,8 +6058,17 @@ try: os.remove('/tmp/chart.png')
 except: pass
     `);
 
-    await pyodide.runPythonAsync(code);
+    // Try instant engine first (no Pyodide needed for simple code)
+    const _iv = (typeof values !== 'undefined' && values) ? values : [];
+    const instantResult = runJsFallback(code, _iv);
+    if (instantResult !== null) {
+      out.innerHTML = instantResult || '<span style="color:#28CA41;">✓ تم التنفيذ بنجاح</span>';
+      btn.textContent = '▶ تشغيل'; btn.disabled = false;
+      return;
+    }
 
+    // Needs Pyodide (numpy/matplotlib etc.)
+    await pyodide.runPythonAsync(code);
     const output = pyodide.runPython(`_capture.getvalue()`);
     out.innerHTML = output
       ? colorizeOutput(output)
@@ -6094,23 +6115,468 @@ function colorizeOutput(text) {
 }
 
 // Fallback JS evaluator for when Pyodide fails to load
-function runJsFallback(code) {
-  const lines = code.split('\n');
-  const prints = [];
-  for (const line of lines) {
-    const m = line.match(/^print\(f?['"](.*?)['"]\)/);
-    if (m) prints.push(m[1]);
-    const m2 = line.match(/^print\((.+)\)/);
-    if (m2 && !m) {
-      try {
-        const val = Function(`"use strict"; return (${m2[1]})`)();
-        prints.push(String(val));
-      } catch(e) { prints.push(`[${m2[1]}]`); }
+// ══════════════════════════════════════════════════════════════════════════════
+// ⚡ INSTANT PYTHON ENGINE — full JS interpreter, zero loading time
+// Handles: variables, print, input, if/elif/else, for/while, 
+//          functions, lists, dicts, f-strings, math, type casting,
+//          list comprehensions, range(), len(), and more
+// Falls back to Pyodide only for: import numpy, matplotlib, etc.
+// ══════════════════════════════════════════════════════════════════════════════
+
+function runJsFallback(code, inputValues) {
+  inputValues = inputValues || [];
+  const out = [];
+  let inputIdx = 0;
+
+  // ── Built-in functions ────────────────────────────────────────────────────
+  const BUILTINS = {
+    print: (...args) => {
+      const line = args.map(a => pyRepr(a, false)).join(' ');
+      out.push(line);
+      return null;
+    },
+    input: (prompt) => {
+      if (prompt !== undefined) out.push(String(prompt));
+      const val = inputValues[inputIdx] !== undefined ? String(inputValues[inputIdx++]) : '';
+      return val;
+    },
+    int: (v) => {
+      const n = parseInt(v);
+      if (isNaN(n)) throw new Error(`invalid literal for int(): '${v}'`);
+      return n;
+    },
+    float: (v) => {
+      const n = parseFloat(v);
+      if (isNaN(n)) throw new Error(`could not convert to float: '${v}'`);
+      return n;
+    },
+    str:    (v) => v === null ? 'None' : v === true ? 'True' : v === false ? 'False' : String(v),
+    bool:   (v) => v !== 0 && v !== '' && v !== null && v !== false && v !== undefined,
+    len:    (v) => Array.isArray(v) ? v.length : (typeof v === 'string' ? v.length : (v && v.__len__ ? v.__len__() : 0)),
+    range: (a, b, c) => {
+      const start = b === undefined ? 0 : a;
+      const stop  = b === undefined ? a : b;
+      const step  = c === undefined ? 1 : c;
+      const arr = [];
+      if (step > 0) for (let i = start; i < stop; i += step) arr.push(i);
+      else          for (let i = start; i > stop; i += step) arr.push(i);
+      return arr;
+    },
+    list:   (v) => Array.isArray(v) ? [...v] : (typeof v === 'string' ? v.split('') : []),
+    tuple:  (v) => Array.isArray(v) ? [...v] : (typeof v === 'string' ? v.split('') : []),
+    dict:   ()  => ({}),
+    set:    (v) => Array.isArray(v) ? [...new Set(v)] : [],
+    abs:    (v) => Math.abs(v),
+    round:  (v, d) => d ? Math.round(v * 10**d) / 10**d : Math.round(v),
+    max:    (...args) => {
+      const arr = args.length === 1 && Array.isArray(args[0]) ? args[0] : args;
+      return Math.max(...arr);
+    },
+    min:    (...args) => {
+      const arr = args.length === 1 && Array.isArray(args[0]) ? args[0] : args;
+      return Math.min(...arr);
+    },
+    sum:    (v) => (v || []).reduce((a, b) => a + b, 0),
+    sorted: (v, key, reverse) => {
+      const arr = [...(v || [])];
+      arr.sort((a, b) => key ? 0 : (typeof a === 'number' ? a - b : String(a).localeCompare(String(b))));
+      if (reverse) arr.reverse();
+      return arr;
+    },
+    reversed:(v) => [...(v||[])].reverse(),
+    enumerate:(v, start) => (v||[]).map((x, i) => [i + (start||0), x]),
+    zip:    (...arrs) => {
+      const len = Math.min(...arrs.map(a => a.length));
+      return Array.from({length:len}, (_, i) => arrs.map(a => a[i]));
+    },
+    map:    (fn, v) => (v||[]).map(fn),
+    filter: (fn, v) => (v||[]).filter(fn),
+    any:    (v) => (v||[]).some(Boolean),
+    all:    (v) => (v||[]).every(Boolean),
+    type:   (v) => {
+      if (v === null) return "<class 'NoneType'>";
+      if (typeof v === 'boolean') return "<class 'bool'>";
+      if (typeof v === 'number') return Number.isInteger(v) ? "<class 'int'>" : "<class 'float'>";
+      if (typeof v === 'string') return "<class 'str'>";
+      if (Array.isArray(v)) return "<class 'list'>";
+      return "<class 'dict'>";
+    },
+    isinstance:(v, t) => {
+      if (t === 'int' || t === 0) return typeof v === 'number' && Number.isInteger(v);
+      if (t === 'float') return typeof v === 'number';
+      if (t === 'str') return typeof v === 'string';
+      if (t === 'list') return Array.isArray(v);
+      return false;
+    },
+    chr: (n) => String.fromCharCode(n),
+    ord: (s) => s.charCodeAt(0),
+    hex: (n) => '0x' + n.toString(16),
+    bin: (n) => '0b' + n.toString(2),
+    pow: (base, exp) => Math.pow(base, exp),
+    divmod: (a, b) => [Math.floor(a/b), a % b],
+    // Math module
+    sqrt:   (v) => Math.sqrt(v),
+    ceil:   (v) => Math.ceil(v),
+    floor:  (v) => Math.floor(v),
+    pi:     Math.PI,
+    e:      Math.E,
+    log:    (v, base) => base ? Math.log(v)/Math.log(base) : Math.log(v),
+    sin:    Math.sin,
+    cos:    Math.cos,
+    tan:    Math.tan,
+    // Statistics
+    statistics_mean:   (v) => v.reduce((a,b)=>a+b,0)/v.length,
+    statistics_median: (v) => { const s=[...v].sort((a,b)=>a-b), m=Math.floor(s.length/2); return s.length%2?s[m]:(s[m-1]+s[m])/2; },
+    statistics_stdev:  (v) => { const m=v.reduce((a,b)=>a+b,0)/v.length; return Math.sqrt(v.reduce((s,x)=>s+(x-m)**2,0)/(v.length-1)); },
+    statistics_variance:(v) => { const m=v.reduce((a,b)=>a+b,0)/v.length; return v.reduce((s,x)=>s+(x-m)**2,0)/(v.length-1); },
+  };
+
+  function pyRepr(v, repr) {
+    if (v === null || v === undefined) return 'None';
+    if (v === true) return 'True';
+    if (v === false) return 'False';
+    if (Array.isArray(v)) return '[' + v.map(x => pyRepr(x, true)).join(', ') + ']';
+    if (typeof v === 'object') {
+      const pairs = Object.entries(v).map(([k,val]) => `'${k}': ${pyRepr(val, true)}`);
+      return '{' + pairs.join(', ') + '}';
     }
+    if (typeof v === 'string' && repr) return "'" + v.replace(/\\/g,'\\\\').replace(/'/g,"\\'") + "'";
+    return String(v);
   }
-  if (prints.length) return prints.join('\n') || '<span style="color:#28CA41;">✓ تم</span>';
-  return '<span style="color:#aaa;">⚠️ Pyodide لم يُحمَّل — الكود بحاجة لاتصال إنترنت لتحميل محرك Python</span>';
+
+  // ── Preprocess Python → JS-runnable form ─────────────────────────────────
+  function pyToJs(src) {
+    // Check for numpy/matplotlib imports → need real Pyodide
+    if (/^\s*(import\s+(numpy|matplotlib|pandas|scipy)|from\s+(numpy|matplotlib|pandas|scipy))/m.test(src)) {
+      return null; // Signal: need Pyodide
+    }
+
+    const lines = src.split('\n');
+    const jsLines = [];
+    let i = 0;
+
+    function processBlock(lines, indent) {
+      const block = [];
+      while (i < lines.length) {
+        const line = lines[i];
+        const stripped = line.trimStart();
+        const lineIndent = line.length - stripped.length;
+
+        if (lineIndent < indent && stripped !== '') break;
+        if (stripped === '' || stripped.startsWith('#')) { i++; block.push(''); continue; }
+
+        // for loop
+        if (stripped.startsWith('for ')) {
+          const m = stripped.match(/^for\s+(.+?)\s+in\s+(.+?):\s*$/);
+          if (m) {
+            const vars = m[1].trim();
+            const iter = convertExpr(m[2].trim());
+            i++;
+            const body = processBlock(lines, lineIndent + 1);
+            if (vars.includes(',')) {
+              const vs = vars.split(',').map(v => v.trim());
+              block.push(`for (const [${vs.join(',')}] of (${iter} || [])) {`);
+            } else {
+              block.push(`for (const ${sanitizeVar(vars)} of (${iter} || [])) {`);
+            }
+            block.push(...body, '}');
+            continue;
+          }
+        }
+
+        // while loop
+        if (stripped.startsWith('while ')) {
+          const m = stripped.match(/^while\s+(.+?):\s*$/);
+          if (m) {
+            i++;
+            const body = processBlock(lines, lineIndent + 1);
+            block.push(`let _wc=0; while ((${convertExpr(m[1])}) && _wc++<10000) {`);
+            block.push(...body, '}');
+            continue;
+          }
+        }
+
+        // if/elif/else
+        if (stripped.startsWith('if ')) {
+          const m = stripped.match(/^if\s+(.+?):\s*$/);
+          if (m) {
+            i++;
+            const body = processBlock(lines, lineIndent + 1);
+            block.push(`if (${convertCond(m[1])}) {`);
+            block.push(...body, '}');
+            // Check for elif/else
+            while (i < lines.length) {
+              const nxt = lines[i].trimStart();
+              const nxtInd = lines[i].length - nxt.length;
+              if (nxtInd !== lineIndent) break;
+              if (nxt.startsWith('elif ')) {
+                const em = nxt.match(/^elif\s+(.+?):\s*$/);
+                i++;
+                const ebody = processBlock(lines, lineIndent + 1);
+                block.push(`else if (${convertCond(em[1])}) {`);
+                block.push(...ebody, '}');
+              } else if (nxt.startsWith('else:') || nxt === 'else:') {
+                i++;
+                const ebody = processBlock(lines, lineIndent + 1);
+                block.push('else {');
+                block.push(...ebody, '}');
+              } else break;
+            }
+            continue;
+          }
+        }
+
+        // def function
+        if (stripped.startsWith('def ')) {
+          const m = stripped.match(/^def\s+(\w+)\s*\(([^)]*)\):\s*$/);
+          if (m) {
+            const fname = m[1];
+            const params = m[2].split(',').map(p => {
+              const parts = p.trim().split('=');
+              return parts[0].trim() ? sanitizeVar(parts[0].trim()) + (parts[1] ? '=' + convertExpr(parts[1].trim()) : '') : '';
+            }).filter(Boolean).join(', ');
+            i++;
+            const body = processBlock(lines, lineIndent + 1);
+            block.push(`function ${fname}(${params}) {`);
+            block.push(...body, '}');
+            continue;
+          }
+        }
+
+        // return
+        if (stripped.startsWith('return ')) {
+          block.push('return ' + convertExpr(stripped.slice(7)) + ';');
+          i++; continue;
+        }
+        if (stripped === 'return') { block.push('return;'); i++; continue; }
+
+        // break/continue
+        if (stripped === 'break') { block.push('break;'); i++; continue; }
+        if (stripped === 'continue') { block.push('continue;'); i++; continue; }
+
+        // pass
+        if (stripped === 'pass') { block.push('/* pass */'); i++; continue; }
+
+        // import (math, statistics, random, string)
+        if (stripped.startsWith('import ') || stripped.startsWith('from ')) {
+          // Safe imports — just ignore, builtins already have them
+          block.push('/* import handled */');
+          i++; continue;
+        }
+
+        // print with end= or sep=
+        if (stripped.startsWith('print(')) {
+          block.push(convertPrint(stripped) + ';');
+          i++; continue;
+        }
+
+        // Assignment with augmented operators
+        const augm = stripped.match(/^(\w+)\s*(\+=|-=|\*=|\/=|\/\/=|%=|\*\*=)\s*(.+)$/);
+        if (augm) {
+          const v = sanitizeVar(augm[1]), op = augm[2], val = convertExpr(augm[3]);
+          if (op === '//=') block.push(`${v} = Math.floor(${v} / ${val});`);
+          else if (op === '**=') block.push(`${v} = Math.pow(${v}, ${val});`);
+          else block.push(`${v} ${op} ${val};`);
+          i++; continue;
+        }
+
+        // Regular assignment: a = expr, a, b = x, y
+        const assign = stripped.match(/^([a-zA-Z_]\w*(?:\s*,\s*[a-zA-Z_]\w*)*)\s*=(?!=)\s*(.+)$/);
+        if (assign && !stripped.includes('==')) {
+          const lhs = assign[1].trim();
+          const rhs = convertExpr(assign[2].trim());
+          if (lhs.includes(',')) {
+            const vs = lhs.split(',').map(v => sanitizeVar(v.trim()));
+            block.push(`[${vs.join(',')}] = ${rhs};`);
+          } else {
+            block.push(`${sanitizeVar(lhs)} = ${rhs};`);
+          }
+          i++; continue;
+        }
+
+        // List/dict indexing assignment: a[i] = x
+        const idxAssign = stripped.match(/^(\w+)\[(.+?)\]\s*=(?!=)\s*(.+)$/);
+        if (idxAssign) {
+          block.push(`${sanitizeVar(idxAssign[1])}[${convertExpr(idxAssign[2])}] = ${convertExpr(idxAssign[3])};`);
+          i++; continue;
+        }
+
+        // Expression statement (function call etc)
+        block.push(convertExpr(stripped) + ';');
+        i++;
+      }
+      return block;
+    }
+
+    function sanitizeVar(name) {
+      // Avoid JS reserved words
+      const reserved = new Set(['class','delete','export','import','new','var','let','const',
+        'function','return','typeof','instanceof','void','yield','await','async','in','of',
+        'default','extends','super','this','null','true','false','undefined','do','try',
+        'catch','finally','throw','with','debugger','switch','case','break','continue']);
+      if (reserved.has(name)) return '_py_' + name;
+      return name;
+    }
+
+    function convertCond(expr) {
+      return convertExpr(expr)
+        .replace(/\band\b/g, '&&').replace(/\bor\b/g, '||').replace(/\bnot\b/g, '!');
+    }
+
+    function convertExpr(expr) {
+      if (!expr || expr === 'None') return 'null';
+      if (expr === 'True') return 'true';
+      if (expr === 'False') return 'false';
+      if (expr === '...') return 'null';
+
+      // F-strings: f"..." or f'...'
+      expr = expr.replace(/f(['"])((?:[^\\]|\\.)*?)\1/g, (_, q, s) => {
+        const parts = s.split(/(\{[^}]+\})/g);
+        return '(' + parts.map(p => {
+          if (p.startsWith('{') && p.endsWith('}')) {
+            const inner = p.slice(1,-1);
+            // Handle format spec like {x:.2f}
+            const fmtM = inner.match(/^(.+?):\.(\d+)f$/);
+            const fmtM2 = inner.match(/^(.+?):\.(\d+)f$/);
+            if (fmtM2) return `Number(${convertExpr(fmtM2[1])}).toFixed(${fmtM2[2]})`;
+            return `pyReprFn(${convertExpr(inner)})`;
+          }
+          return JSON.stringify(p);
+        }).join('+') + ')';
+      });
+
+      // String multiplication: "x" * 3
+      expr = expr.replace(/(['"][^'"]*['"'])\s*\*\s*(\d+)/g, (_, s, n) => `${s}.repeat(${n})`);
+
+      // List comprehension: [x for x in range(n)]
+      const listComp = expr.match(/^\[(.+?)\s+for\s+(\w+)\s+in\s+(.+?)(?:\s+if\s+(.+?))?\]$/);
+      if (listComp) {
+        const mapExpr = convertExpr(listComp[1]);
+        const varN = sanitizeVar(listComp[2]);
+        const iter = convertExpr(listComp[3]);
+        const cond = listComp[4] ? `.filter(${varN} => ${convertCond(listComp[4])})` : '';
+        return `(${iter}||[])${cond}.map(${varN} => ${mapExpr})`;
+      }
+
+      // not x
+      expr = expr.replace(/\bnot\s+/g, '!');
+
+      // Python operators → JS
+      expr = expr.replace(/\*\*/g, '**');  // keep as is, JS supports **
+      expr = expr.replace(/\s+and\s+/g, ' && ');
+      expr = expr.replace(/\s+or\s+/g, ' || ');
+      expr = expr.replace(/\bNone\b/g, 'null');
+      expr = expr.replace(/\bTrue\b/g, 'true');
+      expr = expr.replace(/\bFalse\b/g, 'false');
+
+      // Integer division: //
+      expr = expr.replace(/(\S+)\s*\/\/\s*(\S+)/g, 'Math.floor($1/$2)');
+
+      // method calls: .append, .extend, .pop, .sort, .upper, .lower, .strip, .split, .join, etc.
+      expr = expr.replace(/\.append\((.+?)\)/g, '.push($1)');
+      expr = expr.replace(/\.extend\((.+?)\)/g, '.push(...($1))');
+      expr = expr.replace(/\.remove\((.+?)\)/g, (_, a) => `.splice(indexOf(${a}),1)`);
+      expr = expr.replace(/\.upper\(\)/g, '.toUpperCase()');
+      expr = expr.replace(/\.lower\(\)/g, '.toLowerCase()');
+      expr = expr.replace(/\.strip\(\)/g, '.trim()');
+      expr = expr.replace(/\.strip\((.+?)\)/g, '.trim()');
+      expr = expr.replace(/\.split\(\)/g, ".split(' ')");
+      expr = expr.replace(/\.replace\((.+?),\s*(.+?)\)/g, '.replaceAll($1,$2)');
+      expr = expr.replace(/\.startswith\(/g, '.startsWith(');
+      expr = expr.replace(/\.endswith\(/g, '.endsWith(');
+      expr = expr.replace(/\.count\((.+?)\)/g, '.split($1).length-1');
+      expr = expr.replace(/\.index\((.+?)\)/g, '.indexOf($1)');
+      expr = expr.replace(/\.sort\(\)/g, '.sort((a,b)=>typeof a==="number"?a-b:String(a).localeCompare(String(b)))');
+      expr = expr.replace(/\.reverse\(\)/g, '.reverse()');
+      expr = expr.replace(/\.keys\(\)/g, '.keys()');
+      expr = expr.replace(/\.values\(\)/g, '.values()');
+      expr = expr.replace(/\.items\(\)/g, 'Object.entries(this)');
+
+      // statistics.mean(x) etc.
+      expr = expr.replace(/statistics\.(mean|median|stdev|variance|mode)\(/g, 'statistics_$1(');
+
+      // math.sqrt, math.pi etc.
+      expr = expr.replace(/math\.sqrt\(/g, 'Math.sqrt(');
+      expr = expr.replace(/math\.pi/g, 'Math.PI');
+      expr = expr.replace(/math\.e\b/g, 'Math.E');
+      expr = expr.replace(/math\.ceil\(/g, 'Math.ceil(');
+      expr = expr.replace(/math\.floor\(/g, 'Math.floor(');
+      expr = expr.replace(/math\.log\(/g, 'Math.log(');
+      expr = expr.replace(/math\.sin\(/g, 'Math.sin(');
+      expr = expr.replace(/math\.cos\(/g, 'Math.cos(');
+      expr = expr.replace(/math\.abs\(/g, 'Math.abs(');
+      expr = expr.replace(/math\.pow\(/g, 'Math.pow(');
+      expr = expr.replace(/math\.log10\(/g, '(v=>Math.log(v)/Math.log(10))(');
+
+      // random
+      expr = expr.replace(/random\.randint\((\d+),\s*(\d+)\)/g, '(Math.floor(Math.random()*($2-($1)+1))+($1))');
+      expr = expr.replace(/random\.random\(\)/g, 'Math.random()');
+      expr = expr.replace(/random\.choice\((.+?)\)/g, '($1)[Math.floor(Math.random()*($1).length)]');
+
+      return expr;
+    }
+
+    function convertPrint(line) {
+      // print(*args, sep=' ', end='\n')
+      const inner = line.slice(6, -1).trim(); // remove print( and )
+      if (!inner) return 'print()';
+      
+      // Check for sep= or end= kwargs
+      const sepM = inner.match(/,\s*sep\s*=\s*(['"])(.*?)\1/);
+      const endM = inner.match(/,\s*end\s*=\s*(['"])(.*?)\1/);
+      let args = inner
+        .replace(/,\s*sep\s*=\s*(['"]).*?\1/, '')
+        .replace(/,\s*end\s*=\s*(['"]).*?\1/, '')
+        .trim();
+      const sep = sepM ? sepM[2] : ' ';
+      const end = endM ? endM[2] : '\n';
+      
+      // Convert args
+      const jsArgs = args ? args.split(/,(?![^([{]*[\])}])/).map(a => convertExpr(a.trim())).join(', ') : '';
+      return `out.push([${jsArgs}].map(a=>pyReprFn(a)).join(${JSON.stringify(sep)}))`;
+    }
+
+    const body = processBlock(lines, 0);
+    return body.join('\n');
+  }
+
+  // ── Execute ───────────────────────────────────────────────────────────────
+  function pyReprFn(v) {
+    if (v === null || v === undefined) return 'None';
+    if (v === true) return 'True';
+    if (v === false) return 'False';
+    if (Array.isArray(v)) return '[' + v.map(x => pyRepr(x, true)).join(', ') + ']';
+    if (typeof v === 'object') {
+      const pairs = Object.entries(v).map(([k,val]) => `'${k}': ${pyRepr(val, true)}`);
+      return '{' + pairs.join(', ') + '}';
+    }
+    return String(v);
+  }
+
+  const jsCode = pyToJs(code);
+  if (jsCode === null) return null; // Needs Pyodide
+
+  try {
+    // Build scope with all builtins + pyReprFn + out array
+    const scope = { ...BUILTINS, pyReprFn, out, Math };
+    const fn = new Function(...Object.keys(scope), jsCode);
+    fn(...Object.values(scope));
+
+    if (out.length === 0) return '<span style="color:#28CA41">✓ تم التنفيذ بنجاح (لا مخرجات)</span>';
+    return out.map(line => 
+      String(line)
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+        .replace(/(\d+\.?\d+)/g, n => `<span style="color:#79c0ff">${n}</span>`)
+        .replace(/\b(True|False|None)\b/g, k => `<span style="color:#ff7b72">${k}</span>`)
+    ).join('\n');
+  } catch(e) {
+    const msg = e.message
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    return `<span style="color:#FF5252">❌ خطأ: ${msg}</span>`;
+  }
 }
+
+
 
 // ══════════════════════════════════════════════════
 // 📊 EXCEL-LIKE ENVIRONMENT
@@ -6830,7 +7296,7 @@ _bi.input = _patched_input
 `);
 }
 
-</script>>
+</script>
 
 
 

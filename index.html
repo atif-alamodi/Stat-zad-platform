@@ -1030,6 +1030,70 @@ let _elabXlInited = false;
 // Re-use PY_TEMPLATES from main lab
 const ELAB_PY_TEMPLATES = typeof PY_TEMPLATES !== 'undefined' ? PY_TEMPLATES : {};
 
+// ═══ Excel Lab: Global Constants & State ══════════════════════════════════
+const ELAB_XL_COLS = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'];
+let _exlData = {}, _exlStyles = {}, _exlRows = 10, _exlCols = 7;
+let _exlSel = {r:1, c:1}, _exlChartInst = null;
+
+const ELAB_XL_TMPLS = {
+  grades: {
+    rows: 8, cols: 5,
+    data: {
+      '1_1':'الطالب','1_2':'الاختبار1','1_3':'الاختبار2','1_4':'المشروع','1_5':'المجموع',
+      '2_1':'أحمد',  '2_2':85,  '2_3':78,  '2_4':90,  '2_5':'=B2+C2+D2',
+      '3_1':'فاطمة', '3_2':92,  '3_3':88,  '3_4':95,  '3_5':'=B3+C3+D3',
+      '4_1':'محمد',  '4_2':75,  '4_3':82,  '4_4':70,  '4_5':'=B4+C4+D4',
+      '5_1':'نورة',  '5_2':88,  '5_3':91,  '5_4':85,  '5_5':'=B5+C5+D5',
+      '6_1':'خالد',  '6_2':60,  '6_3':65,  '6_4':72,  '6_5':'=B6+C6+D6',
+      '7_1':'المتوسط','7_2':'=AVERAGE(B2:B6)','7_3':'=AVERAGE(C2:C6)','7_4':'=AVERAGE(D2:D6)','7_5':'=AVERAGE(E2:E6)',
+      '8_1':'الأعلى','8_2':'=MAX(B2:B6)','8_3':'=MAX(C2:C6)','8_4':'=MAX(D2:D6)','8_5':'=MAX(E2:E6)'
+    }
+  },
+  stats: {
+    rows: 10, cols: 4,
+    data: {
+      '1_1':'القيمة (x)','1_2':'x - x̄','1_3':'(x - x̄)²','1_4':'الإحصاءات',
+      '2_1':15,'3_1':22,'4_1':18,'5_1':25,'6_1':30,'7_1':12,'8_1':28,
+      '9_1':'المتوسط','9_2':'=AVERAGE(A2:A8)',
+      '10_1':'الانحراف','10_2':'=STDEV(A2:A8)',
+      '2_4':'المجموع','2_2':'=AVERAGE(A2:A8)',
+      '3_4':'المتوسط','3_2':'=AVERAGE(A2:A8)',
+      '4_4':'الوسيط','4_2':'=MEDIAN(A2:A8)',
+      '5_4':'الأكبر','5_2':'=MAX(A2:A8)',
+      '6_4':'الأصغر','6_2':'=MIN(A2:A8)',
+      '7_4':'الانحراف','7_2':'=STDEV(A2:A8)',
+      '8_4':'التباين','8_2':'=VAR(A2:A8)'
+    }
+  },
+  sales: {
+    rows: 8, cols: 4,
+    data: {
+      '1_1':'الشهر','1_2':'المبيعات','1_3':'الهدف','1_4':'الفارق',
+      '2_1':'يناير','2_2':45000,'2_3':50000,'2_4':'=B2-C2',
+      '3_1':'فبراير','3_2':52000,'3_3':50000,'3_4':'=B3-C3',
+      '4_1':'مارس','4_2':48000,'4_3':55000,'4_4':'=B4-C4',
+      '5_1':'أبريل','5_2':61000,'5_3':55000,'5_4':'=B5-C5',
+      '6_1':'مايو','6_2':58000,'6_3':60000,'6_4':'=B6-C6',
+      '7_1':'المجموع','7_2':'=SUM(B2:B6)','7_3':'=SUM(C2:C6)','7_4':'=SUM(D2:D6)',
+      '8_1':'المتوسط','8_2':'=AVERAGE(B2:B6)','8_3':'=AVERAGE(C2:C6)','8_4':'=AVERAGE(D2:D6)'
+    }
+  },
+  employees: {
+    rows: 8, cols: 5,
+    data: {
+      '1_1':'الموظف','1_2':'الراتب','1_3':'البدلات','1_4':'الخصومات','1_5':'الصافي',
+      '2_1':'سارة أحمد','2_2':8000,'2_3':1500,'2_4':500,'2_5':'=B2+C2-D2',
+      '3_1':'يوسف علي','3_2':6500,'3_3':1200,'3_4':400,'3_5':'=B3+C3-D3',
+      '4_1':'منى خالد','4_2':9000,'4_3':2000,'4_4':600,'4_5':'=B4+C4-D4',
+      '5_1':'عمر محمد','5_2':7200,'5_3':1800,'5_4':450,'5_5':'=B5+C5-D5',
+      '6_1':'ليلى سعد','6_2':5500,'6_3':1000,'6_4':350,'6_5':'=B6+C6-D6',
+      '7_1':'المجموع','7_2':'=SUM(B2:B6)','7_3':'=SUM(C2:C6)','7_4':'=SUM(D2:D6)','7_5':'=SUM(E2:E6)',
+      '8_1':'المتوسط','8_2':'=AVERAGE(B2:B6)','8_3':'=AVERAGE(C2:C6)','8_4':'=AVERAGE(D2:D6)','8_5':'=AVERAGE(E2:E6)'
+    }
+  }
+};
+
+
 function elabSwitch(tab) {
   const py = document.getElementById('elab-py');
   const xl = document.getElementById('elab-xl');
@@ -1176,98 +1240,242 @@ async function elabRunPy() {
   const btn = document.getElementById('elab-run-btn');
   if (!ta || !out) return;
   const code = ta.value.trim();
-  if (!code) return;
-
-  // Sync from main lab's pyodide if available
-  if (!_elabPyReady && typeof pyodide !== 'undefined' && pyodide && pyReady) {
-    _elabPyodide = pyodide; _elabPyReady = true;
-    try { pyodide.runPython(`import sys\nif '_cap' not in dir():\n  class _Cap:\n    def __init__(self): self.d=[]\n    def write(self,s): self.d.append(s)\n    def flush(self): pass\n    def getvalue(self): return ''.join(self.d)\n  _cap=_Cap()\nsys.stdout=_cap;sys.stderr=_cap`); } catch(e){}
-    const dot=document.getElementById('elab-py-dot'),txt=document.getElementById('elab-py-status');
-    if(dot)dot.style.background='#28CA41';if(txt)txt.textContent='Python جاهز ✓';
-  }
-  if (!_elabPyReady || !_elabPyodide) {
-    // Auto-wait and retry instead of making user press again
-    out.innerHTML = '<span style="color:#FFD600">⏳ Python يتحمّل، سيبدأ تلقائياً...</span>';
-    if (btn) { btn.textContent = '⏳'; btn.disabled = true; }
-    if (typeof initPyodide !== 'undefined' && !pyReady) initPyodide();
-    const _elabWait = setInterval(() => {
-      const ready = (pyReady && pyodide) || _elabPyReady;
-      if (ready) {
-        clearInterval(_elabWait);
-        if (!_elabPyReady && pyodide && pyReady) {
-          _elabPyodide = pyodide; _elabPyReady = true;
-          try { pyodide.runPython(`import sys\nif '_cap' not in dir():\n  class _Cap:\n    def __init__(self): self.d=[]\n    def write(self,s): self.d.append(s)\n    def flush(self): pass\n    def getvalue(self): return ''.join(self.d)\n  _cap=_Cap()\nsys.stdout=_cap;sys.stderr=_cap`); } catch(e){}
-        }
-        if (btn) { btn.textContent = '▶ تشغيل'; btn.disabled = false; }
-        elabRunPy(); // auto-retry
-      }
-    }, 600);
-    setTimeout(() => {
-      clearInterval(_elabWait);
-      if (!_elabPyReady) {
-        if (btn) { btn.textContent = '▶ تشغيل'; btn.disabled = false; }
-        out.innerHTML = '<span style="color:#FF5252">⚠️ تعذّر تحميل Python — تحقق من اتصالك بالإنترنت</span>';
-      }
-    }, 30000);
-    return;
-  }
-
-  // ── Detect input() calls and collect values first ──────────────────────────
-  const inputPrompts = detectInputCalls(code);
-  let _collectedVals = [];
-  if (inputPrompts.length > 0) {
-    out.innerHTML = '<span style="color:#FFD600">⌨️ انتظار مدخلات المستخدم...</span>';
-    const values = await collectInputs(inputPrompts);
-    _collectedVals = values || [];
-    if (values === null) {
-      out.innerHTML = '<span style="color:#888">⚠️ تم إلغاء الإدخال</span>';
-      return;
-    }
-    patchPyodideWithInputs(_elabPyodide, _collectedVals);
-  }
+  if (!code) { out.innerHTML = '<span style="color:#888">// اكتب كوداً ثم اضغط ▶</span>'; return; }
 
   if (btn) { btn.textContent = '⏳'; btn.disabled = true; }
-  out.innerHTML = '<span style="color:#FFD600">⏳ جاري التنفيذ...</span>';
 
-  try {
-    // Try instant engine first — instant JS engine, zero loading
-    const instantRes = runJsFallback(code, _collectedVals);
-    if (instantRes !== null) {
-      out.innerHTML = instantRes || '<span style="color:#28CA41">✓ تم بنجاح</span>';
+  // ══════════════════════════════════════════════════════════════
+  // STEP 1: Detect input() calls and collect values from user
+  // ══════════════════════════════════════════════════════════════
+  let _collectedVals = [];
+  const inputPrompts = detectInputCalls(code);
+  if (inputPrompts.length > 0) {
+    out.innerHTML = '<span style="color:#FFD600">⌨️ انتظار مدخلات المستخدم...</span>';
+    const vals = await collectInputs(inputPrompts);
+    if (vals === null) {
+      out.innerHTML = '<span style="color:#888">⚠️ تم إلغاء الإدخال</span>';
       if (btn) { btn.textContent = '▶ تشغيل'; btn.disabled = false; }
       return;
     }
+    _collectedVals = vals || [];
+    patchPyodideWithInputs(_elabPyodide, _collectedVals);
+  }
 
-    // Needs Pyodide (numpy/matplotlib)
+  out.innerHTML = '<span style="color:#FFD600">⏳ جاري التنفيذ...</span>';
+
+  // ══════════════════════════════════════════════════════════════
+  // STEP 2: Try instant JS engine first (no internet needed)
+  // Handles: variables, print, input, if/elif/else, for/while,
+  //          functions, lists, dicts, f-strings, math, statistics
+  // ══════════════════════════════════════════════════════════════
+  try {
+    const instantRes = runJsFallback(code, _collectedVals);
+    if (instantRes !== null) {
+      // Instant engine handled it — show result with feedback
+      out.innerHTML = buildPyOutput(instantRes, code);
+      if (btn) { btn.textContent = '▶ تشغيل'; btn.disabled = false; }
+      return;
+    }
+  } catch(e) {
+    out.innerHTML = buildPyError(e.message, code);
+    if (btn) { btn.textContent = '▶ تشغيل'; btn.disabled = false; }
+    return;
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // STEP 3: Needs Pyodide (numpy / matplotlib)
+  // ══════════════════════════════════════════════════════════════
+  // Sync from main lab if available
+  if (!_elabPyReady && typeof pyodide !== 'undefined' && pyodide && pyReady) {
+    _elabPyodide = pyodide; _elabPyReady = true;
+    try { pyodide.runPython(`import sys\nif '_cap' not in dir():\n  class _Cap:\n    def __init__(self): self.d=[]\n    def write(self,s): self.d.append(s)\n    def flush(self): pass\n    def getvalue(self): return ''.join(self.d)\n  _cap=_Cap()\nsys.stdout=_cap;sys.stderr=_cap`); } catch(e){}
+  }
+
+  if (!_elabPyReady || !_elabPyodide) {
+    out.innerHTML = '<span style="color:#FFD600">⏳ جاري تحميل Python (numpy/matplotlib)...</span>';
+    if (btn) { btn.textContent = '⏳'; btn.disabled = true; }
+    if (typeof initPyodide !== 'undefined' && !pyReady) initPyodide();
+    const _wait = setInterval(() => {
+      if (pyReady && pyodide) {
+        clearInterval(_wait);
+        _elabPyodide = pyodide; _elabPyReady = true;
+        try { pyodide.runPython(`import sys\nif '_cap' not in dir():\n  class _Cap:\n    def __init__(self): self.d=[]\n    def write(self,s): self.d.append(s)\n    def flush(self): pass\n    def getvalue(self): return ''.join(self.d)\n  _cap=_Cap()\nsys.stdout=_cap;sys.stderr=_cap`); } catch(e){}
+        if (btn) { btn.textContent = '▶ تشغيل'; btn.disabled = false; }
+        elabRunPy();
+      }
+    }, 600);
+    setTimeout(() => { clearInterval(_wait); if(!_elabPyReady){ if(btn){btn.textContent='▶ تشغيل';btn.disabled=false;} out.innerHTML='<span style="color:#FF5252">⚠️ تعذّر تحميل Python — تحقق من اتصالك</span>'; }}, 30000);
+    return;
+  }
+
+  try {
     _elabPyodide.runPython(`_cap.d=[]\nimport sys\nsys.stdout=_cap\nsys.stderr=_cap\nimport os\ntry: os.remove('/tmp/elab_chart.png')\nexcept: pass`);
-    const patched = code.replace(/plt\.savefig\(['"][^'"]*['"]/g, "plt.savefig('/tmp/elab_chart.png'");
+    const patched = code.replace(/plt\.savefig\(['"]['"].*?['"]['"]]/g, "plt.savefig('/tmp/elab_chart.png'");
     await _elabPyodide.runPythonAsync(patched);
     const result = _elabPyodide.runPython(`_cap.getvalue()`);
     out.innerHTML = result
-      ? result.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-              .replace(/(\d+\.?\d*)/g, n => `<span style="color:#79c0ff">${n}</span>`)
-              .replace(/(True|False|None)/g, k => `<span style="color:#ff7b72">${k}</span>`)
+      ? buildPyOutput(result.replace(/</g,'&lt;').replace(/>/g,'&gt;'), code)
       : '<span style="color:#28CA41">✓ تم بنجاح (لا مخرجات)</span>';
-
     try {
       const hasChart = _elabPyodide.runPython(`import os; os.path.exists('/tmp/elab_chart.png')`);
       if (hasChart) {
         const b64 = _elabPyodide.runPython(`import base64\nwith open('/tmp/elab_chart.png','rb') as f: data=base64.b64encode(f.read()).decode()\ndata`);
         const cw = document.getElementById('elab-chart-wrap');
         const cv = document.getElementById('elab-chart-canvas');
-        if (cw && cv) {
-          cw.style.display = 'block';
-          const img = new Image();
-          img.onload = () => { cv.width=img.width; cv.height=img.height; cv.getContext('2d').drawImage(img,0,0); };
-          img.src = 'data:image/png;base64,' + b64;
-        }
+        if (cw && cv) { cw.style.display='block'; const img=new Image(); img.onload=()=>{cv.width=img.width;cv.height=img.height;cv.getContext('2d').drawImage(img,0,0);}; img.src='data:image/png;base64,'+b64; }
       }
     } catch(e) {}
   } catch(e) {
-    out.innerHTML = `<span style="color:#FF5252">❌ خطأ:\n${e.message}</span>`;
+    out.innerHTML = buildPyError(e.message, code);
   }
   if (btn) { btn.textContent = '▶ تشغيل'; btn.disabled = false; }
 }
+
+// ── Output formatters ──────────────────────────────────────────────────────
+// ═══ Python Output Formatters ═════════════════════════════════════════════
+function buildPyOutput(rawHtml, code) {
+  // rawHtml comes from runJsFallback — already HTML-escaped and colored
+  if (!rawHtml) {
+    return '<div style="display:flex;align-items:center;gap:8px;padding:10px 0">'
+      + '<span style="font-size:1.2rem">✅</span>'
+      + '<span style="color:#28CA41;font-weight:700">تم التنفيذ بنجاح — لا مخرجات</span>'
+      + '</div>';
+  }
+  // إذا كان الناتج خطأ، حوّله لصندوق الخطأ
+  if (rawHtml.includes('❌') || rawHtml.includes('color:#FF5252')) {
+    const plainMsg = rawHtml.replace(/<[^>]+>/g, '').replace(/^❌ خطأ:\s*/, '').trim();
+    return buildPyError(plainMsg, code);
+  }
+
+  return '<div style="background:#0d1117;border-radius:12px;overflow:hidden;border:1px solid rgba(40,202,65,0.2)">'
+    // شريط النجاح
+    + '<div style="background:rgba(40,202,65,0.12);padding:8px 14px;display:flex;align-items:center;gap:8px;border-bottom:1px solid rgba(40,202,65,0.15)">'
+    + '<span style="color:#28CA41;font-size:1rem">✅</span>'
+    + '<span style="color:#28CA41;font-weight:700;font-size:0.85rem">تم التنفيذ بنجاح</span>'
+    + '<span style="color:rgba(40,202,65,0.5);font-size:0.75rem;margin-right:auto">المخرجات:</span>'
+    + '</div>'
+    // منطقة الناتج — rawHtml جاهز، نعرضه مباشرة
+    + '<div style="padding:12px 14px;font-family:\'Fira Code\',monospace;font-size:0.85rem;line-height:1.8;direction:ltr;text-align:left;color:#e6edf3;white-space:pre-wrap">'
+    + rawHtml
+    + '</div>'
+    + '</div>';
+}
+
+function buildPyError(errMsg, code) {
+  const msg = String(errMsg || 'خطأ غير معروف')
+    .replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>');
+  const hints = getPyErrorHints(msg, code || '');
+
+  let html = '';
+  // صندوق الخطأ
+  html += '<div style="background:rgba(255,82,82,0.07);border:1px solid rgba(255,82,82,0.3);border-radius:12px;padding:14px;margin-bottom:10px">';
+  html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">';
+  html += '<span style="font-size:1.2rem">❌</span>';
+  html += '<span style="color:#FF5252;font-weight:800;font-size:0.9rem">خطأ في الكود</span>';
+  html += '</div>';
+  html += '<div style="font-family:\'Fira Code\',monospace;font-size:0.82rem;color:#ff9090;'
+        + 'background:rgba(0,0,0,0.3);padding:10px 12px;border-radius:8px;'
+        + 'direction:ltr;text-align:left;overflow-x:auto;white-space:pre-wrap">'
+        + msg.replace(/</g,'&lt;').replace(/>/g,'&gt;')
+        + '</div>';
+  html += '</div>';
+
+  // صندوق التصحيح
+  if (hints.length) {
+    html += '<div style="background:rgba(255,214,0,0.06);border:1px solid rgba(255,214,0,0.25);border-radius:12px;padding:14px">';
+    html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">';
+    html += '<span style="font-size:1.1rem">💡</span>';
+    html += '<span style="color:#FFD600;font-weight:800;font-size:0.88rem">كيف تُصلح هذا الخطأ؟</span>';
+    html += '</div>';
+    hints.forEach(h => {
+      html += '<div style="display:flex;gap:10px;margin-bottom:10px;align-items:flex-start">';
+      html += '<div style="min-width:20px;height:20px;border-radius:50%;background:rgba(255,214,0,0.2);'
+            + 'display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">'
+            + '<span style="color:#FFD600;font-size:0.7rem;font-weight:900">→</span></div>';
+      html += '<div style="font-size:0.84rem;line-height:1.6;color:var(--text)">' + h.text;
+      if (h.code) {
+        html += '<div style="margin-top:5px;font-family:\'Fira Code\',monospace;font-size:0.8rem;'
+              + 'background:rgba(0,0,0,0.3);padding:6px 10px;border-radius:6px;'
+              + 'color:#79c0ff;direction:ltr;text-align:left;overflow-x:auto">'
+              + h.code.replace(/</g,'&lt;') + '</div>';
+      }
+      html += '</div></div>';
+    });
+    html += '</div>';
+  }
+  return html;
+}
+
+function getPyErrorHints(err, code) {
+  const hints = [];
+  const e = String(err).toLowerCase();
+
+  if (e.includes('is not defined') || e.includes('nameerror')) {
+    const varName = String(err).match(/(\w+)\s+is not defined/)?.[1]
+                 || String(err).match(/name '(\w+)'/)?.[1] || '';
+    if (varName) {
+      hints.push({
+        text: `المتغير <b style="color:#79c0ff">${varName}</b> غير معرَّف — عرِّفه قبل استخدامه:`,
+        code: `${varName} = 0  # أو أي قيمة مناسبة`
+      });
+    }
+    hints.push({ text: 'Python حساس لحالة الأحرف — <b>Count</b> ≠ <b>count</b> ≠ <b>COUNT</b>' });
+  }
+  else if (e.includes('syntaxerror') || e.includes('unexpected') || e.includes('invalid syntax')) {
+    hints.push({ text: 'لا تنسَ النقطتين <b style="color:#FFD600">:</b> بعد if / for / while / def / else:', code: 'if x > 0:\n    print(x)  # ← النقطتان ضرورية' });
+    hints.push({ text: 'تأكد من إغلاق كل قوس فتحته:', code: 'print(x + y)  # ✅\nprint(x + y   # ❌ قوس مفتوح' });
+    hints.push({ text: 'تأكد من المسافة البادئة (Indentation) — استخدم 4 مسافات داخل الحلقات والشروط' });
+  }
+  else if (e.includes('zerodivision') || e.includes('division by zero')) {
+    hints.push({
+      text: 'لا يمكن القسمة على صفر — أضف شرطاً للتحقق:',
+      code: 'if b != 0:\n    result = a / b\nelse:\n    print("لا يمكن القسمة على صفر")'
+    });
+  }
+  else if (e.includes('typeerror') || e.includes('unsupported operand')) {
+    if (e.includes('str') || e.includes('string')) {
+      hints.push({
+        text: 'النص لا يُجمع مع الأرقام مباشرة — حوِّل النص لرقم أولاً:',
+        code: 'x = float(input("أدخل رقماً: "))  # ✅ يحوّل النص → رقم\ny = int(input("أدخل رقماً: "))   # ✅ للأعداد الصحيحة'
+      });
+    } else {
+      hints.push({ text: 'تعارض في أنواع البيانات — تحقق من نوع كل متغير:', code: 'print(type(x))  # اعرف نوع المتغير' });
+    }
+  }
+  else if (e.includes('valueerror') || e.includes('invalid literal') || e.includes('could not convert')) {
+    hints.push({
+      text: 'تعذّر تحويل القيمة — تأكد أن المدخل رقم وليس نصاً:',
+      code: 'x = float("3.14")  # ✅ يعمل\n# x = float("مرحبا")  # ❌ لا يعمل'
+    });
+  }
+  else if (e.includes('indexerror') || e.includes('index out of range')) {
+    hints.push({
+      text: 'الفهرس خارج النطاق — فهارس القوائم تبدأ من 0 وتنتهي عند len-1:',
+      code: 'lst = [10, 20, 30]\nprint(lst[0])   # 10 ← أول عنصر\nprint(lst[-1])  # 30 ← آخر عنصر\nprint(len(lst)) # 3  ← الطول'
+    });
+  }
+  else if (e.includes('indentation') || e.includes('indent')) {
+    hints.push({
+      text: 'خطأ في المسافة البادئة — يجب أن تكون متسقة (4 مسافات):',
+      code: 'for i in range(3):\n    print(i)  # 4 مسافات ← صحيح\n  print(i)    # 2 مسافات ← خطأ'
+    });
+  }
+  else if (e.includes('attributeerror')) {
+    hints.push({ text: 'الكائن لا يملك هذه الخاصية — تحقق من اسمها وتهجئتها', code: 'lst = [1,2,3]\nlst.append(4)   # ✅ صحيح\n# lst.add(4)    # ❌ ليست دالة للقوائم' });
+  }
+
+  // نصيحة عامة دائماً
+  if (hints.length === 0) {
+    hints.push({ text: 'راجع الكود سطراً سطراً — ابحث عن الفرق بين الكود المكتوب والمطلوب' });
+  }
+  hints.push({ text: 'تذكر: Python حساس للمسافات والحالة — كل تفصيلة مهمة 💪' });
+
+  return hints;
+}
+
+
+
+
 
 function elabInitXl() {
   _exlData={}; _exlStyles={}; _exlRows=10; _exlCols=7; _exlSel={r:1,c:1};
@@ -1283,7 +1491,7 @@ function elabLoadXlTmpl(name) {
   _exlRows = t.rows||10; _exlCols = t.cols||7;
   _exlData = Object.assign({}, t.data||{});
   _exlStyles = {};
-  if (t.hdr) for(let c=1;c<=_exlCols;c++) _exlStyles[`1_${c}`]={bold:true,bg:'#2d2d4e',color:'#E8A020'};
+  for(let c=1;c<=_exlCols;c++) _exlStyles[`1_${c}`]={bold:true,bg:'#1f1f35',color:'#E8A020'};
   if (sel) sel.value='';
   elabXlRender(); elabXlComputeAll();
 }
@@ -1301,7 +1509,9 @@ function elabXlRender() {
       const key=`${r}_${c}`, st=_exlStyles[key]||{}, raw=_exlData[key];
       const disp = raw!==undefined&&raw!==null&&String(raw).startsWith('=') ? (elabXlCompute(raw)??'') : (raw??'');
       const isA = _exlSel.r===r&&_exlSel.c===c;
-      let cs=`border:1px solid #333;padding:0;min-width:100px;${st.bg?`background:${st.bg}`:(isA?'background:rgba(108,99,255,0.15)':'background:#1e1e2e')};${isA?'outline:2px solid #6C63FF;outline-offset:-2px':''}`;
+      const isHdr = r===1;
+      const bgColor = st.bg ? st.bg : isA ? 'rgba(108,99,255,0.15)' : isHdr ? '#1f1f35' : '#1e1e2e';
+      let cs=`border:1px solid #333;padding:0;min-width:100px;background:${bgColor};${isA?'outline:2px solid #6C63FF;outline-offset:-2px':''}`;
       let is=`width:100%;background:transparent;border:none;outline:none;padding:5px 9px;color:${st.color||'#e0e0e0'};font-weight:${st.bold?700:400};font-family:inherit;font-size:inherit;text-align:${st.align||'left'};direction:auto`;
       h+=`<td style="${cs}" onclick="elabXlSel(${r},${c})"><input data-key="${key}" value="${String(disp).replace(/"/g,'&quot;').replace(/</g,'&lt;')}" style="${is}" onchange="elabXlChange(event,'${key}')" onfocus="elabXlFocus(${r},${c})" onkeydown="elabXlNav(event,${r},${c})"/></td>`;
     }
@@ -1429,6 +1639,142 @@ function elabXlUpdateStats(){
 function elabXlAddRow(){_exlRows++;elabXlRender();elabXlComputeAll();}
 function elabXlAddCol(){if(_exlCols<ELAB_XL_COLS.length){_exlCols++;elabXlRender();elabXlComputeAll();}}
 function elabXlClear(){_exlData={};_exlStyles={};elabXlRender();const s=document.getElementById('elab-xl-stats');if(s)s.innerHTML='';const cw=document.getElementById('elab-xl-chart-wrap');if(cw)cw.style.display='none';}
+
+function elabXlValidate(){
+  const fb = document.getElementById('elab-xl-feedback');
+  if(!fb) return;
+  
+  // Collect all formula cells and evaluate them
+  const results = [];
+  let correct = 0, errors = 0;
+  
+  for(let r=1;r<=_exlRows;r++){
+    for(let co=1;co<=_exlCols;co++){
+      const key = r+'_'+co;
+      const val = _exlData[key];
+      if(typeof val === 'string' && val.startsWith('=')){
+        const computed = elabXlCompute(val);
+        const display = String(computed);
+        const isError = display.startsWith('#');
+        if(isError) errors++; else correct++;
+        results.push({r,co,formula:val,computed,isError});
+      }
+    }
+  }
+  
+  if(results.length === 0){
+    fb.style.display = 'block';
+    fb.innerHTML = '<div style="background:rgba(255,214,0,0.08);border:1px solid rgba(255,214,0,0.3);border-radius:12px;padding:14px">'
+      +'<div style="color:#FFD600;font-weight:800;font-size:0.9rem;margin-bottom:8px">💡 لا توجد صيغ بعد</div>'
+      +'<div style="font-size:0.85rem;color:var(--text-muted);line-height:1.6">ابدأ بكتابة صيغة في أي خلية بعلامة <code style="background:rgba(0,0,0,0.3);padding:2px 6px;border-radius:4px;color:#79c0ff">=</code>'
+      +'<br>مثال: <code style="background:rgba(0,0,0,0.3);padding:2px 6px;border-radius:4px;color:#79c0ff">=AVERAGE(B2:B5)</code></div>'
+      +'</div>';
+    return;
+  }
+  
+  const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  let html = '';
+  
+  // Summary bar
+  html += '<div style="background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px">';
+  html += '<div style="font-weight:800;font-size:0.9rem;margin-bottom:10px">📊 نتائج التحقق</div>';
+  html += '<div style="display:flex;gap:12px;flex-wrap:wrap">';
+  html += '<div style="background:rgba(40,202,65,0.1);border:1px solid rgba(40,202,65,0.3);border-radius:9px;padding:8px 16px;text-align:center">'
+    +'<div style="font-size:1.4rem;font-weight:900;color:#28CA41">'+correct+'</div>'
+    +'<div style="font-size:0.73rem;color:var(--text-muted)">صيغ صحيحة</div></div>';
+  if(errors>0) html += '<div style="background:rgba(255,82,82,0.1);border:1px solid rgba(255,82,82,0.3);border-radius:9px;padding:8px 16px;text-align:center">'
+    +'<div style="font-size:1.4rem;font-weight:900;color:#FF5252">'+errors+'</div>'
+    +'<div style="font-size:0.73rem;color:var(--text-muted)">تحتاج تصحيح</div></div>';
+  html += '<div style="background:rgba(108,99,255,0.1);border:1px solid rgba(108,99,255,0.3);border-radius:9px;padding:8px 16px;text-align:center">'
+    +'<div style="font-size:1.4rem;font-weight:900;color:var(--primary)">'+results.length+'</div>'
+    +'<div style="font-size:0.73rem;color:var(--text-muted)">مجموع الصيغ</div></div>';
+  html += '</div></div>';
+  
+  // Per-formula results
+  results.forEach(({r,co,formula,computed,isError}) => {
+    const cellRef = LETTERS[co-1] + r;
+    const hint = getXlFormulaHint(formula, computed, isError);
+    
+    html += '<div style="background:'+(isError?'rgba(255,82,82,0.06)':'rgba(40,202,65,0.05)')+';border:1px solid '+(isError?'rgba(255,82,82,0.25)':'rgba(40,202,65,0.2)')+';border-radius:12px;padding:14px;margin-bottom:10px">';
+    
+    // Header
+    html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">';
+    html += '<div style="background:'+(isError?'#FF5252':'#28CA41')+';color:white;width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:0.85rem;flex-shrink:0">'+cellRef+'</div>';
+    html += '<div style="flex:1">';
+    html += '<div style="font-family:\'Fira Code\',monospace;font-size:0.88rem;color:#79c0ff;direction:ltr;text-align:left">'+formula+'</div>';
+    html += '</div>';
+    html += '<div style="font-weight:900;font-size:1rem;color:'+(isError?'#FF5252':'#28CA41')+'">'+String(computed)+'</div>';
+    html += '</div>';
+    
+    // Visual result bar (for numbers)
+    if(!isError && typeof computed === 'number' && computed > 0) {
+      html += '<div style="background:rgba(255,255,255,0.06);border-radius:20px;height:6px;margin-bottom:10px;overflow:hidden">'
+        +'<div style="height:100%;width:100%;background:linear-gradient(90deg,#28CA41,#00BFA5);border-radius:20px;animation:load-anim 0.6s ease"></div>'
+        +'</div>';
+    }
+    
+    // Hint / correction
+    if(hint){
+      html += '<div style="display:flex;gap:8px;align-items:flex-start;padding:8px 10px;background:rgba(255,214,0,0.07);border-radius:8px">';
+      html += '<span style="color:#FFD600;flex-shrink:0">'+(isError?'🔧':'💡')+'</span>';
+      html += '<div style="font-size:0.82rem;line-height:1.5;color:var(--text)">'+hint+'</div>';
+      html += '</div>';
+    }
+    
+    html += '</div>';
+  });
+  
+  // Stats summary if numbers present
+  const allNums = [];
+  for(let r=2;r<=_exlRows;r++) for(let co=1;co<=_exlCols;co++){const v=elabXlGetNum(r+'_'+co);if(v!==null)allNums.push(v);}
+  if(allNums.length >= 2){
+    const sum = allNums.reduce((a,b)=>a+b,0);
+    const avg = sum/allNums.length;
+    const sorted = [...allNums].sort((a,b)=>a-b);
+    const mid = Math.floor(sorted.length/2);
+    const med = sorted.length%2 ? sorted[mid] : (sorted[mid-1]+sorted[mid])/2;
+    const std = Math.sqrt(allNums.reduce((s,x)=>s+(x-avg)**2,0)/(allNums.length-1));
+    
+    html += '<div style="background:rgba(108,99,255,0.06);border:1px solid rgba(108,99,255,0.2);border-radius:12px;padding:14px">';
+    html += '<div style="font-weight:800;font-size:0.85rem;color:var(--primary);margin-bottom:10px">📈 إحصاءات البيانات</div>';
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px">';
+    [
+      {label:'المجموع',val:Math.round(sum*100)/100,icon:'Σ'},
+      {label:'المتوسط',val:Math.round(avg*100)/100,icon:'x̄'},
+      {label:'الوسيط',val:Math.round(med*100)/100,icon:'M'},
+      {label:'الانحراف',val:Math.round(std*100)/100,icon:'σ'},
+      {label:'الأكبر',val:Math.max(...allNums),icon:'↑'},
+      {label:'الأصغر',val:Math.min(...allNums),icon:'↓'},
+    ].forEach(({label,val,icon}) => {
+      html += '<div style="background:rgba(255,255,255,0.04);border-radius:8px;padding:8px;text-align:center">'
+        +'<div style="font-size:0.75rem;color:var(--primary);font-weight:700">'+icon+' '+label+'</div>'
+        +'<div style="font-size:1.05rem;font-weight:900;color:var(--text)">'+val+'</div>'
+        +'</div>';
+    });
+    html += '</div></div>';
+  }
+  
+  fb.style.display = 'block';
+  fb.innerHTML = html;
+}
+
+function getXlFormulaHint(formula, computed, isError){
+  const f = formula.toUpperCase();
+  if(!isError){
+    if(f.startsWith('=AVERAGE')) return 'المتوسط الحسابي محسوب بشكل صحيح — تذكر: المتوسط = مجموع القيم ÷ عددها (x̄ = Σx ÷ n)';
+    if(f.startsWith('=SUM')) return 'دالة SUM تجمع كل القيم في النطاق المحدد';
+    if(f.startsWith('=STDEV')) return 'الانحراف المعياري يقيس مدى تشتت البيانات عن المتوسط';
+    if(f.startsWith('=MEDIAN')) return 'الوسيط هو القيمة الوسطى بعد ترتيب البيانات تصاعدياً';
+    if(f.startsWith('=MAX')) return 'القيمة الأعلى (الأكبر) في النطاق';
+    if(f.startsWith('=MIN')) return 'القيمة الأدنى (الأصغر) في النطاق';
+    return null;
+  }
+  if(computed === '#ERR!' || computed === '#REF!') return 'تحقق من النطاق المحدد في الصيغة — مثال صحيح: <code style="background:rgba(0,0,0,0.3);padding:1px 5px;border-radius:3px">B2:B6</code>';
+  if(computed === '#IF!') return 'صيغة IF تحتاج ثلاثة أجزاء: <code style="background:rgba(0,0,0,0.3);padding:1px 5px;border-radius:3px">=IF(الشرط, قيمة_صح, قيمة_خطأ)</code>';
+  return 'راجع كتابة الصيغة — تأكد من الأقواس والفاصلة';
+}
+
+
 
 function elabXlChart(){
   let lblCol=-1, numCol=-1;
@@ -4148,6 +4494,7 @@ function buildEmbeddedLab(subjectId) {
         <button onclick="elabXlAddRow()" style="padding:5px 10px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--text);font-family:var(--font);font-size:0.78rem;cursor:pointer">+ صف</button>
         <button onclick="elabXlAddCol()" style="padding:5px 10px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--text);font-family:var(--font);font-size:0.78rem;cursor:pointer">+ عمود</button>
         <button onclick="elabXlChart()" style="padding:5px 11px;border-radius:7px;border:1px solid rgba(232,160,32,0.4);background:rgba(232,160,32,0.1);color:#E8A020;font-family:var(--font);font-size:0.78rem;cursor:pointer;font-weight:600">📊 رسم</button>
+        <button onclick="elabXlValidate()" style="padding:5px 11px;border-radius:7px;border:1px solid rgba(0,191,165,0.4);background:rgba(0,191,165,0.1);color:#00BFA5;font-family:var(--font);font-size:0.78rem;cursor:pointer;font-weight:600">✅ تحقق</button>
         <button onclick="elabXlClear()" style="padding:5px 10px;border-radius:7px;border:1px solid var(--border);background:rgba(255,82,82,0.07);color:#FF5252;font-family:var(--font);font-size:0.78rem;cursor:pointer">🗑️</button>
       </div>
       <div style="display:flex;align-items:center;gap:7px;margin-bottom:7px;background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:6px 11px">
@@ -4159,6 +4506,7 @@ function buildEmbeddedLab(subjectId) {
       <div style="border-radius:11px;overflow:auto;border:1px solid rgba(255,255,255,0.08);background:#1a1a2a;max-height:360px" id="elab-xl-grid"></div>
       <div id="elab-xl-stats" style="margin-top:11px;display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:7px"></div>
       <div id="elab-xl-chart-wrap" style="display:none;margin-top:11px;background:white;border-radius:13px;padding:14px"><canvas id="elab-xl-chart" style="max-width:100%;max-height:300px"></canvas></div>
+      <div id="elab-xl-feedback" style="display:none;margin-top:11px"></div>
       <div style="margin-top:11px;padding:11px 13px;background:rgba(232,160,32,0.06);border-radius:9px;border:1px solid rgba(232,160,32,0.17)">
         <div style="font-size:0.73rem;color:#E8A020;font-weight:700;margin-bottom:6px">📖 الدوال:</div>
         <div id="elab-xl-fnref" style="display:flex;flex-wrap:wrap;gap:5px"></div>
@@ -6616,6 +6964,16 @@ function runJsFallback(code, inputValues) {
     const scope = { ...BUILTINS, pyReprFn, out, Math };
     const fn = new Function(...Object.keys(scope), jsCode);
     fn(...Object.values(scope));
+
+    // فحص Infinity/NaN (تقسيم على صفر في Python يُسبب خطأ)
+    for (const line of out) {
+      if (String(line) === 'Infinity' || String(line) === '-Infinity') {
+        throw new Error('ZeroDivisionError: division by zero');
+      }
+      if (String(line) === 'NaN') {
+        throw new Error('ValueError: math domain error');
+      }
+    }
 
     if (out.length === 0) return '<span style="color:#28CA41">✓ تم التنفيذ بنجاح (لا مخرجات)</span>';
     return out.map(line => 

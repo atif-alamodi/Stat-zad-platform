@@ -1214,24 +1214,24 @@ async function elabRunPy() {
 
   // ── Detect input() calls and collect values first ──────────────────────────
   const inputPrompts = detectInputCalls(code);
+  let _collectedVals = [];
   if (inputPrompts.length > 0) {
     out.innerHTML = '<span style="color:#FFD600">⌨️ انتظار مدخلات المستخدم...</span>';
     const values = await collectInputs(inputPrompts);
-    const inputValues = values || [];
+    _collectedVals = values || [];
     if (values === null) {
       out.innerHTML = '<span style="color:#888">⚠️ تم إلغاء الإدخال</span>';
       return;
     }
-    patchPyodideWithInputs(_elabPyodide, values);
+    patchPyodideWithInputs(_elabPyodide, _collectedVals);
   }
 
   if (btn) { btn.textContent = '⏳'; btn.disabled = true; }
   out.innerHTML = '<span style="color:#FFD600">⏳ جاري التنفيذ...</span>';
 
   try {
-    // Try instant engine first
-    const inputValues = [];
-    const instantRes = runJsFallback(code, _iv);
+    // Try instant engine first — instant JS engine, zero loading
+    const instantRes = runJsFallback(code, _collectedVals);
     if (instantRes !== null) {
       out.innerHTML = instantRes || '<span style="color:#28CA41">✓ تم بنجاح</span>';
       if (btn) { btn.textContent = '▶ تشغيل'; btn.disabled = false; }
@@ -3949,7 +3949,7 @@ function showSubject(subjectId, activeTab) {
     </div>
     ${tabBar}${body}`;
 
-  if (activeTab === 'lab') setTimeout(() => initEmbeddedLab(subjectId), 150);
+  if (activeTab === 'lab') { _elabXlInited = false; setTimeout(() => initEmbeddedLab(subjectId), 150); }
 }
 
 function buildLessonsTab(subject, subjectId) {
@@ -4012,21 +4012,84 @@ function buildInfoCards(subject, subjectId) {
   return `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px">${cards}</div>`;
 }
 
+function buildMindMap(mm) {
+  if (!mm) return '';
+  var branches = mm.branches || [];
+  var center = (mm.center || '').replace(/</g,'&lt;');
+  var W=560, H=320, cx=280, cy=160, R=118;
+  var svg = '';
+  var PALETTE=['#6C63FF','#00BFA5','#FF7043','#FFD600','#E91E63','#00B0FF'];
+
+  for(var i=0;i<branches.length;i++){
+    var b=branches[i];
+    var col=b.color||PALETTE[i%PALETTE.length];
+    var ang=(2*Math.PI*i/branches.length)-Math.PI/2;
+    var bx=Math.round(cx+R*Math.cos(ang));
+    var by=Math.round(cy+R*Math.sin(ang));
+    var lbl=(b.label||'').replace(/</g,'&lt;');
+    svg+='<line x1="'+cx+'" y1="'+cy+'" x2="'+bx+'" y2="'+by+'" stroke="'+col+'" stroke-width="2.5" stroke-opacity="0.45" stroke-dasharray="8,4"/>';
+    var rw=Math.min(Math.max(lbl.length*5.2+20,44),92);
+    svg+='<ellipse cx="'+bx+'" cy="'+by+'" rx="'+rw+'" ry="20" fill="'+col+'22" stroke="'+col+'" stroke-width="2"/>';
+    svg+='<text x="'+bx+'" y="'+(by+5)+'" text-anchor="middle" font-family="Cairo,sans-serif" font-size="11" fill="'+col+'" font-weight="800">'+lbl+'</text>';
+    var ch=b.children||[];
+    for(var j=0;j<ch.length;j++){
+      var cs=String(ch[j]).replace(/</g,'&lt;');
+      var spread=(ch.length-1)/2;
+      var ca=ang+(j-spread)*0.42;
+      var chx=Math.round(cx+(R+66)*Math.cos(ca));
+      var chy=Math.round(cy+(R+66)*Math.sin(ca));
+      svg+='<line x1="'+bx+'" y1="'+by+'" x2="'+chx+'" y2="'+chy+'" stroke="'+col+'" stroke-width="1" stroke-opacity="0.3"/>';
+      svg+='<text x="'+chx+'" y="'+chy+'" text-anchor="middle" dominant-baseline="middle" font-family="Cairo,sans-serif" font-size="9.5" fill="'+col+'cc">'+cs+'</text>';
+    }
+  }
+
+  var cards='';
+  for(var i=0;i<branches.length;i++){
+    var b=branches[i];
+    var col=b.color||PALETTE[i%PALETTE.length];
+    var chips='';
+    var ch=b.children||[];
+    for(var j=0;j<ch.length;j++){
+      chips+='<span style="font-size:0.68rem;padding:2px 7px;background:'+col+'18;border-radius:20px;color:var(--text)">'+String(ch[j])+'</span>';
+    }
+    cards+='<div style="background:'+col+'12;border:1.5px solid '+col+'35;border-radius:12px;padding:10px">';
+    cards+='<div style="font-weight:800;font-size:0.8rem;color:'+col+';margin-bottom:5px;padding-bottom:4px;border-bottom:1px solid '+col+'22">'+b.label+'</div>';
+    cards+='<div style="display:flex;flex-wrap:wrap;gap:4px">'+chips+'</div></div>';
+  }
+
+  return '<div style="margin-top:20px"><div style="font-size:0.95rem;font-weight:700;margin-bottom:10px;color:var(--primary)">🧠 الخريطة الذهنية</div>'
+    +'<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(108,99,255,0.2);border-radius:16px;padding:14px;overflow:hidden">'
+    +'<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;max-height:250px;overflow:visible" xmlns="http://www.w3.org/2000/svg">'
+    +svg
+    +'<ellipse cx="'+cx+'" cy="'+cy+'" rx="60" ry="28" fill="#6C63FF" opacity="0.9"/>'
+    +'<text x="'+cx+'" y="'+(cy+5)+'" text-anchor="middle" font-family="Cairo,sans-serif" font-size="12.5" fill="white" font-weight="900">'+center+'</text>'
+    +'</svg>'
+    +'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-top:10px">'+cards+'</div>'
+    +'</div></div>';
+}
+
 function buildAllMindMaps(subject) {
-  let items = '';
-  subject.chapters.forEach(ch => {
-    ch.lessons.forEach(lesson => {
-      const mm = lesson.content && lesson.content.mindMap;
-      if (!mm) return;
-      items += `<div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:16px;padding:14px">
-        <div style="font-size:0.72rem;font-weight:700;color:var(--text-muted);margin-bottom:3px">${ch.title}</div>
-        <div style="font-size:0.92rem;font-weight:800;margin-bottom:10px">${lesson.title}</div>
-        ${buildMindMap(mm)}</div>`;
+  var PALETTE=['#6C63FF','#00BFA5','#FF7043','#FFD600','#E91E63','#00B0FF'];
+  var out='<div style="display:flex;flex-direction:column;gap:16px">';
+  var found=0;
+  subject.chapters.forEach(function(ch){
+    ch.lessons.forEach(function(lesson){
+      var mm=lesson.content&&lesson.content.mindMap;
+      if(!mm) return;
+      if(mm.branches) mm.branches.forEach(function(b,i){ if(!b.color) b.color=PALETTE[i%PALETTE.length]; });
+      found++;
+      out+='<div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:18px;padding:16px">';
+      out+='<div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:2px">'+ch.title+'</div>';
+      out+='<div style="font-size:0.9rem;font-weight:800;margin-bottom:6px">'+lesson.title+'</div>';
+      out+=buildMindMap(mm);
+      out+='</div>';
     });
   });
-  return items ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px">${items}</div>` :
-    `<div style="text-align:center;padding:50px;color:var(--text-muted)">لا توجد خرائط ذهنية</div>`;
+  out+='</div>';
+  if(!found) return '<div style="text-align:center;padding:60px"><div style="font-size:3rem;margin-bottom:12px">🧠</div><div style="color:var(--text-muted);font-size:0.9rem">لا توجد خرائط ذهنية لهذه المادة</div></div>';
+  return out;
 }
+
 
 function buildEmbeddedLab(subjectId) {
   return `
@@ -4253,162 +4316,154 @@ function buildLessonBody(lesson, subject) {
 }
 
 function buildConceptLesson(lesson) {
-  const c = lesson.content;
-  return `
-    <div class="lesson-content-wrap" style="padding: 0;">
-      ${c.definition ? `
-        <div style="
-          background: linear-gradient(135deg, rgba(108,99,255,0.15), transparent);
-          border-right: 4px solid var(--primary);
-          border-radius: 15px;
-          padding: 20px;
-          margin-bottom: 20px;
-          font-size: 1.05rem;
-          line-height: 1.7;
-        ">${c.definition}</div>
-      ` : ''}
-      
-      ${c.whyLearn ? `
-        <div style="
-          background: rgba(255,255,255,0.04);
-          border: 1px solid var(--border);
-          border-radius: 20px;
-          padding: 25px;
-          margin-bottom: 20px;
-        ">
-          <div style="font-size: 1.1rem; font-weight: 700; margin-bottom: 15px;">💡 لماذا نتعلم هذا؟</div>
-          ${c.whyLearn.map(w => `
-            <div style="display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border);">
-              <span style="font-size: 1.2rem;">${w.split(' ')[0]}</span>
-              <span style="font-size: 0.95rem;">${w.substring(w.indexOf(' ')+1)}</span>
-            </div>
-          `).join('')}
-        </div>
-      ` : ''}
+  var c = lesson.content;
+  var html = '';
 
-      ${c.keyTerms ? `
-        <div style="margin-bottom: 20px;">
-          <div style="font-size: 1.1rem; font-weight: 700; margin-bottom: 15px;">📖 مصطلحات أساسية</div>
-          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px,1fr)); gap: 10px;">
-            ${c.keyTerms.map(kt => `
-              <div style="
-                background: rgba(108,99,255,0.07);
-                border: 1px solid rgba(108,99,255,0.2);
-                border-radius: 12px; padding: 14px;
-              ">
-                <div style="font-weight: 800; color: var(--primary); margin-bottom: 5px; font-size: 0.9rem;">${kt.term}</div>
-                <div style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.5;">${kt.def}</div>
-              </div>
-            `).join('')}
-          </div>
-        </div>
-      ` : ''}
-      
-      ${c.realExamples ? `
-        <div style="margin-bottom: 20px;">
-          <div style="font-size: 1.1rem; font-weight: 700; margin-bottom: 15px;">🌍 أمثلة من الواقع</div>
-          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px;">
-            ${c.realExamples.map(ex => `
-              <div style="
-                background: rgba(255,255,255,0.04);
-                border: 1px solid var(--border);
-                border-radius: 15px; padding: 20px; text-align: center;
-                transition: transform 0.2s; cursor: default;
-              " onmouseenter="this.style.transform='translateY(-4px)'" onmouseleave="this.style.transform='none'">
-                <div style="font-size: 2rem; margin-bottom: 10px;">${ex.icon || '🌐'}</div>
-                <div style="font-weight: 700; margin-bottom: 5px;">${ex.title}</div>
-                <div style="font-size: 0.8rem; color: var(--text-muted);">${ex.desc}</div>
-              </div>
-            `).join('')}
-          </div>
-        </div>
-      ` : ''}
-      
-      ${c.components ? `
-        <div style="margin-bottom: 20px;">
-          <div style="font-size: 1.1rem; font-weight: 700; margin-bottom: 15px;">⚙️ المكونات الأساسية</div>
-          ${c.components.map((comp, i) => `
-            <div class="step-card" style="opacity: 1; transform: none;">
-              <div class="step-num">${i+1}</div>
-              <div class="step-content">
-                <div class="step-title">${comp.name}</div>
-                <div style="color: var(--text-muted);">${comp.desc}</div>
-              </div>
-            </div>
-          `).join('')}
-        </div>
-      ` : ''}
-      
-      ${c.types ? `
-        <div style="margin-bottom: 20px;">
-          ${c.types.map(type => `
-            <div style="display: flex; align-items: center; gap: 15px; padding: 15px;
-              background: rgba(255,255,255,0.04); border: 1px solid var(--border);
-              border-radius: 15px; margin-bottom: 10px;">
-              <span style="font-size: 2rem;">${type.icon || '📌'}</span>
-              <div>
-                <div style="font-weight: 700;">${type.name}</div>
-                <div style="font-size: 0.85rem; color: var(--text-muted);">${type.desc}</div>
-              </div>
-            </div>
-          `).join('')}
-        </div>
-      ` : ''}
-      
-      ${c.properties ? `
-        <div style="background: rgba(0,230,118,0.08); border: 1px solid rgba(0,230,118,0.2);
-          border-radius: 15px; padding: 20px; margin-bottom: 20px;">
-          <div style="font-size: 1.1rem; font-weight: 700; margin-bottom: 12px; color: var(--success);">🔑 خصائص مهمة</div>
-          ${c.properties.map(p => `
-            <div style="display: flex; align-items: center; gap: 10px; padding: 8px 0;">
-              <span style="color: var(--success);">✓</span>
-              <span>${p}</span>
-            </div>
-          `).join('')}
-        </div>
-      ` : ''}
+  // ── 1. Hero definition ────────────────────────────────────────────────────
+  if (c.definition) {
+    html += '<div style="background:linear-gradient(135deg,rgba(108,99,255,0.18),rgba(156,140,255,0.08));border-right:4px solid var(--primary);border-radius:16px;padding:22px;margin-bottom:22px;font-size:1.05rem;line-height:1.8;position:relative;overflow:hidden">'
+      +'<div style="position:absolute;top:-20px;right:-20px;font-size:5rem;opacity:0.07">📐</div>'
+      +c.definition+'</div>';
+  }
 
-      ${c.mindMap ? buildMindMap(c.mindMap) : ''}
-    </div>
-  `;
+  // ── 2. Why learn — horizontal scroll cards ────────────────────────────────
+  if (c.whyLearn && c.whyLearn.length) {
+    html += '<div style="margin-bottom:22px">'
+      +'<div style="font-size:1.05rem;font-weight:800;margin-bottom:12px;display:flex;align-items:center;gap:8px"><span style="background:linear-gradient(135deg,#FFD600,#FF7043);-webkit-background-clip:text;-webkit-text-fill-color:transparent">💡</span> لماذا نتعلم هذا؟</div>'
+      +'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">';
+    c.whyLearn.forEach(function(w) {
+      var icon = w.split(' ')[0];
+      var text = w.substring(w.indexOf(' ')+1);
+      html += '<div style="background:rgba(255,214,0,0.07);border:1px solid rgba(255,214,0,0.2);border-radius:13px;padding:14px;display:flex;gap:10px;align-items:flex-start;transition:transform 0.2s" onmouseenter="this.style.transform=\'translateY(-3px)\'" onmouseleave="this.style.transform=\'none\'">'
+        +'<span style="font-size:1.4rem;flex-shrink:0">'+icon+'</span>'
+        +'<span style="font-size:0.88rem;line-height:1.5;color:var(--text)">'+text+'</span>'
+        +'</div>';
+    });
+    html += '</div></div>';
+  }
+
+  // ── 3. Types — visual cards with icons ───────────────────────────────────
+  if (c.types && c.types.length) {
+    var COLORS = ['#6C63FF','#00BFA5','#FF7043','#FFD600','#E91E63','#00B0FF'];
+    html += '<div style="margin-bottom:22px">'
+      +'<div style="font-size:1.05rem;font-weight:800;margin-bottom:12px">📌 الأنواع والتصنيفات</div>'
+      +'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px">';
+    c.types.forEach(function(type, i) {
+      var col = COLORS[i % COLORS.length];
+      html += '<div style="background:'+col+'0d;border:1.5px solid '+col+'30;border-radius:16px;padding:18px;transition:all 0.2s;cursor:default;position:relative;overflow:hidden" onmouseenter="this.style.transform=\'translateY(-4px)\';this.style.boxShadow=\'0 8px 24px '+col+'25\'" onmouseleave="this.style.transform=\'none\';this.style.boxShadow=\'none\'">'
+        +'<div style="position:absolute;top:-8px;right:-8px;font-size:3.5rem;opacity:0.1">'+(type.icon||'📌')+'</div>'
+        +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">'
+        +'<div style="width:40px;height:40px;border-radius:12px;background:'+col+'25;display:flex;align-items:center;justify-content:center;font-size:1.5rem;flex-shrink:0">'+(type.icon||'📌')+'</div>'
+        +'<div style="font-weight:800;font-size:0.92rem;color:'+col+'">'+type.name+'</div>'
+        +'</div>'
+        +'<div style="font-size:0.83rem;color:var(--text-muted);line-height:1.6">'+type.desc+'</div>'
+        +'</div>';
+    });
+    html += '</div></div>';
+  }
+
+  // ── 4. Formula / keyTerms — pill cards with copy ─────────────────────────
+  if (c.keyTerms && c.keyTerms.length) {
+    html += '<div style="margin-bottom:22px">'
+      +'<div style="font-size:1.05rem;font-weight:800;margin-bottom:12px">🔑 المصطلحات والقوانين</div>'
+      +'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px">';
+    c.keyTerms.forEach(function(kt) {
+      var isFormula = /[=+÷×∑√μσ]/.test(kt.def||'') || /[\^₀-₉]/.test(kt.def||'');
+      html += '<div style="background:'+(isFormula?'rgba(108,99,255,0.1)':'rgba(255,255,255,0.04)')+';border:1px solid '+(isFormula?'rgba(108,99,255,0.3)':'var(--border)')+';border-radius:13px;padding:14px;transition:border-color 0.2s" onmouseenter="this.style.borderColor=\'var(--primary)\'" onmouseleave="this.style.borderColor=\''+(isFormula?'rgba(108,99,255,0.3)':'var(--border)')+'\'">'
+        +'<div style="font-weight:800;color:var(--primary);font-size:0.88rem;margin-bottom:6px">'+kt.term+'</div>'
+        +(isFormula
+          ? '<div style="font-family:\'Fira Code\',monospace;font-size:0.9rem;background:rgba(0,0,0,0.3);padding:8px 12px;border-radius:8px;color:#79c0ff;direction:ltr;text-align:left;overflow-x:auto">'+kt.def+'</div>'
+          : '<div style="font-size:0.82rem;color:var(--text-muted);line-height:1.55">'+kt.def+'</div>'
+        )
+        +'</div>';
+    });
+    html += '</div></div>';
+  }
+
+  // ── 5. Steps / Components ─────────────────────────────────────────────────
+  if (c.steps && c.steps.length) {
+    html += '<div style="margin-bottom:22px">'
+      +'<div style="font-size:1.05rem;font-weight:800;margin-bottom:14px">📋 الخطوات</div>';
+    c.steps.forEach(function(step, i) {
+      html += '<div style="display:flex;gap:14px;padding:14px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:14px;margin-bottom:10px;align-items:flex-start">'
+        +'<div style="min-width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--secondary));display:flex;align-items:center;justify-content:center;font-weight:900;font-size:0.9rem;color:white;flex-shrink:0">'+(i+1)+'</div>'
+        +'<div style="flex:1">'
+        +(typeof step==='string' ? '<div style="font-size:0.9rem;line-height:1.6">'+step+'</div>'
+          : '<div style="font-weight:700;margin-bottom:4px">'+(step.name||step.title||'')+'</div><div style="font-size:0.83rem;color:var(--text-muted);line-height:1.55">'+(step.desc||step.description||'')+'</div>')
+        +'</div></div>';
+    });
+    html += '</div>';
+  }
+
+  if (c.components && c.components.length) {
+    html += '<div style="margin-bottom:22px">'
+      +'<div style="font-size:1.05rem;font-weight:800;margin-bottom:14px">⚙️ المكونات</div>';
+    c.components.forEach(function(comp, i) {
+      html += '<div style="display:flex;gap:14px;padding:14px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:14px;margin-bottom:10px;align-items:flex-start">'
+        +'<div style="min-width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--secondary));display:flex;align-items:center;justify-content:center;font-weight:900;font-size:0.9rem;color:white;flex-shrink:0">'+(i+1)+'</div>'
+        +'<div><div style="font-weight:700;margin-bottom:4px">'+comp.name+'</div><div style="font-size:0.83rem;color:var(--text-muted);line-height:1.55">'+comp.desc+'</div></div>'
+        +'</div>';
+    });
+    html += '</div>';
+  }
+
+  // ── 6. Properties ─────────────────────────────────────────────────────────
+  if (c.properties && c.properties.length) {
+    html += '<div style="background:rgba(0,191,165,0.08);border:1px solid rgba(0,191,165,0.25);border-radius:14px;padding:18px;margin-bottom:22px">'
+      +'<div style="font-size:1rem;font-weight:800;color:#00BFA5;margin-bottom:10px">✅ خصائص مهمة</div>'
+      +'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px">';
+    c.properties.forEach(function(p) {
+      html += '<div style="display:flex;gap:8px;align-items:flex-start;padding:6px 0">'
+        +'<span style="color:#00BFA5;font-weight:900;flex-shrink:0">✓</span>'
+        +'<span style="font-size:0.87rem;line-height:1.5">'+p+'</span>'
+        +'</div>';
+    });
+    html += '</div></div>';
+  }
+
+  // ── 7. Real examples — story cards ────────────────────────────────────────
+  if (c.realExamples && c.realExamples.length) {
+    html += '<div style="margin-bottom:22px">'
+      +'<div style="font-size:1.05rem;font-weight:800;margin-bottom:12px">🌍 أمثلة من الواقع</div>'
+      +'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px">';
+    c.realExamples.forEach(function(ex) {
+      html += '<div style="background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:15px;padding:18px;text-align:center;transition:all 0.2s;cursor:default" onmouseenter="this.style.transform=\'translateY(-4px)\';this.style.borderColor=\'var(--primary)\'" onmouseleave="this.style.transform=\'none\';this.style.borderColor=\'var(--border)\'">'
+        +'<div style="font-size:2.2rem;margin-bottom:10px">'+(ex.icon||'🌐')+'</div>'
+        +'<div style="font-weight:700;font-size:0.9rem;margin-bottom:6px">'+ex.title+'</div>'
+        +'<div style="font-size:0.78rem;color:var(--text-muted);line-height:1.5">'+ex.desc+'</div>'
+        +'</div>';
+    });
+    html += '</div></div>';
+  }
+
+  // ── 8. Visual diagram for types (SVG bar chart simulation) ────────────────
+  if (c.types && c.types.length >= 2 && !c.steps) {
+    var COLORS = ['#6C63FF','#00BFA5','#FF7043','#FFD600'];
+    html += '<div style="margin-bottom:22px">'
+      +'<div style="font-size:1rem;font-weight:800;margin-bottom:12px;color:var(--primary)">📊 مقارنة بصرية</div>'
+      +'<div style="background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:16px;padding:18px;overflow-x:auto">'
+      +'<svg viewBox="0 0 500 160" style="width:100%;min-width:300px;max-height:160px" xmlns="http://www.w3.org/2000/svg">';
+    var barW = Math.min(80, Math.floor(460/c.types.length)-12);
+    var spacing = Math.floor(500/c.types.length);
+    c.types.forEach(function(type, i) {
+      var col = COLORS[i%COLORS.length];
+      var h = 60 + (i%3)*20;
+      var x = 30 + i*spacing;
+      html += '<rect x="'+x+'" y="'+(120-h)+'" width="'+barW+'" height="'+h+'" rx="8" fill="'+col+'" opacity="0.8"/>';
+      var lbl = (type.name||'').replace(/\(.+\)/,'').trim().slice(0,8);
+      html += '<text x="'+(x+barW/2)+'" y="140" text-anchor="middle" font-family="Cairo,sans-serif" font-size="10" fill="'+col+'">'+lbl+'</text>';
+    });
+    html += '</svg></div></div>';
+  }
+
+  // ── 9. Mind map ────────────────────────────────────────────────────────────
+  if (c.mindMap) {
+    html += buildMindMap(c.mindMap);
+  }
+
+  return '<div class="lesson-content-wrap" style="padding:0">'+html+'</div>';
 }
 
-function buildMindMap(mm) {
-  if (!mm) return '';
-  const branches = mm.branches || [];
-  const cx = 280, cy = 180, R = 120;
-  const svgLines = branches.map((b,i) => {
-    const a = (2*Math.PI*i/branches.length) - Math.PI/2;
-    return `<line x1="${cx}" y1="${cy}" x2="${Math.round(cx+R*Math.cos(a))}" y2="${Math.round(cy+R*Math.sin(a))}" stroke="${b.color||'#6C63FF'}" stroke-width="2" stroke-opacity="0.4" stroke-dasharray="6,3"/>`;
-  }).join('');
-  const svgNodes = branches.map((b,i) => {
-    const a = (2*Math.PI*i/branches.length) - Math.PI/2;
-    const x = Math.round(cx+R*Math.cos(a)), y = Math.round(cy+R*Math.sin(a));
-    const lbl = (b.label||'').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    const rw = Math.min(Math.max(lbl.length*5+18, 42), 90);
-    return `<ellipse cx="${x}" cy="${y}" rx="${rw}" ry="17" fill="${b.color||'#6C63FF'}22" stroke="${b.color||'#6C63FF'}" stroke-width="1.5"/>
-    <text x="${x}" y="${y+5}" text-anchor="middle" font-family="Cairo,sans-serif" font-size="10.5" fill="${b.color||'#6C63FF'}" font-weight="800">${lbl}</text>`;
-  }).join('');
-  const center = (mm.center||'').replace(/</g,'&lt;');
-  return `<div style="margin-top:24px">
-    <div style="font-size:1rem;font-weight:700;margin-bottom:12px;color:var(--primary);">🧠 الخريطة الذهنية</div>
-    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(108,99,255,0.18);border-radius:18px;padding:16px;overflow:hidden;">
-      <svg viewBox="0 0 560 360" style="width:100%;max-height:230px" xmlns="http://www.w3.org/2000/svg">
-        <defs><radialGradient id="cg${Math.random().toString(36).slice(2,6)}"><stop offset="0%" stop-color="#6C63FF"/><stop offset="100%" stop-color="#9C8CFF" stop-opacity="0.7"/></radialGradient></defs>
-        ${svgLines}
-        <ellipse cx="${cx}" cy="${cy}" rx="60" ry="28" fill="#6C63FF" opacity="0.9" filter="drop-shadow(0 4px 10px #6C63FF66)"/>
-        <text x="${cx}" y="${cy+5}" text-anchor="middle" font-family="Cairo,sans-serif" font-size="12" fill="white" font-weight="900">${center}</text>
-        ${svgNodes}
-      </svg>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:12px;">
-        ${branches.map(b=>`<div style="background:${b.color||'#6C63FF'}10;border:1.5px solid ${b.color||'#6C63FF'}30;border-radius:12px;padding:10px;transition:transform 0.2s" onmouseenter="this.style.transform='translateY(-3px)'" onmouseleave="this.style.transform='none'">
-          <div style="font-weight:800;font-size:0.82rem;color:${b.color||'#6C63FF'};margin-bottom:6px;padding-bottom:5px;border-bottom:1px solid ${b.color||'#6C63FF'}20">${b.label}</div>
-          <div style="display:flex;flex-wrap:wrap;gap:4px">${(b.children||[]).map(ch=>`<span style="font-size:0.7rem;padding:2px 7px;background:${b.color||'#6C63FF'}15;border-radius:20px;color:var(--text)">${ch}</span>`).join('')}</div>
-        </div>`).join('')}
-      </div>
-    </div>
-  </div>`;
-}
 
 function buildCalculationLesson(lesson) {
   const steps = lesson.content.steps || [];
@@ -6060,7 +6115,7 @@ except: pass
 
     // Try instant engine first (no Pyodide needed for simple code)
     const _iv = (typeof values !== 'undefined' && values) ? values : [];
-    const instantResult = runJsFallback(code, _iv);
+    const instantResult = runJsFallback(code, _eivColl);
     if (instantResult !== null) {
       out.innerHTML = instantResult || '<span style="color:#28CA41;">✓ تم التنفيذ بنجاح</span>';
       btn.textContent = '▶ تشغيل'; btn.disabled = false;

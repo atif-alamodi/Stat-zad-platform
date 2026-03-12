@@ -1186,8 +1186,29 @@ async function elabRunPy() {
     if(dot)dot.style.background='#28CA41';if(txt)txt.textContent='Python جاهز ✓';
   }
   if (!_elabPyReady || !_elabPyodide) {
-    out.innerHTML = '<span style="color:#FFD600">⏳ Python يتحمّل... اضغط تشغيل مرة أخرى بعد ثانية</span>';
+    // Auto-wait and retry instead of making user press again
+    out.innerHTML = '<span style="color:#FFD600">⏳ Python يتحمّل، سيبدأ تلقائياً...</span>';
+    if (btn) { btn.textContent = '⏳'; btn.disabled = true; }
     if (typeof initPyodide !== 'undefined' && !pyReady) initPyodide();
+    const _elabWait = setInterval(() => {
+      const ready = (pyReady && pyodide) || _elabPyReady;
+      if (ready) {
+        clearInterval(_elabWait);
+        if (!_elabPyReady && pyodide && pyReady) {
+          _elabPyodide = pyodide; _elabPyReady = true;
+          try { pyodide.runPython(`import sys\nif '_cap' not in dir():\n  class _Cap:\n    def __init__(self): self.d=[]\n    def write(self,s): self.d.append(s)\n    def flush(self): pass\n    def getvalue(self): return ''.join(self.d)\n  _cap=_Cap()\nsys.stdout=_cap;sys.stderr=_cap`); } catch(e){}
+        }
+        if (btn) { btn.textContent = '▶ تشغيل'; btn.disabled = false; }
+        elabRunPy(); // auto-retry
+      }
+    }, 600);
+    setTimeout(() => {
+      clearInterval(_elabWait);
+      if (!_elabPyReady) {
+        if (btn) { btn.textContent = '▶ تشغيل'; btn.disabled = false; }
+        out.innerHTML = '<span style="color:#FF5252">⚠️ تعذّر تحميل Python — تحقق من اتصالك بالإنترنت</span>';
+      }
+    }, 30000);
     return;
   }
 
@@ -3634,6 +3655,12 @@ function enterApp() {
   document.body.setAttribute('data-gender', APP.student.gender || 'male');
   updateStudentUI();
   showPage('page-app');
+  // Pre-load Pyodide silently in background so it's ready when student opens lab
+  setTimeout(() => {
+    if (typeof initPyodide !== 'undefined' && !pyReady) {
+      initPyodide();
+    }
+  }, 1000);
 
   // Restore last location
   const loc = loadLocation();
@@ -5664,9 +5691,10 @@ let pyodide = null;
 let pyReady = false;
 
 async function initPyodide() {
+  if (pyReady || typeof loadPyodide === 'undefined' && document.querySelector('script[src*="pyodide"]')) return;
   const dot = document.getElementById('py-status-dot');
   const txt = document.getElementById('py-status-text');
-  if (!dot || !txt) return;
+  // Continue even if UI elements don't exist (background loading)
 
   dot.style.background = '#FFD600';
   txt.textContent = 'جاري تحميل محرك Python (Pyodide)...';
@@ -5691,8 +5719,26 @@ sys.stdout = _capture
 sys.stderr = _capture
     `);
     pyReady = true;
-    dot.style.background = '#28CA41';
-    txt.textContent = 'Python جاهز ✓';
+    // Create _cap alias for embedded lab (uses _cap, main lab uses _capture)
+    pyodide.runPython(`
+import sys
+class _Cap:
+  def __init__(self): self.d = []
+  def write(self, s): self.d.append(s)
+  def flush(self): pass
+  def getvalue(self): return ''.join(self.d)
+_cap = _Cap()
+`);
+    // Sync to embedded lab immediately
+    _elabPyodide = pyodide; _elabPyReady = true;
+    // Update UI only if elements exist
+    if (dot) dot.style.background = '#28CA41';
+    if (txt) txt.textContent = 'Python جاهز ✓';
+    // Update embedded lab status if visible
+    const elDot = document.getElementById('elab-py-dot');
+    const elTxt = document.getElementById('elab-py-status');
+    if (elDot) elDot.style.background = '#28CA41';
+    if (elTxt) elTxt.textContent = 'Python جاهز ✓';
     setTimeout(() => { txt.textContent = 'Python جاهز ✓'; }, 2000);
   } catch (e) {
     dot.style.background = '#FF5252';
@@ -5953,8 +5999,24 @@ async function runPython() {
   const btn = document.getElementById('run-btn');
 
   if (!pyReady || !pyodide) {
-    btn.textContent = '▶ تشغيل'; btn.disabled = false;
-    out.innerHTML = runJsFallback(code); return;
+    // Wait up to 30s for Pyodide to finish loading then auto-run
+    out.innerHTML = '<span style="color:#FFD600">⏳ Python يتحمّل، سيبدأ التنفيذ تلقائياً...</span>';
+    btn.textContent = '⏳'; btn.disabled = true;
+    const _waitAndRun = setInterval(() => {
+      if (pyReady && pyodide) {
+        clearInterval(_waitAndRun);
+        btn.textContent = '▶ تشغيل'; btn.disabled = false;
+        runPython();
+      }
+    }, 600);
+    setTimeout(() => {
+      clearInterval(_waitAndRun);
+      if (!pyReady) {
+        btn.textContent = '▶ تشغيل'; btn.disabled = false;
+        out.innerHTML = runJsFallback(code);
+      }
+    }, 30000);
+    return;
   }
 
   // ── Detect input() calls and collect values first ──────────────────────

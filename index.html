@@ -1132,34 +1132,44 @@ function elabClearPy() {
 }
 
 async function elabRunPy() {
-  const ta = document.getElementById('elab-editor');
+  const ta  = document.getElementById('elab-editor');
   const out = document.getElementById('elab-out');
   const btn = document.getElementById('elab-run-btn');
   if (!ta || !out) return;
   const code = ta.value.trim();
   if (!code) return;
-  if (btn) { btn.textContent = '⏳'; btn.disabled = true; }
-  out.innerHTML = '<span style="color:#FFD600">⏳ جاري التنفيذ...</span>';
 
   if (!_elabPyReady || !_elabPyodide) {
     out.innerHTML = '<span style="color:#aaa">⚠️ Python لم يُحمَّل بعد — انتظر قليلاً ثم أعد المحاولة</span>';
-    if (btn) { btn.textContent = '▶ تشغيل'; btn.disabled = false; }
     return;
   }
 
+  // ── Detect input() calls and collect values first ──────────────────────────
+  const inputPrompts = detectInputCalls(code);
+  if (inputPrompts.length > 0) {
+    out.innerHTML = '<span style="color:#FFD600">⌨️ انتظار مدخلات المستخدم...</span>';
+    const values = await collectInputs(inputPrompts);
+    if (values === null) {
+      out.innerHTML = '<span style="color:#888">⚠️ تم إلغاء الإدخال</span>';
+      return;
+    }
+    patchPyodideWithInputs(_elabPyodide, values);
+  }
+
+  if (btn) { btn.textContent = '⏳'; btn.disabled = true; }
+  out.innerHTML = '<span style="color:#FFD600">⏳ جاري التنفيذ...</span>';
+
   try {
     _elabPyodide.runPython(`_cap.d=[]\nimport sys\nsys.stdout=_cap\nsys.stderr=_cap\nimport os\ntry: os.remove('/tmp/elab_chart.png')\nexcept: pass`);
-    // Patch matplotlib savefig path
     const patched = code.replace(/plt\.savefig\(['"][^'"]*['"]/g, "plt.savefig('/tmp/elab_chart.png'");
     await _elabPyodide.runPythonAsync(patched);
     const result = _elabPyodide.runPython(`_cap.getvalue()`);
     out.innerHTML = result
       ? result.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-              .replace(/(\d+\.\d+)/g,'<span style="color:#79c0ff">$1</span>')
-              .replace(/(✅|❌|⚠️)/g, s => `<span style="color:${s==='✅'?'#28CA41':s==='❌'?'#FF5252':'#FFD600'}">${s}</span>`)
-      : '<span style="color:#28CA41">✓ تم بنجاح</span>';
+              .replace(/(\d+\.?\d*)/g, n => `<span style="color:#79c0ff">${n}</span>`)
+              .replace(/(True|False|None)/g, k => `<span style="color:#ff7b72">${k}</span>`)
+      : '<span style="color:#28CA41">✓ تم بنجاح (لا مخرجات)</span>';
 
-    // Check chart
     try {
       const hasChart = _elabPyodide.runPython(`import os; os.path.exists('/tmp/elab_chart.png')`);
       if (hasChart) {
@@ -1179,18 +1189,6 @@ async function elabRunPy() {
   }
   if (btn) { btn.textContent = '▶ تشغيل'; btn.disabled = false; }
 }
-
-// ─── Excel engine (embedded, self-contained) ──────────────────────────────────
-const ELAB_XL_COLS = 'ABCDEFGHIJKLM'.split('');
-let _exlData = {}, _exlStyles = {}, _exlRows = 10, _exlCols = 7, _exlSel = {r:1,c:1};
-let _exlChartInst = null;
-
-const ELAB_XL_TMPLS = {
-  grades:{rows:9,cols:5,data:{'1_1':'الاسم','1_2':'المادة','1_3':'الدرجة','1_4':'','1_5':'الحالة','2_1':'أحمد','2_2':'إحصاء','2_3':85,'3_1':'سارة','3_2':'إحصاء','3_3':92,'4_1':'محمد','4_2':'إحصاء','4_3':78,'5_1':'نورة','5_2':'إحصاء','5_3':95,'6_1':'خالد','6_2':'إحصاء','6_3':70,'7_1':'لمى','7_2':'إحصاء','7_3':88,'8_1':'المتوسط','8_3':'=AVERAGE(C2:C7)','9_1':'الانحراف','9_3':'=STDEV(C2:C7)'},hdr:1},
-  stats:{rows:10,cols:4,data:{'1_1':'القيمة','1_2':'الانحراف عن المتوسط','1_3':'مربع الانحراف','1_4':'Z-Score','2_1':80,'3_1':75,'4_1':90,'5_1':85,'6_1':70,'7_1':95,'8_1':78,'9_1':88,'10_1':'المتوسط','10_2':'=AVERAGE(A2:A9)'},hdr:1},
-  sales:{rows:8,cols:4,data:{'1_1':'المنطقة','1_2':'المبيعات','1_3':'الهدف','1_4':'الفرق','2_1':'الرياض','2_2':45000,'2_3':40000,'3_1':'جدة','3_2':38000,'3_3':35000,'4_1':'الدمام','4_2':29000,'4_3':30000,'5_1':'مكة','5_2':22000,'5_3':25000,'6_1':'المدينة','6_2':18000,'6_3':20000,'7_1':'المجموع','7_2':'=SUM(B2:B6)','7_3':'=SUM(C2:C6)','8_1':'المتوسط','8_2':'=AVERAGE(B2:B6)'},hdr:1},
-  employees:{rows:8,cols:4,data:{'1_1':'الاسم','1_2':'القسم','1_3':'الراتب','1_4':'الخبرة','2_1':'سلمى','2_2':'IT','2_3':12000,'2_4':5,'3_1':'فهد','3_2':'HR','3_3':9500,'3_4':3,'4_1':'مريم','4_2':'IT','4_3':14000,'4_4':8,'5_1':'عمر','5_2':'مالية','5_3':11000,'5_4':6,'6_1':'دانة','6_2':'HR','6_3':8500,'6_4':2,'7_1':'عدد','7_3':'=COUNT(C2:C6)','8_1':'متوسط الراتب','8_3':'=AVERAGE(C2:C6)'},hdr:1},
-};
 
 function elabInitXl() {
   _exlData={}; _exlStyles={}; _exlRows=10; _exlCols=7; _exlSel={r:1,c:1};
@@ -5906,20 +5904,29 @@ async function runPython() {
 
   const out = document.getElementById('py-output');
   const btn = document.getElementById('run-btn');
+
+  if (!pyReady || !pyodide) {
+    btn.textContent = '▶ تشغيل'; btn.disabled = false;
+    out.innerHTML = runJsFallback(code); return;
+  }
+
+  // ── Detect input() calls and collect values first ──────────────────────
+  const inputPrompts = detectInputCalls(code);
+  if (inputPrompts.length > 0) {
+    out.innerHTML = '<span style="color:#FFD600;">⌨️ انتظار مدخلات المستخدم...</span>';
+    const values = await collectInputs(inputPrompts);
+    if (values === null) {
+      out.innerHTML = '<span style="color:#888;">⚠️ تم إلغاء الإدخال</span>';
+      return;
+    }
+    patchPyodideWithInputs(pyodide, values);
+  }
+
   btn.textContent = '⏳ جاري التنفيذ...';
   btn.disabled = true;
   out.innerHTML = '<span style="color:#FFD600;">⏳ جاري التنفيذ...</span>';
 
-  if (!pyReady || !pyodide) {
-    // Fallback: JS-based simple eval for basic print/math
-    btn.textContent = '▶ تشغيل';
-    btn.disabled = false;
-    out.innerHTML = runJsFallback(code);
-    return;
-  }
-
   try {
-    // Reset capture
     pyodide.runPython(`
 _capture.data = []
 import sys
@@ -5937,7 +5944,6 @@ except: pass
       ? colorizeOutput(output)
       : '<span style="color:#28CA41;">✓ تم التنفيذ بنجاح (لا يوجد مخرجات)</span>';
 
-    // Check for chart
     try {
       const hasChart = pyodide.runPython(`import os; os.path.exists('/tmp/chart.png')`);
       if (hasChart) {
@@ -5953,8 +5959,7 @@ data
         const img = new Image();
         img.onload = () => {
           const ctx = canvas.getContext('2d');
-          canvas.width = img.width;
-          canvas.height = img.height;
+          canvas.width = img.width; canvas.height = img.height;
           ctx.drawImage(img, 0, 0);
         };
         img.src = 'data:image/png;base64,' + chartData;
@@ -6620,6 +6625,139 @@ if (typeof Chart === 'undefined') {
 }
 
 
-</script>
+
+
+
+
+// ══════════════════════════════════════════════════════════════════
+// 🎯 PYTHON input() BRIDGE  — pre-collect all inputs, then run
+// ══════════════════════════════════════════════════════════════════
+
+// Resolve callback set by runPython/elabRunPy
+let _pyInputResolve = null;
+
+function pyInputConfirm() {
+  const fields = document.querySelectorAll('#py-input-fields input[data-idx]');
+  const vals = Array.from(fields).map(f => f.value);
+  document.getElementById('py-input-modal').style.display = 'none';
+  if (_pyInputResolve) { _pyInputResolve(vals); _pyInputResolve = null; }
+}
+
+function pyInputCancel() {
+  document.getElementById('py-input-modal').style.display = 'none';
+  if (_pyInputResolve) { _pyInputResolve(null); _pyInputResolve = null; }
+}
+
+// Detect all input() calls in code and extract their prompt strings
+function detectInputCalls(code) {
+  const results = [];
+  // Match: input("...") or input('...') or input(f"...") or bare input()
+  const re = /input\s*\(\s*(?:[f]?["']([^"']*(?:""[^"']*)*?)["']|([^)]*))?\s*\)/g;
+  let m;
+  while ((m = re.exec(code)) !== null) {
+    const prompt = (m[1] !== undefined ? m[1] : (m[2] ? m[2].trim() : '')) || '';
+    // Clean up f-string variable refs for display
+    const displayPrompt = prompt.replace(/\{[^}]+\}/g, '(قيمة)');
+    results.push(displayPrompt);
+  }
+  return results;
+}
+
+// Show modal with fields for each input() call, return promise
+function collectInputs(prompts) {
+  return new Promise(resolve => {
+    _pyInputResolve = resolve;
+    const fields = document.getElementById('py-input-fields');
+    if (!fields) { resolve(prompts.map(() => '')); return; }
+    
+    fields.innerHTML = prompts.map((p, i) => `
+      <div>
+        ${p ? `<div style="font-size:0.78rem;color:#6ab0e8;margin-bottom:5px;font-family:'Fira Code',monospace;direction:ltr;text-align:left">${escHtml(p)}</div>` : `<div style="font-size:0.78rem;color:rgba(255,255,255,0.4);margin-bottom:5px;">مدخل ${i+1}</div>`}
+        <input type="text" data-idx="${i}" autocomplete="off"
+          placeholder="اكتب القيمة هنا..."
+          style="width:100%;background:#0d1117;border:1.5px solid rgba(108,99,255,0.35);
+                 border-radius:10px;padding:10px 14px;color:white;font-size:0.9rem;
+                 font-family:'Fira Code',monospace;outline:none;box-sizing:border-box;
+                 direction:ltr;text-align:left;transition:border-color 0.2s,box-shadow 0.2s;"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();
+            const nxt=document.querySelector('#py-input-fields input[data-idx=\\'${i+1}\\']');
+            nxt?nxt.focus():pyInputConfirm();}">
+      </div>
+    `).join('');
+    
+    document.getElementById('py-input-modal').style.display = 'flex';
+    const first = fields.querySelector('input[data-idx="0"]');
+    if (first) setTimeout(() => first.focus(), 60);
+  });
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// Inject collected inputs into Pyodide as a queue so input() returns them
+function patchPyodideWithInputs(pyInstance, inputValues) {
+  if (!pyInstance || !inputValues) return;
+  // Serialize values to Python list
+  const pyList = JSON.stringify(inputValues); // safe JSON array
+  pyInstance.runPython(`
+import builtins as _bi, json as _json
+
+_input_queue = _json.loads('${pyList.replace(/'/g, "\\'")}')
+_input_idx = [0]
+
+def _patched_input(prompt=''):
+    idx = _input_idx[0]
+    if idx < len(_input_queue):
+        val = _input_queue[idx]
+        _input_idx[0] += 1
+        if prompt:
+            import sys
+            sys.stdout.write(str(prompt) + val + '\\n')
+        return val
+    return ''
+
+_bi.input = _patched_input
+`);
+}
+
+</script>>
+
+
+
+<!-- ══ Python input() collector modal ══ -->
+<div id="py-input-modal" style="
+  display:none;position:fixed;inset:0;z-index:99999;
+  background:rgba(0,0,0,0.7);backdrop-filter:blur(8px);
+  align-items:center;justify-content:center;padding:16px;box-sizing:border-box;">
+  <div style="
+    background:#1e1e2e;border:1.5px solid rgba(108,99,255,0.5);
+    border-radius:22px;padding:26px;width:100%;max-width:420px;
+    box-shadow:0 24px 64px rgba(0,0,0,0.6);animation:popIn 0.2s ease;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px;">
+      <div style="font-size:1.6rem;">⌨️</div>
+      <div>
+        <div style="font-weight:800;font-size:1rem;color:white;">البرنامج يحتاج مدخلات</div>
+        <div style="font-size:0.76rem;color:rgba(255,255,255,0.4);margin-top:2px;">اكتب القيم أدناه ثم اضغط تشغيل</div>
+      </div>
+    </div>
+    <div id="py-input-fields" style="display:flex;flex-direction:column;gap:10px;max-height:60vh;overflow-y:auto;"></div>
+    <div style="display:flex;gap:10px;margin-top:18px;">
+      <button onclick="pyInputConfirm()" style="
+        flex:1;padding:12px;background:linear-gradient(135deg,#6C63FF,#9C8CFF);
+        border:none;border-radius:12px;color:white;font-family:var(--font);
+        font-weight:800;font-size:0.92rem;cursor:pointer;">▶ تشغيل الآن</button>
+      <button onclick="pyInputCancel()" style="
+        padding:12px 16px;background:rgba(255,82,82,0.1);border:1px solid rgba(255,82,82,0.3);
+        border-radius:12px;color:#FF5252;font-family:var(--font);font-weight:700;
+        font-size:0.88rem;cursor:pointer;">✕</button>
+    </div>
+  </div>
+</div>
+<style>
+@keyframes popIn {from{transform:scale(0.92);opacity:0}to{transform:scale(1);opacity:1}}
+#py-input-modal input[type=text]:focus{border-color:#6C63FF!important;box-shadow:0 0 0 3px rgba(108,99,255,0.2);}
+</style>
+
 </body>
 </html>

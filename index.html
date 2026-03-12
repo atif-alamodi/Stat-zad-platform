@@ -3118,10 +3118,39 @@ function loginStudent() {
 }
 
 // ─── Enter the app ───
+// ── Location persistence ──
+function saveLocation(data) {
+  try { localStorage.setItem('zad_location_v2', JSON.stringify(data)); } catch(e) {}
+}
+function loadLocation() {
+  try { return JSON.parse(localStorage.getItem('zad_location_v2') || 'null'); } catch(e) { return null; }
+}
+function clearLocation() {
+  try { localStorage.removeItem('zad_location_v2'); } catch(e) {}
+}
+
 function enterApp() {
   document.body.setAttribute('data-gender', APP.student.gender || 'male');
   updateStudentUI();
   showPage('page-app');
+
+  // Restore last location
+  const loc = loadLocation();
+  if (loc) {
+    if (loc.type === 'lesson' && loc.subjectId && loc.lessonId) {
+      openLesson(loc.subjectId, loc.lessonId);
+      return;
+    }
+    if (loc.type === 'subject' && loc.subjectId) {
+      showSubject(loc.subjectId);
+      return;
+    }
+    if (loc.type === 'section' && loc.section) {
+      showSection(loc.section);
+      if (loc.section === 'progress') renderProgress();
+      return;
+    }
+  }
   initDashboard();
 }
 
@@ -3129,6 +3158,7 @@ function enterApp() {
 function logoutStudent() {
   closeSidebar();
   saveCurrentStudent();
+  clearLocation();
   setActiveEmail('');
   Object.assign(APP.student, { name:'', email:'', gender:'', level:'beginner', joinDate:'' });
   Object.assign(APP.progress, { lessons:0, quizzes:0, scores:[], streak:1, lastDate:'', subjectProgress:{} });
@@ -3193,6 +3223,10 @@ function showPage(id) {
 }
 
 function showSection(name) {
+  // Persist location (skip transient sections)
+  if (APP.student.email && !['subject-detail','lesson'].includes(name)) {
+    saveLocation({ type: 'section', section: name });
+  }
   ['dashboard', 'subjects', 'progress', 'subject-detail', 'lesson', 'exam-generator', 'lab'].forEach(s => {
     const el = document.getElementById(`section-${s}`);
     if (el) el.style.display = 'none';
@@ -3338,7 +3372,7 @@ function showSubject(subjectId) {
   APP.currentSubject = subjectId;
   const subject = CURRICULUM[subjectId];
   if (!subject) return;
-  
+  if (APP.student.email) saveLocation({ type: 'subject', subjectId });
   showSection('subject-detail');
   const container = document.getElementById('subject-detail-content');
   
@@ -3481,6 +3515,7 @@ function openLesson(subjectId, lessonId) {
   const totalLessons = allLessons.length;
 
   APP.currentLesson = lesson;
+  if (APP.student.email) saveLocation({ type: 'lesson', subjectId, lessonId });
 
   showSection('lesson');
   const container = document.getElementById('lesson-content');

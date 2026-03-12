@@ -1018,6 +1018,381 @@ function getQuestionCount(subjectId) {
   return count;
 }
 
+
+// ═══════════════════════════════════════════════════════════════
+// 🧪 EMBEDDED LAB — Python + Excel inside subject tabs
+// ═══════════════════════════════════════════════════════════════
+
+let _elabPyReady = false;
+let _elabPyodide = null;
+let _elabXlInited = false;
+
+// Re-use PY_TEMPLATES from main lab
+const ELAB_PY_TEMPLATES = typeof PY_TEMPLATES !== 'undefined' ? PY_TEMPLATES : {};
+
+function elabSwitch(tab) {
+  const py = document.getElementById('elab-py');
+  const xl = document.getElementById('elab-xl');
+  const btnPy = document.getElementById('elab-tab-py');
+  const btnXl = document.getElementById('elab-tab-xl');
+  if (!py || !xl) return;
+  if (tab === 'py') {
+    py.style.display = 'block'; xl.style.display = 'none';
+    if (btnPy) { btnPy.style.borderColor='#3776AB'; btnPy.style.background='rgba(55,118,171,0.2)'; btnPy.style.color='#6ab0e8'; }
+    if (btnXl) { btnXl.style.borderColor='rgba(255,255,255,0.12)'; btnXl.style.background='rgba(255,255,255,0.04)'; btnXl.style.color='var(--text-muted)'; }
+  } else {
+    py.style.display = 'none'; xl.style.display = 'block';
+    if (btnPy) { btnPy.style.borderColor='rgba(255,255,255,0.12)'; btnPy.style.background='rgba(255,255,255,0.04)'; btnPy.style.color='var(--text-muted)'; }
+    if (btnXl) { btnXl.style.borderColor='#217346'; btnXl.style.background='rgba(33,115,70,0.2)'; btnXl.style.color='#5cb888'; }
+    if (!_elabXlInited) { _elabXlInited=true; elabInitXl(); }
+  }
+}
+
+function initEmbeddedLab(subjectId) {
+  elabUpdateLines();
+  elabInitXl();
+  elabBuildFnRef();
+  // Boot Pyodide
+  if (!_elabPyReady && !_elabPyodide) {
+    const dot = document.getElementById('elab-py-dot');
+    const txt = document.getElementById('elab-py-status');
+    if (dot) dot.style.background = '#FFD600';
+    if (txt) txt.textContent = 'جاري تحميل Python...';
+    const loadFn = () => {
+      loadPyodide({ indexURL:'https://cdn.jsdelivr.net/pyodide/v0.25.1/full/' }).then(async py => {
+        _elabPyodide = py;
+        await py.loadPackage(['numpy','micropip']);
+        try { await py.runPythonAsync("import micropip; await micropip.install('matplotlib')"); } catch(e){}
+        py.runPython(`import sys,io\nclass _Cap:\n  def __init__(self): self.d=[]\n  def write(self,s): self.d.append(s)\n  def flush(self): pass\n  def getvalue(self): return ''.join(self.d)\n_cap=_Cap(); sys.stdout=_cap; sys.stderr=_cap`);
+        _elabPyReady = true;
+        const d2 = document.getElementById('elab-py-dot');
+        const t2 = document.getElementById('elab-py-status');
+        if (d2) d2.style.background = '#28CA41';
+        if (t2) t2.textContent = 'Python جاهز ✓';
+      }).catch(() => {
+        const d2 = document.getElementById('elab-py-dot');
+        const t2 = document.getElementById('elab-py-status');
+        if (d2) d2.style.background = '#FF5252';
+        if (t2) t2.textContent = '⚠️ جاري استخدام المحاكي';
+      });
+    };
+    if (typeof loadPyodide !== 'undefined') { loadFn(); }
+    else {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/pyodide/v0.25.1/full/pyodide.js';
+      s.onload = loadFn;
+      document.head.appendChild(s);
+    }
+  } else if (_elabPyReady) {
+    const dot = document.getElementById('elab-py-dot');
+    const txt = document.getElementById('elab-py-status');
+    if (dot) dot.style.background = '#28CA41';
+    if (txt) txt.textContent = 'Python جاهز ✓';
+  }
+}
+
+function elabUpdateLines() {
+  const ta = document.getElementById('elab-editor');
+  const ln = document.getElementById('elab-lnums');
+  if (!ta || !ln) return;
+  const n = ta.value.split('\n').length;
+  ln.innerHTML = Array.from({length:n},(_,i)=>i+1).join('<br>');
+}
+
+function elabTab(e) {
+  if (e.key !== 'Tab') return;
+  e.preventDefault();
+  const ta = e.target;
+  const s = ta.selectionStart;
+  ta.value = ta.value.slice(0,s) + '    ' + ta.value.slice(ta.selectionEnd);
+  ta.selectionStart = ta.selectionEnd = s + 4;
+  elabUpdateLines();
+}
+
+function elabLoadPyTmpl() {
+  const sel = document.getElementById('elab-py-tmpl');
+  if (!sel || !sel.value) return;
+  const tmpl = ELAB_PY_TEMPLATES[sel.value] || '';
+  const ta = document.getElementById('elab-editor');
+  if (ta) { ta.value = tmpl; elabUpdateLines(); }
+  const out = document.getElementById('elab-out');
+  if (out) out.innerHTML = '<span style="color:#555">// اضغط ▶ تشغيل</span>';
+  const cw = document.getElementById('elab-chart-wrap');
+  if (cw) cw.style.display = 'none';
+  sel.value = '';
+}
+
+function elabClearPy() {
+  const ta = document.getElementById('elab-editor');
+  if (ta) { ta.value = ''; elabUpdateLines(); }
+  const out = document.getElementById('elab-out');
+  if (out) out.innerHTML = '<span style="color:#555">// تم المسح</span>';
+  const cw = document.getElementById('elab-chart-wrap');
+  if (cw) cw.style.display = 'none';
+}
+
+async function elabRunPy() {
+  const ta = document.getElementById('elab-editor');
+  const out = document.getElementById('elab-out');
+  const btn = document.getElementById('elab-run-btn');
+  if (!ta || !out) return;
+  const code = ta.value.trim();
+  if (!code) return;
+  if (btn) { btn.textContent = '⏳'; btn.disabled = true; }
+  out.innerHTML = '<span style="color:#FFD600">⏳ جاري التنفيذ...</span>';
+
+  if (!_elabPyReady || !_elabPyodide) {
+    out.innerHTML = '<span style="color:#aaa">⚠️ Python لم يُحمَّل بعد — انتظر قليلاً ثم أعد المحاولة</span>';
+    if (btn) { btn.textContent = '▶ تشغيل'; btn.disabled = false; }
+    return;
+  }
+
+  try {
+    _elabPyodide.runPython(`_cap.d=[]\nimport sys\nsys.stdout=_cap\nsys.stderr=_cap\nimport os\ntry: os.remove('/tmp/elab_chart.png')\nexcept: pass`);
+    // Patch matplotlib savefig path
+    const patched = code.replace(/plt\.savefig\(['"][^'"]*['"]/g, "plt.savefig('/tmp/elab_chart.png'");
+    await _elabPyodide.runPythonAsync(patched);
+    const result = _elabPyodide.runPython(`_cap.getvalue()`);
+    out.innerHTML = result
+      ? result.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+              .replace(/(\d+\.\d+)/g,'<span style="color:#79c0ff">$1</span>')
+              .replace(/(✅|❌|⚠️)/g, s => `<span style="color:${s==='✅'?'#28CA41':s==='❌'?'#FF5252':'#FFD600'}">${s}</span>`)
+      : '<span style="color:#28CA41">✓ تم بنجاح</span>';
+
+    // Check chart
+    try {
+      const hasChart = _elabPyodide.runPython(`import os; os.path.exists('/tmp/elab_chart.png')`);
+      if (hasChart) {
+        const b64 = _elabPyodide.runPython(`import base64\nwith open('/tmp/elab_chart.png','rb') as f: data=base64.b64encode(f.read()).decode()\ndata`);
+        const cw = document.getElementById('elab-chart-wrap');
+        const cv = document.getElementById('elab-chart-canvas');
+        if (cw && cv) {
+          cw.style.display = 'block';
+          const img = new Image();
+          img.onload = () => { cv.width=img.width; cv.height=img.height; cv.getContext('2d').drawImage(img,0,0); };
+          img.src = 'data:image/png;base64,' + b64;
+        }
+      }
+    } catch(e) {}
+  } catch(e) {
+    out.innerHTML = `<span style="color:#FF5252">❌ خطأ:\n${e.message}</span>`;
+  }
+  if (btn) { btn.textContent = '▶ تشغيل'; btn.disabled = false; }
+}
+
+// ─── Excel engine (embedded, self-contained) ──────────────────────────────────
+const ELAB_XL_COLS = 'ABCDEFGHIJKLM'.split('');
+let _exlData = {}, _exlStyles = {}, _exlRows = 10, _exlCols = 7, _exlSel = {r:1,c:1};
+let _exlChartInst = null;
+
+const ELAB_XL_TMPLS = {
+  grades:{rows:9,cols:5,data:{'1_1':'الاسم','1_2':'المادة','1_3':'الدرجة','1_4':'','1_5':'الحالة','2_1':'أحمد','2_2':'إحصاء','2_3':85,'3_1':'سارة','3_2':'إحصاء','3_3':92,'4_1':'محمد','4_2':'إحصاء','4_3':78,'5_1':'نورة','5_2':'إحصاء','5_3':95,'6_1':'خالد','6_2':'إحصاء','6_3':70,'7_1':'لمى','7_2':'إحصاء','7_3':88,'8_1':'المتوسط','8_3':'=AVERAGE(C2:C7)','9_1':'الانحراف','9_3':'=STDEV(C2:C7)'},hdr:1},
+  stats:{rows:10,cols:4,data:{'1_1':'القيمة','1_2':'الانحراف عن المتوسط','1_3':'مربع الانحراف','1_4':'Z-Score','2_1':80,'3_1':75,'4_1':90,'5_1':85,'6_1':70,'7_1':95,'8_1':78,'9_1':88,'10_1':'المتوسط','10_2':'=AVERAGE(A2:A9)'},hdr:1},
+  sales:{rows:8,cols:4,data:{'1_1':'المنطقة','1_2':'المبيعات','1_3':'الهدف','1_4':'الفرق','2_1':'الرياض','2_2':45000,'2_3':40000,'3_1':'جدة','3_2':38000,'3_3':35000,'4_1':'الدمام','4_2':29000,'4_3':30000,'5_1':'مكة','5_2':22000,'5_3':25000,'6_1':'المدينة','6_2':18000,'6_3':20000,'7_1':'المجموع','7_2':'=SUM(B2:B6)','7_3':'=SUM(C2:C6)','8_1':'المتوسط','8_2':'=AVERAGE(B2:B6)'},hdr:1},
+  employees:{rows:8,cols:4,data:{'1_1':'الاسم','1_2':'القسم','1_3':'الراتب','1_4':'الخبرة','2_1':'سلمى','2_2':'IT','2_3':12000,'2_4':5,'3_1':'فهد','3_2':'HR','3_3':9500,'3_4':3,'4_1':'مريم','4_2':'IT','4_3':14000,'4_4':8,'5_1':'عمر','5_2':'مالية','5_3':11000,'5_4':6,'6_1':'دانة','6_2':'HR','6_3':8500,'6_4':2,'7_1':'عدد','7_3':'=COUNT(C2:C6)','8_1':'متوسط الراتب','8_3':'=AVERAGE(C2:C6)'},hdr:1},
+};
+
+function elabInitXl() {
+  _exlData={}; _exlStyles={}; _exlRows=10; _exlCols=7; _exlSel={r:1,c:1};
+  elabLoadXlTmpl('grades');
+  elabBuildFnRef();
+}
+
+function elabLoadXlTmpl(name) {
+  const sel = document.getElementById('elab-xl-tmpl');
+  if (!name && sel) name = sel.value;
+  if (!name) name = 'grades';
+  const t = ELAB_XL_TMPLS[name] || ELAB_XL_TMPLS.grades;
+  _exlRows = t.rows||10; _exlCols = t.cols||7;
+  _exlData = Object.assign({}, t.data||{});
+  _exlStyles = {};
+  if (t.hdr) for(let c=1;c<=_exlCols;c++) _exlStyles[`1_${c}`]={bold:true,bg:'#2d2d4e',color:'#E8A020'};
+  if (sel) sel.value='';
+  elabXlRender(); elabXlComputeAll();
+}
+
+function elabXlRender() {
+  const wrap = document.getElementById('elab-xl-grid');
+  if (!wrap) return;
+  let h = '<table style="border-collapse:collapse;min-width:100%;font-family:Fira Code,monospace;font-size:0.8rem">';
+  h += '<thead><tr><th style="width:38px;background:#1a1a2a;border:1px solid #333;padding:5px;color:#555;position:sticky;top:0;left:0;z-index:3"></th>';
+  for(let c=1;c<=_exlCols;c++) h+=`<th style="background:#1a1a2a;border:1px solid #333;padding:5px 12px;color:#888;min-width:100px;position:sticky;top:0;z-index:2;font-weight:600">${ELAB_XL_COLS[c-1]}</th>`;
+  h += '</tr></thead><tbody>';
+  for(let r=1;r<=_exlRows;r++) {
+    h += `<tr><td style="background:#1a1a2a;border:1px solid #333;padding:3px 7px;color:#555;text-align:center;position:sticky;left:0;z-index:1;font-weight:600">${r}</td>`;
+    for(let c=1;c<=_exlCols;c++) {
+      const key=`${r}_${c}`, st=_exlStyles[key]||{}, raw=_exlData[key];
+      const disp = raw!==undefined&&raw!==null&&String(raw).startsWith('=') ? (elabXlCompute(raw)??'') : (raw??'');
+      const isA = _exlSel.r===r&&_exlSel.c===c;
+      let cs=`border:1px solid #333;padding:0;min-width:100px;${st.bg?`background:${st.bg}`:(isA?'background:rgba(108,99,255,0.15)':'background:#1e1e2e')};${isA?'outline:2px solid #6C63FF;outline-offset:-2px':''}`;
+      let is=`width:100%;background:transparent;border:none;outline:none;padding:5px 9px;color:${st.color||'#e0e0e0'};font-weight:${st.bold?700:400};font-family:inherit;font-size:inherit;text-align:${st.align||'left'};direction:auto`;
+      h+=`<td style="${cs}" onclick="elabXlSel(${r},${c})"><input data-key="${key}" value="${String(disp).replace(/"/g,'&quot;').replace(/</g,'&lt;')}" style="${is}" onchange="elabXlChange(event,'${key}')" onfocus="elabXlFocus(${r},${c})" onkeydown="elabXlNav(event,${r},${c})"/></td>`;
+    }
+    h += '</tr>';
+  }
+  h += '</tbody></table>';
+  wrap.innerHTML = h;
+  elabXlUpdateStats();
+}
+
+function elabXlSel(r,c){_exlSel={r,c};}
+function elabXlFocus(r,c){
+  _exlSel={r,c};
+  const ref=document.getElementById('elab-xl-ref'), fb=document.getElementById('elab-xl-fbar');
+  if(ref) ref.textContent=`${ELAB_XL_COLS[c-1]}${r}`;
+  const v=_exlData[`${r}_${c}`];
+  if(fb) fb.value=(v!==undefined&&v!==null)?String(v):'';
+}
+function elabXlNav(e,r,c){
+  const moves={ArrowRight:[0,1],ArrowLeft:[0,-1],ArrowDown:[1,0],ArrowUp:[-1,0],Enter:[1,0],Tab:[0,1]};
+  if(!moves[e.key]) return;
+  e.preventDefault();
+  const [dr,dc]=moves[e.key];
+  const nr=Math.max(1,Math.min(_exlRows,r+dr)), nc=Math.max(1,Math.min(_exlCols,c+dc));
+  document.querySelector(`input[data-key="${nr}_${nc}"]`)?.focus();
+}
+function elabXlChange(e,key){
+  const v=e.target.value;
+  _exlData[key]=(!isNaN(v)&&v!=='')?Number(v):v;
+  elabXlComputeAll(); elabXlUpdateStats();
+}
+function elabXlFbarInput(){
+  const fb=document.getElementById('elab-xl-fbar'); if(!fb) return;
+  const key=`${_exlSel.r}_${_exlSel.c}`, v=fb.value;
+  _exlData[key]=(!isNaN(v)||v.startsWith('='))?v:v;
+  const inp=document.querySelector(`input[data-key="${key}"]`);
+  if(inp) inp.value=v.startsWith('=')?String(elabXlCompute(v)??''):v;
+}
+function elabXlFbarCommit(){elabXlComputeAll();elabXlUpdateStats();}
+
+function elabXlGetNum(key){
+  const v=_exlData[key];
+  if(v===undefined||v===null||v==='') return null;
+  if(typeof v==='number') return v;
+  if(typeof v==='string'&&v.startsWith('=')){const r=elabXlCompute(v);return typeof r==='number'?r:null;}
+  const n=parseFloat(v); return isNaN(n)?null:n;
+}
+
+function elabXlParseRange(range){
+  const m=range.trim().match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/i);
+  if(!m) return [];
+  const c1=ELAB_XL_COLS.indexOf(m[1].toUpperCase())+1, r1=parseInt(m[2]);
+  const c2=ELAB_XL_COLS.indexOf(m[3].toUpperCase())+1, r2=parseInt(m[4]);
+  const vals=[];
+  for(let r=r1;r<=r2;r++) for(let c=c1;c<=c2;c++){const v=elabXlGetNum(`${r}_${c}`);if(v!==null)vals.push(v);}
+  return vals;
+}
+
+function elabXlCompute(formula){
+  if(!formula||!formula.startsWith('=')) return formula;
+  const expr=formula.slice(1).trim().toUpperCase();
+  try {
+    const FNS={
+      SUM:r=>r.reduce((a,b)=>a+b,0),
+      AVERAGE:r=>r.reduce((a,b)=>a+b,0)/r.length,
+      MAX:r=>Math.max(...r), MIN:r=>Math.min(...r), COUNT:r=>r.length,
+      STDEV:r=>{const m=r.reduce((a,b)=>a+b,0)/r.length;return Math.sqrt(r.reduce((s,x)=>s+(x-m)**2,0)/(r.length-1));},
+      VAR:r=>{const m=r.reduce((a,b)=>a+b,0)/r.length;return r.reduce((s,x)=>s+(x-m)**2,0)/(r.length-1);},
+      MEDIAN:r=>{const s=[...r].sort((a,b)=>a-b),mid=Math.floor(s.length/2);return s.length%2?s[mid]:(s[mid-1]+s[mid])/2;},
+      ROUND:r=>Math.round(r[0]*10**r[1])/10**r[1],
+    };
+    const fm=expr.match(/^(\w+)\((.+)\)$/);
+    if(fm&&FNS[fm[1]]){
+      const rangeM=fm[2].match(/([A-Z]+\d+:[A-Z]+\d+)/i);
+      if(rangeM){const vals=elabXlParseRange(rangeM[1]);return vals.length?Math.round(FNS[fm[1]](vals)*100)/100:0;}
+      const parts=fm[2].split(',').map(a=>{const cr=a.trim().match(/^([A-Z]+)(\d+)$/i);if(cr){const c=ELAB_XL_COLS.indexOf(cr[1].toUpperCase())+1;return elabXlGetNum(`${parseInt(cr[2])}_${c}`)||0;}return parseFloat(a)||0;});
+      return Math.round(FNS[fm[1]](parts)*100)/100;
+    }
+    if(expr.startsWith('IF(')){
+      const inner=expr.slice(3,-1);
+      const m2=inner.match(/^([A-Z]+)(\d+)\s*([><=!]+)\s*([^,]+),(.+),(.+)$/i);
+      if(!m2) return '#IF!';
+      const c=ELAB_XL_COLS.indexOf(m2[1].toUpperCase())+1, cellV=elabXlGetNum(`${parseInt(m2[2])}_${c}`)||0;
+      const cmp=parseFloat(m2[4]), ops={'>':v=>v>cmp,'<':v=>v<cmp,'>=':v=>v>=cmp,'<=':v=>v<=cmp,'=':v=>v===cmp,'<>':v=>v!==cmp};
+      return (ops[m2[3]]||(() =>false))(cellV) ? m2[5].trim().replace(/['"]/g,'') : m2[6].trim().replace(/['"]/g,'');
+    }
+    // Cell ref or arithmetic
+    const withV=expr.replace(/([A-Z]+)(\d+)/gi,(_,col,row)=>{const c=ELAB_XL_COLS.indexOf(col.toUpperCase())+1;return elabXlGetNum(`${row}_${c}`)||0;});
+    const res=Function(`"use strict";return(${withV})`)();
+    return typeof res==='number'?Math.round(res*100)/100:res;
+  } catch(e){return '#ERR!';}
+}
+
+function elabXlComputeAll(){
+  Object.keys(_exlData).forEach(key=>{
+    const v=_exlData[key];
+    if(typeof v==='string'&&v.startsWith('=')){
+      const inp=document.querySelector(`input[data-key="${key}"]`);
+      if(inp) inp.value=String(elabXlCompute(v)??'');
+    }
+  });
+  elabXlUpdateStats();
+}
+
+function elabXlUpdateStats(){
+  const panel=document.getElementById('elab-xl-stats'); if(!panel) return;
+  const nums=[];
+  for(let r=2;r<=_exlRows;r++) for(let c=1;c<=_exlCols;c++){const v=elabXlGetNum(`${r}_${c}`);if(v!==null&&v>0)nums.push(v);}
+  if(nums.length<2){panel.innerHTML='';return;}
+  const mean=nums.reduce((a,b)=>a+b,0)/nums.length;
+  const sorted=[...nums].sort((a,b)=>a-b),mid=Math.floor(sorted.length/2);
+  const median=sorted.length%2?sorted[mid]:(sorted[mid-1]+sorted[mid])/2;
+  const stdev=Math.sqrt(nums.reduce((s,x)=>s+(x-mean)**2,0)/(nums.length-1));
+  const STATS=[
+    {l:'∑ المجموع',v:Math.round(nums.reduce((a,b)=>a+b,0)),i:'➕',c:'#6C63FF'},
+    {l:'x̄ المتوسط',v:mean.toFixed(2),i:'📊',c:'#00BFA5'},
+    {l:'↕ الوسيط',v:median.toFixed(2),i:'↕️',c:'#FFD600'},
+    {l:'σ الانحراف',v:stdev.toFixed(2),i:'📐',c:'#FF7043'},
+    {l:'⬆ الأعلى',v:Math.max(...nums),i:'🔺',c:'#28CA41'},
+    {l:'⬇ الأدنى',v:Math.min(...nums),i:'🔻',c:'#FF5252'},
+  ];
+  panel.innerHTML=STATS.map(s=>`<div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:10px;text-align:center"><div style="font-size:1.1rem">${s.i}</div><div style="font-size:1rem;font-weight:700;color:${s.c}">${s.v}</div><div style="font-size:0.68rem;color:var(--text-muted);margin-top:2px">${s.l}</div></div>`).join('');
+}
+
+function elabXlAddRow(){_exlRows++;elabXlRender();elabXlComputeAll();}
+function elabXlAddCol(){if(_exlCols<ELAB_XL_COLS.length){_exlCols++;elabXlRender();elabXlComputeAll();}}
+function elabXlClear(){_exlData={};_exlStyles={};elabXlRender();const s=document.getElementById('elab-xl-stats');if(s)s.innerHTML='';const cw=document.getElementById('elab-xl-chart-wrap');if(cw)cw.style.display='none';}
+
+function elabXlChart(){
+  let lblCol=-1, numCol=-1;
+  for(let c=1;c<=_exlCols;c++){const v=_exlData[`2_${c}`];if(v&&typeof v==='string'&&!v.startsWith('=')&&isNaN(v)){lblCol=c;break;}}
+  for(let c=1;c<=_exlCols;c++){if(elabXlGetNum(`2_${c}`)!==null){numCol=c;break;}}
+  const labels=[],data=[];
+  for(let r=2;r<=_exlRows;r++){
+    const lbl=lblCol>=1?(String(_exlData[`${r}_${lblCol}`]||`صف${r}`)): `صف${r}`;
+    const val=numCol>=1?elabXlGetNum(`${r}_${numCol}`):null;
+    if(val!==null&&lbl){labels.push(lbl);data.push(val);}
+  }
+  if(!data.length) return;
+  const cw=document.getElementById('elab-xl-chart-wrap'), cv=document.getElementById('elab-xl-chart');
+  if(!cw||!cv) return;
+  cw.style.display='block';
+  if(_exlChartInst){_exlChartInst.destroy();_exlChartInst=null;}
+  const ctx=cv.getContext('2d');
+  const COLORS=['#6C63FF','#00BFA5','#FF7043','#FFD600','#FF5252','#28CA41','#3776AB'];
+  _exlChartInst=new Chart(ctx,{type:'bar',data:{labels,datasets:[{label:'القيم',data,backgroundColor:COLORS.slice(0,data.length),borderRadius:8}]},options:{responsive:true,plugins:{legend:{display:false},title:{display:true,text:'الرسم البياني',font:{size:15}}},scales:{y:{beginAtZero:true}}}});
+}
+
+function elabBuildFnRef(){
+  const el=document.getElementById('elab-xl-fnref'); if(!el) return;
+  const FNS=[['=SUM(A1:A5)','جمع'],['=AVERAGE(A1:A5)','متوسط'],['=MAX(A1:A5)','الأعلى'],['=MIN(A1:A5)','الأدنى'],['=COUNT(A1:A5)','عد'],['=MEDIAN(A1:A5)','وسيط'],['=STDEV(A1:A5)','انحراف'],['=VAR(A1:A5)','تباين'],['=IF(A1>60,"ناجح","راسب")','IF'],['=ROUND(A1,2)','تقريب']];
+  el.innerHTML=FNS.map(([f,l])=>`<span onclick="elabXlPasteFn('${f.replace(/'/g,"\\'")}')" title="${l}" style="background:rgba(232,160,32,0.1);border:1px solid rgba(232,160,32,0.22);border-radius:6px;padding:2px 7px;font-size:0.71rem;color:#E8A020;cursor:pointer;font-family:Fira Code,monospace" onmouseenter="this.style.background='rgba(232,160,32,0.2)'" onmouseleave="this.style.background='rgba(232,160,32,0.1)'">${f}</span>`).join('');
+}
+
+function elabXlPasteFn(fn){
+  const key=`${_exlSel.r}_${_exlSel.c}`;
+  const inp=document.querySelector(`input[data-key="${key}"]`);
+  if(inp){inp.value=fn;inp.focus();_exlData[key]=fn;const fb=document.getElementById('elab-xl-fbar');if(fb)fb.value=fn;elabXlComputeAll();}
+}
+
+// Ensure Chart.js loaded
+if (typeof Chart === 'undefined') {
+  const s = document.createElement('script');
+  s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
+  document.head.appendChild(s);
+}
+
+
 window.CURRICULUM = CURRICULUM;
 window.generateQuiz = generateQuiz;
 window.generateMixedExam = generateMixedExam;
@@ -3454,113 +3829,195 @@ function renderProgressChart() {
 }
 
 // ============ SUBJECT DETAIL ============
-function showSubject(subjectId) {
+function showSubject(subjectId, activeTab) {
   APP.currentSubject = subjectId;
   const subject = CURRICULUM[subjectId];
   if (!subject) return;
   if (APP.student.email) saveLocation({ type: 'subject', subjectId });
+  activeTab = activeTab || 'lessons';
   showSection('subject-detail');
   const container = document.getElementById('subject-detail-content');
-  
+
+  const TABS = [
+    { id:'lessons',  icon:'📖', label:'الدروس'           },
+    { id:'cards',    icon:'🃏', label:'بطاقات المعلومات' },
+    { id:'mindmaps', icon:'🧠', label:'الخرائط الذهنية'  },
+    { id:'lab',      icon:'🧪', label:'المختبر'           },
+  ];
+
+  const tabBar = `<div style="display:flex;gap:5px;margin-bottom:20px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:16px;padding:5px;flex-wrap:wrap">
+    ${TABS.map(t=>`<button onclick="showSubject('${subjectId}','${t.id}')" style="flex:1;min-width:72px;padding:9px 12px;border-radius:11px;border:none;cursor:pointer;font-family:var(--font);font-size:0.82rem;font-weight:700;transition:all 0.2s;${t.id===activeTab?'background:linear-gradient(135deg,var(--primary),var(--secondary));color:white;box-shadow:0 4px 14px rgba(108,99,255,0.3)':'background:transparent;color:var(--text-muted)'}">${t.icon} ${t.label}</button>`).join('')}
+  </div>`;
+
+  let body = '';
+  if (activeTab === 'lessons')  body = buildLessonsTab(subject, subjectId);
+  if (activeTab === 'cards')    body = buildInfoCards(subject, subjectId);
+  if (activeTab === 'mindmaps') body = buildAllMindMaps(subject);
+  if (activeTab === 'lab')      body = buildEmbeddedLab(subjectId);
+
   container.innerHTML = `
-    <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 30px;">
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px;flex-wrap:wrap">
       <button class="back-btn" onclick="showSection('dashboard')">←</button>
-      <div>
-        <div style="font-size: 1.8rem; font-weight: 900;">${subject.icon} ${subject.title}</div>
-        <div style="color: var(--text-muted); font-size: 0.9rem;">${subject.description}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:1.7rem;font-weight:900">${subject.icon} ${subject.title}</div>
+        <div style="color:var(--text-muted);font-size:0.85rem;margin-top:2px">${subject.description}</div>
       </div>
-      <button style="
-        margin-right: auto;
-        padding: 12px 25px;
-        background: linear-gradient(135deg, var(--primary), var(--secondary));
-        border: none; border-radius: 12px; color: white;
-        font-family: var(--font); font-weight: 700; font-size: 0.95rem;
-        cursor: pointer;
-      " onclick="startQuizForSubject('${subjectId}')">
-        ⚡ اختبر نفسك
-      </button>
+      <button style="padding:10px 20px;background:linear-gradient(135deg,var(--primary),var(--secondary));border:none;border-radius:12px;color:white;font-family:var(--font);font-weight:700;font-size:0.88rem;cursor:pointer;white-space:nowrap" onclick="startQuizForSubject('${subjectId}')">⚡ اختبر نفسك</button>
     </div>
-    
-    ${subject.id === 'statistics' ? renderStatsIntroSection() : ''}
-    ${subject.id === 'python' ? renderPythonPlaygroundSection() : ''}
-    
-    <div class="section-title">📖 الفصول والدروس</div>
-    <div class="chapter-list">
-      ${subject.chapters.map((ch, i) => `
-        <div class="chapter-item" id="ch-${ch.id}">
-          <div class="chapter-header" onclick="toggleChapter('${ch.id}')">
-            <div class="chapter-num">${i+1}</div>
-            <div class="chapter-info">
-              <div class="chapter-title">${ch.icon} ${ch.title}</div>
-              <div class="chapter-pages">📄 الصفحات: ${ch.pages}</div>
-            </div>
-            <i class="fas fa-chevron-left chapter-chevron"></i>
+    ${tabBar}${body}`;
+
+  if (activeTab === 'lab') setTimeout(() => initEmbeddedLab(subjectId), 150);
+}
+
+function buildLessonsTab(subject, subjectId) {
+  return `<div class="chapter-list">${subject.chapters.map((ch,i)=>`
+    <div class="chapter-item" id="ch-${ch.id}">
+      <div class="chapter-header" onclick="toggleChapter('${ch.id}')">
+        <div class="chapter-num">${i+1}</div>
+        <div class="chapter-info">
+          <div class="chapter-title">${ch.icon||'📘'} ${ch.title}</div>
+          <div class="chapter-pages">📄 ${ch.pages}</div>
+        </div>
+        <i class="fas fa-chevron-left chapter-chevron"></i>
+      </div>
+      <div class="lesson-list">${ch.lessons.map(l=>`
+        <div class="lesson-item" onclick="openLesson('${subjectId}','${l.id}')">
+          <span class="lesson-icon">${getLessonTypeIcon(l.type)}</span>
+          <span class="lesson-name">${l.title}</span>
+          <span class="lesson-type type-${l.type||'concept'}">${getLessonTypeLabel(l.type)}</span>
+        </div>`).join('')}
+      </div>
+    </div>`).join('')}</div>`;
+}
+
+function buildInfoCards(subject, subjectId) {
+  const PAL = [
+    {bg:'rgba(108,99,255,0.1)', b:'rgba(108,99,255,0.28)', a:'#6C63FF'},
+    {bg:'rgba(0,191,165,0.1)',  b:'rgba(0,191,165,0.28)',  a:'#00BFA5'},
+    {bg:'rgba(255,112,67,0.1)', b:'rgba(255,112,67,0.28)', a:'#FF7043'},
+    {bg:'rgba(255,214,0,0.1)',  b:'rgba(255,214,0,0.28)',  a:'#E8A020'},
+    {bg:'rgba(40,202,129,0.1)', b:'rgba(40,202,129,0.28)', a:'#28CA81'},
+    {bg:'rgba(233,30,99,0.1)',  b:'rgba(233,30,99,0.28)',  a:'#E91E63'},
+  ];
+  let cards = '';
+  let ci = 0;
+  subject.chapters.forEach(ch => {
+    ch.lessons.forEach(lesson => {
+      const c = lesson.content || {};
+      const p = PAL[ci++ % PAL.length];
+      let body = '';
+      if (c.definition) body += `<div style="font-size:0.84rem;line-height:1.6;color:var(--text);margin-bottom:10px;padding:10px;background:rgba(255,255,255,0.04);border-radius:10px">${c.definition.slice(0,180)}${c.definition.length>180?'…':''}</div>`;
+      if (c.formula) body += `<div style="background:rgba(0,0,0,0.3);border-radius:9px;padding:7px 12px;font-family:monospace;font-size:0.82rem;color:#7ee787;margin-bottom:10px;text-align:center;direction:ltr">${c.formula}</div>`;
+      if (c.keyTerms&&c.keyTerms.length) body += `<div style="margin-bottom:10px"><div style="font-size:0.7rem;font-weight:700;color:${p.a};letter-spacing:1px;margin-bottom:6px">📖 مصطلحات</div>${c.keyTerms.slice(0,3).map(kt=>`<div style="font-size:0.79rem;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.05);display:flex;gap:7px;align-items:flex-start"><span style="color:${p.a};margin-top:2px">◆</span><div><strong>${kt.term}</strong> <span style="color:var(--text-muted)">— ${kt.def.slice(0,70)}${kt.def.length>70?'…':''}</span></div></div>`).join('')}</div>`;
+      if (c.properties&&c.properties.length) body += `<div style="margin-bottom:10px">${c.properties.slice(0,3).map(p2=>`<div style="font-size:0.79rem;display:flex;gap:6px;padding:3px 0"><span style="color:${p.a}">✓</span>${p2}</div>`).join('')}</div>`;
+      if (c.types&&c.types.length) body += `<div style="margin-bottom:10px">${c.types.slice(0,3).map(t=>`<div style="font-size:0.79rem;display:flex;gap:8px;align-items:center;padding:3px 0"><span>${t.icon||'▸'}</span><strong>${t.name}</strong><span style="color:var(--text-muted);font-size:0.76rem">— ${(t.desc||'').slice(0,50)}</span></div>`).join('')}</div>`;
+      if (c.steps&&c.steps.length) body += `<div style="margin-bottom:10px"><div style="font-size:0.7rem;font-weight:700;color:${p.a};letter-spacing:1px;margin-bottom:6px">📋 خطوات</div>${c.steps.slice(0,4).map((s,i)=>`<div style="font-size:0.79rem;display:flex;gap:7px;padding:3px 0;align-items:flex-start"><span style="background:${p.a};color:white;border-radius:50%;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;font-size:0.65rem;flex-shrink:0;margin-top:1px">${i+1}</span><span>${typeof s==='string'?s:(s.step||s.title||'')}</span></div>`).join('')}</div>`;
+      if (!body) body = `<div style="color:var(--text-muted);font-size:0.82rem;padding:8px 0">اضغط لفتح الدرس الكامل</div>`;
+      cards += `<div style="background:${p.bg};border:1.5px solid ${p.b};border-radius:18px;padding:18px;transition:transform 0.25s,box-shadow 0.25s" onmouseenter="this.style.transform='translateY(-4px)';this.style.boxShadow='0 12px 28px rgba(0,0,0,0.22)'" onmouseleave="this.style.transform='none';this.style.boxShadow='none'">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;gap:8px">
+          <div style="flex:1">
+            <div style="font-size:0.68rem;font-weight:700;color:${p.a};letter-spacing:1.4px;margin-bottom:3px;text-transform:uppercase">${ch.title}</div>
+            <div style="font-size:0.97rem;font-weight:800;line-height:1.3">${lesson.title}</div>
           </div>
-          <div class="lesson-list">
-            ${ch.lessons.map(lesson => `
-              <div class="lesson-item" onclick="openLesson('${subjectId}', '${lesson.id}')">
-                <span class="lesson-icon">${getLessonTypeIcon(lesson.type)}</span>
-                <span class="lesson-name">${lesson.title}</span>
-                <span class="lesson-type type-${lesson.type}">${getLessonTypeLabel(lesson.type)}</span>
-              </div>
-            `).join('')}
+          <span style="background:${p.a}22;border:1px solid ${p.b};border-radius:8px;padding:4px 9px;font-size:0.68rem;color:${p.a};font-weight:700;white-space:nowrap">${getLessonTypeLabel(lesson.type)}</span>
+        </div>
+        ${body}
+        <button onclick="openLesson('${subjectId}','${lesson.id}')" style="width:100%;padding:8px;background:${p.a};border:none;border-radius:9px;color:white;font-family:var(--font);font-weight:700;font-size:0.8rem;cursor:pointer;margin-top:10px;transition:opacity 0.2s" onmouseenter="this.style.opacity='0.85'" onmouseleave="this.style.opacity='1'">📖 فتح الدرس</button>
+      </div>`;
+    });
+  });
+  return `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px">${cards}</div>`;
+}
+
+function buildAllMindMaps(subject) {
+  let items = '';
+  subject.chapters.forEach(ch => {
+    ch.lessons.forEach(lesson => {
+      const mm = lesson.content && lesson.content.mindMap;
+      if (!mm) return;
+      items += `<div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:16px;padding:14px">
+        <div style="font-size:0.72rem;font-weight:700;color:var(--text-muted);margin-bottom:3px">${ch.title}</div>
+        <div style="font-size:0.92rem;font-weight:800;margin-bottom:10px">${lesson.title}</div>
+        ${buildMindMap(mm)}</div>`;
+    });
+  });
+  return items ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px">${items}</div>` :
+    `<div style="text-align:center;padding:50px;color:var(--text-muted)">لا توجد خرائط ذهنية</div>`;
+}
+
+function buildEmbeddedLab(subjectId) {
+  return `
+    <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+      <button id="elab-tab-py" onclick="elabSwitch('py')" style="flex:1;min-width:120px;padding:11px 18px;border-radius:13px;border:2px solid #3776AB;background:rgba(55,118,171,0.2);color:#6ab0e8;font-family:var(--font);font-size:0.88rem;font-weight:700;cursor:pointer;transition:all 0.2s">🐍 بيئة Python</button>
+      <button id="elab-tab-xl" onclick="elabSwitch('xl')" style="flex:1;min-width:120px;padding:11px 18px;border-radius:13px;border:2px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.04);color:var(--text-muted);font-family:var(--font);font-size:0.88rem;font-weight:700;cursor:pointer;transition:all 0.2s">📊 بيئة Excel</button>
+    </div>
+    <div id="elab-py">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;flex-wrap:wrap;gap:8px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div id="elab-py-dot" style="width:9px;height:9px;border-radius:50%;background:#555;transition:background 0.3s"></div>
+          <span id="elab-py-status" style="font-size:0.77rem;color:var(--text-muted)">جاري تحميل Python...</span>
+        </div>
+        <div style="display:flex;gap:7px;flex-wrap:wrap">
+          <select id="elab-py-tmpl" onchange="elabLoadPyTmpl()" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:5px 9px;border-radius:8px;font-family:var(--font);font-size:0.78rem;cursor:pointer">
+            <option value="">📋 قوالب...</option>
+            <option value="mean">المتوسط</option><option value="median">الوسيط والمنوال</option>
+            <option value="variance">التباين والانحراف</option><option value="zscore">Z-Score</option>
+            <option value="correlation">الارتباط r</option><option value="regression">خط الانحدار</option>
+            <option value="histogram">مدرج تكراري</option><option value="scatter">مخطط تشتت</option>
+            <option value="countif">دوال COUNTIF</option>
+          </select>
+          <button onclick="elabClearPy()" style="padding:5px 11px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-muted);font-family:var(--font);font-size:0.78rem;cursor:pointer">🗑️</button>
+          <button onclick="elabRunPy()" id="elab-run-btn" style="padding:7px 16px;border-radius:10px;border:none;background:linear-gradient(135deg,#3776AB,#1a4a7a);color:white;font-weight:700;font-size:0.86rem;cursor:pointer;font-family:var(--font)">▶ تشغيل</button>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:11px" id="elab-py-grid">
+        <div style="background:#1e1e2e;border-radius:14px;overflow:hidden;border:1px solid rgba(55,118,171,0.3)">
+          <div style="background:#2d2d3e;padding:7px 13px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.07)">
+            <span style="font-size:0.73rem;color:#6ab0e8;font-weight:600">🐍 المحرر</span>
+            <div style="display:flex;gap:4px"><div style="width:8px;height:8px;border-radius:50%;background:#FF5F57"></div><div style="width:8px;height:8px;border-radius:50%;background:#FFBD2E"></div><div style="width:8px;height:8px;border-radius:50%;background:#28CA41"></div></div>
+          </div>
+          <div style="position:relative">
+            <div id="elab-lnums" style="position:absolute;left:0;top:0;width:34px;background:#1a1a2a;padding:11px 0;text-align:center;font-size:0.7rem;color:#555;line-height:1.6;font-family:monospace;pointer-events:none;user-select:none;min-height:280px">1</div>
+            <textarea id="elab-editor" spellcheck="false" style="width:100%;min-height:280px;background:transparent;border:none;outline:none;color:#cdd6f4;font-family:'Fira Code','Courier New',monospace;font-size:0.82rem;line-height:1.6;padding:11px 11px 11px 44px;resize:vertical;box-sizing:border-box;tab-size:4;direction:ltr;text-align:left" placeholder="# اكتب كودك هنا..." oninput="elabUpdateLines()" onkeydown="elabTab(event)"></textarea>
           </div>
         </div>
-      `).join('')}
-    </div>
-  `;
-}
-
-function renderStatsIntroSection() {
-  return `
-    <div style="
-      background: linear-gradient(135deg, rgba(108,99,255,0.15), rgba(67,203,255,0.1));
-      border: 1px solid rgba(108,99,255,0.3);
-      border-radius: 20px;
-      padding: 30px;
-      margin-bottom: 25px;
-    ">
-      <div style="font-size: 1.3rem; font-weight: 800; margin-bottom: 15px;">🤔 لماذا نتعلم الإحصاء؟</div>
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-        ${[
-          { icon: '🤖', title: 'علوم الآلة', desc: 'كل خوارزمية AI تعتمد على الإحصاء' },
-          { icon: '📊', title: 'تحليل البيانات', desc: 'فهم البيانات قبل بناء النماذج' },
-          { icon: '🎯', title: 'دقة التوقعات', desc: 'تحسين دقة نماذجك بنسبة كبيرة' },
-          { icon: '💡', title: 'اتخاذ القرارات', desc: 'قرارات مبنية على بيانات حقيقية' }
-        ].map(item => `
-          <div style="
-            background: rgba(255,255,255,0.05);
-            border-radius: 12px;
-            padding: 15px;
-            display: flex;
-            gap: 12px;
-          ">
-            <span style="font-size: 1.5rem;">${item.icon}</span>
-            <div>
-              <div style="font-weight: 700; font-size: 0.9rem;">${item.title}</div>
-              <div style="font-size: 0.8rem; color: var(--text-muted);">${item.desc}</div>
-            </div>
+        <div style="background:#0d1117;border-radius:14px;overflow:hidden;border:1px solid rgba(55,118,171,0.16)">
+          <div style="background:#161b22;padding:7px 13px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.05)">
+            <span style="font-size:0.73rem;color:#8b949e;font-weight:600">📟 النتيجة</span>
+            <button onclick="document.getElementById('elab-out').innerHTML=''" style="background:none;border:none;color:#555;cursor:pointer;font-size:0.7rem">✕</button>
           </div>
-        `).join('')}
+          <div id="elab-out" style="padding:11px;min-height:280px;font-family:'Fira Code','Courier New',monospace;font-size:0.8rem;color:#e6edf3;white-space:pre-wrap;overflow-y:auto;line-height:1.6;direction:ltr;text-align:left"><span style="color:#555">// اضغط ▶ تشغيل</span></div>
+        </div>
       </div>
+      <div id="elab-chart-wrap" style="display:none;margin-top:11px;background:white;border-radius:13px;padding:14px;text-align:center"><canvas id="elab-chart-canvas" style="max-width:100%;max-height:340px"></canvas></div>
+      <div style="margin-top:9px;padding:9px 13px;background:rgba(55,118,171,0.07);border-radius:9px;border:1px solid rgba(55,118,171,0.17);font-size:0.75rem;color:#6ab0e8">💡 متاح: numpy · statistics · matplotlib. اضغط Tab للمسافة.</div>
     </div>
-  `;
-}
-
-function renderPythonPlaygroundSection() {
-  return `
-    <div style="
-      background: linear-gradient(135deg, rgba(255,214,0,0.1), rgba(255,100,0,0.05));
-      border: 1px solid rgba(255,214,0,0.2);
-      border-radius: 20px;
-      padding: 25px;
-      margin-bottom: 25px;
-    ">
-      <div style="font-size: 1.2rem; font-weight: 800; margin-bottom: 10px;">🐍 Python سهلة جداً!</div>
-      <div style="color: var(--text-muted); margin-bottom: 15px;">جرب كتابة كودك الآن وانظر النتيجة فوراً!</div>
-      ${buildPythonPlayground('print("مرحباً من Python! 🐍")\\nname = "طالب"\\nprint(f"اسمي: {name}")\\nfor i in range(3):\\n    print(f"العدد {i+1}")', 'quick-playground')}
-    </div>
-  `;
+    <div id="elab-xl" style="display:none">
+      <div style="display:flex;gap:7px;margin-bottom:9px;flex-wrap:wrap;align-items:center">
+        <select id="elab-xl-tmpl" onchange="elabLoadXlTmpl()" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:5px 9px;border-radius:8px;font-family:var(--font);font-size:0.78rem;cursor:pointer">
+          <option value="">📋 قوالب...</option>
+          <option value="grades">درجات الطلاب</option><option value="stats">تحليل إحصائي</option>
+          <option value="sales">بيانات مبيعات</option><option value="employees">موظفون ورواتب</option>
+        </select>
+        <button onclick="elabXlAddRow()" style="padding:5px 10px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--text);font-family:var(--font);font-size:0.78rem;cursor:pointer">+ صف</button>
+        <button onclick="elabXlAddCol()" style="padding:5px 10px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--text);font-family:var(--font);font-size:0.78rem;cursor:pointer">+ عمود</button>
+        <button onclick="elabXlChart()" style="padding:5px 11px;border-radius:7px;border:1px solid rgba(232,160,32,0.4);background:rgba(232,160,32,0.1);color:#E8A020;font-family:var(--font);font-size:0.78rem;cursor:pointer;font-weight:600">📊 رسم</button>
+        <button onclick="elabXlClear()" style="padding:5px 10px;border-radius:7px;border:1px solid var(--border);background:rgba(255,82,82,0.07);color:#FF5252;font-family:var(--font);font-size:0.78rem;cursor:pointer">🗑️</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:7px;margin-bottom:7px;background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:6px 11px">
+        <span id="elab-xl-ref" style="font-size:0.8rem;color:var(--primary);font-weight:700;min-width:32px">A1</span>
+        <div style="width:1px;height:16px;background:var(--border)"></div>
+        <span style="font-size:0.8rem;color:var(--text-muted)">fx</span>
+        <input id="elab-xl-fbar" type="text" placeholder="=AVERAGE(A1:A5)" style="flex:1;background:transparent;border:none;outline:none;color:var(--text);font-family:'Fira Code',monospace;font-size:0.82rem;direction:ltr;text-align:left" onkeydown="if(event.key==='Enter'){elabXlFbarCommit();event.preventDefault()}" oninput="elabXlFbarInput()">
+      </div>
+      <div style="border-radius:11px;overflow:auto;border:1px solid rgba(255,255,255,0.08);background:#1a1a2a;max-height:360px" id="elab-xl-grid"></div>
+      <div id="elab-xl-stats" style="margin-top:11px;display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:7px"></div>
+      <div id="elab-xl-chart-wrap" style="display:none;margin-top:11px;background:white;border-radius:13px;padding:14px"><canvas id="elab-xl-chart" style="max-width:100%;max-height:300px"></canvas></div>
+      <div style="margin-top:11px;padding:11px 13px;background:rgba(232,160,32,0.06);border-radius:9px;border:1px solid rgba(232,160,32,0.17)">
+        <div style="font-size:0.73rem;color:#E8A020;font-weight:700;margin-bottom:6px">📖 الدوال:</div>
+        <div id="elab-xl-fnref" style="display:flex;flex-wrap:wrap;gap:5px"></div>
+      </div>
+    </div>`;
 }
 
 function getLessonTypeIcon(type) {
@@ -3834,56 +4291,40 @@ function buildConceptLesson(lesson) {
 }
 
 function buildMindMap(mm) {
-  const colors = mm.branches.map(b => b.color || '#6C63FF');
-  return `
-    <div style="margin-top: 28px; margin-bottom: 8px;">
-      <div style="font-size: 1.1rem; font-weight: 700; margin-bottom: 16px;">🧠 الخريطة الذهنية</div>
-      <div style="
-        background: rgba(255,255,255,0.03);
-        border: 1px solid var(--border);
-        border-radius: 20px; padding: 24px; position: relative;
-        overflow: hidden;
-      ">
-        <!-- Center node -->
-        <div style="display: flex; justify-content: center; margin-bottom: 24px;">
-          <div style="
-            background: linear-gradient(135deg, var(--primary), #9C8CFF);
-            border-radius: 50px; padding: 12px 28px;
-            font-weight: 900; font-size: 1.1rem; color: white;
-            box-shadow: 0 6px 20px rgba(108,99,255,0.35);
-          ">${mm.center}</div>
-        </div>
-        <!-- Branches -->
-        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px;">
-          ${mm.branches.map((b, i) => `
-            <div style="
-              background: ${b.color || '#6C63FF'}15;
-              border: 1.5px solid ${b.color || '#6C63FF'}40;
-              border-radius: 16px; padding: 14px; position: relative;
-              transition: transform 0.25s; cursor: default;
-            " onmouseenter="this.style.transform='scale(1.03)'" onmouseleave="this.style.transform='scale(1)'">
-              <div style="
-                font-weight: 800; font-size: 0.9rem;
-                color: ${b.color || '#6C63FF'};
-                margin-bottom: 10px; padding-bottom: 8px;
-                border-bottom: 1px solid ${b.color || '#6C63FF'}25;
-              ">${b.label}</div>
-              <div style="display: flex; flex-wrap: wrap; gap: 5px;">
-                ${(b.children || []).map(child => `
-                  <span style="
-                    font-size: 0.72rem; padding: 3px 9px;
-                    background: ${b.color || '#6C63FF'}20;
-                    border-radius: 20px; color: var(--text);
-                    border: 1px solid ${b.color || '#6C63FF'}30;
-                  ">${child}</span>
-                `).join('')}
-              </div>
-            </div>
-          `).join('')}
-        </div>
+  if (!mm) return '';
+  const branches = mm.branches || [];
+  const cx = 280, cy = 180, R = 120;
+  const svgLines = branches.map((b,i) => {
+    const a = (2*Math.PI*i/branches.length) - Math.PI/2;
+    return `<line x1="${cx}" y1="${cy}" x2="${Math.round(cx+R*Math.cos(a))}" y2="${Math.round(cy+R*Math.sin(a))}" stroke="${b.color||'#6C63FF'}" stroke-width="2" stroke-opacity="0.4" stroke-dasharray="6,3"/>`;
+  }).join('');
+  const svgNodes = branches.map((b,i) => {
+    const a = (2*Math.PI*i/branches.length) - Math.PI/2;
+    const x = Math.round(cx+R*Math.cos(a)), y = Math.round(cy+R*Math.sin(a));
+    const lbl = (b.label||'').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const rw = Math.min(Math.max(lbl.length*5+18, 42), 90);
+    return `<ellipse cx="${x}" cy="${y}" rx="${rw}" ry="17" fill="${b.color||'#6C63FF'}22" stroke="${b.color||'#6C63FF'}" stroke-width="1.5"/>
+    <text x="${x}" y="${y+5}" text-anchor="middle" font-family="Cairo,sans-serif" font-size="10.5" fill="${b.color||'#6C63FF'}" font-weight="800">${lbl}</text>`;
+  }).join('');
+  const center = (mm.center||'').replace(/</g,'&lt;');
+  return `<div style="margin-top:24px">
+    <div style="font-size:1rem;font-weight:700;margin-bottom:12px;color:var(--primary);">🧠 الخريطة الذهنية</div>
+    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(108,99,255,0.18);border-radius:18px;padding:16px;overflow:hidden;">
+      <svg viewBox="0 0 560 360" style="width:100%;max-height:230px" xmlns="http://www.w3.org/2000/svg">
+        <defs><radialGradient id="cg${Math.random().toString(36).slice(2,6)}"><stop offset="0%" stop-color="#6C63FF"/><stop offset="100%" stop-color="#9C8CFF" stop-opacity="0.7"/></radialGradient></defs>
+        ${svgLines}
+        <ellipse cx="${cx}" cy="${cy}" rx="60" ry="28" fill="#6C63FF" opacity="0.9" filter="drop-shadow(0 4px 10px #6C63FF66)"/>
+        <text x="${cx}" y="${cy+5}" text-anchor="middle" font-family="Cairo,sans-serif" font-size="12" fill="white" font-weight="900">${center}</text>
+        ${svgNodes}
+      </svg>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:12px;">
+        ${branches.map(b=>`<div style="background:${b.color||'#6C63FF'}10;border:1.5px solid ${b.color||'#6C63FF'}30;border-radius:12px;padding:10px;transition:transform 0.2s" onmouseenter="this.style.transform='translateY(-3px)'" onmouseleave="this.style.transform='none'">
+          <div style="font-weight:800;font-size:0.82rem;color:${b.color||'#6C63FF'};margin-bottom:6px;padding-bottom:5px;border-bottom:1px solid ${b.color||'#6C63FF'}20">${b.label}</div>
+          <div style="display:flex;flex-wrap:wrap;gap:4px">${(b.children||[]).map(ch=>`<span style="font-size:0.7rem;padding:2px 7px;background:${b.color||'#6C63FF'}15;border-radius:20px;color:var(--text)">${ch}</span>`).join('')}</div>
+        </div>`).join('')}
       </div>
     </div>
-  `;
+  </div>`;
 }
 
 function buildCalculationLesson(lesson) {

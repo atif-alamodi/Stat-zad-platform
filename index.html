@@ -13395,7 +13395,8 @@ function showToast(msg, type = 'info') {
 
 // ============ THEME ============
 function toggleTheme() {
-  document.body.classList.toggle('light-mode');
+  var isLight = document.body.classList.contains('light-mode');
+  setTheme(isLight ? 'dark' : 'light');
 }
 
 
@@ -15520,21 +15521,51 @@ function closeSettingsPanel() {
 }
 
 function updateSettingsThemeButtons() {
-  const isDark = !document.body.classList.contains('light-mode');
-  const btnD = document.getElementById('btn-dark');
-  const btnL = document.getElementById('btn-light');
-  if (btnD) btnD.classList.toggle('active', isDark);
-  if (btnL) btnL.classList.toggle('active', !isDark);
+  var isDark = !document.body.classList.contains('light-mode');
+  var darkBtn  = document.getElementById('theme-btn-dark');
+  var lightBtn = document.getElementById('theme-btn-light');
+  if (darkBtn) {
+    darkBtn.style.background  = isDark ? 'linear-gradient(135deg,#5B4FF5,#7C6FFF)' : 'rgba(255,255,255,0.07)';
+    darkBtn.style.color        = isDark ? 'white' : '';
+    darkBtn.style.borderColor  = isDark ? 'rgba(108,99,255,0.5)' : 'rgba(255,255,255,0.15)';
+    darkBtn.style.boxShadow    = isDark ? '0 4px 15px rgba(108,99,255,0.4)' : 'none';
+  }
+  if (lightBtn) {
+    lightBtn.style.background  = !isDark ? 'linear-gradient(135deg,#FFB347,#FF9F43)' : 'rgba(255,255,255,0.07)';
+    lightBtn.style.color        = !isDark ? 'white' : '';
+    lightBtn.style.borderColor  = !isDark ? 'rgba(255,159,67,0.6)' : 'rgba(255,255,255,0.15)';
+    lightBtn.style.boxShadow    = !isDark ? '0 4px 15px rgba(255,159,67,0.4)' : 'none';
+  }
 }
 
 function setTheme(mode) {
-  if (mode === 'light') document.body.classList.add('light-mode');
-  else document.body.classList.remove('light-mode');
+  if (mode === 'light') {
+    document.body.classList.add('light-mode');
+    document.documentElement.setAttribute('data-theme','light');
+  } else {
+    document.body.classList.remove('light-mode');
+    document.documentElement.setAttribute('data-theme','dark');
+  }
   localStorage.setItem('zad_theme', mode);
   updateSettingsThemeButtons();
-  // Update moon/sun icon
-  const moonBtn = document.querySelector('.icon-btn[onclick="toggleTheme()"]');
+  // Update icon in top bar
+  var moonBtn = document.querySelector('.icon-btn[onclick="toggleTheme()"]');
   if (moonBtn) moonBtn.textContent = mode === 'light' ? '🌙' : '☀️';
+  // Update settings modal buttons if open
+  var lightBtn = document.getElementById('theme-btn-light');
+  var darkBtn  = document.getElementById('theme-btn-dark');
+  if (lightBtn) {
+    lightBtn.style.background  = mode === 'light' ? 'linear-gradient(135deg,#FFB347,#FF9F43)' : 'rgba(255,255,255,0.06)';
+    lightBtn.style.color        = mode === 'light' ? 'white' : '';
+    lightBtn.style.borderColor  = mode === 'light' ? '#FF9F43' : '';
+    lightBtn.style.boxShadow    = mode === 'light' ? '0 4px 15px rgba(255,159,67,0.4)' : '';
+  }
+  if (darkBtn) {
+    darkBtn.style.background   = mode === 'dark' ? 'linear-gradient(135deg,#5B4FF5,#7C6FFF)' : 'rgba(255,255,255,0.06)';
+    darkBtn.style.color         = mode === 'dark' ? 'white' : '';
+    darkBtn.style.borderColor   = mode === 'dark' ? '#7C6FFF' : '';
+    darkBtn.style.boxShadow     = mode === 'dark' ? '0 4px 15px rgba(108,99,255,0.4)' : '';
+  }
 }
 
 function changeFontSize(dir) {
@@ -15619,7 +15650,7 @@ function confirmDeleteAccount() {
 // Apply saved theme on load
 (function() {
   const saved = localStorage.getItem('zad_theme');
-  if (saved === 'light') document.body.classList.add('light-mode');
+  if (saved === 'light') { document.body.classList.add('light-mode'); document.documentElement.setAttribute('data-theme','light'); } else { document.documentElement.setAttribute('data-theme','dark'); }
   const savedAnim = localStorage.getItem('zad_animations');
   if (savedAnim === 'false') document.body.classList.add('no-animations');
 })();
@@ -15769,6 +15800,303 @@ function confirmDeleteAccount() {
 
 /* ══ OS Lab Styles ══ */
 .oslab-panel { animation: fadeIn 0.3s ease; }
+
+/* ══════════════════════════════════════════════════════════
+   🌞 LIGHT MODE — ZAD PLATFORM
+   ══════════════════════════════════════════════════════════ */
+
+body.light-mode {
+  --primary: #5B4FF5;
+  --secondary: #FF6584;
+  --accent: #0099CC;
+  --text: #1A1A2E;
+  --text-muted: #5A5A7A;
+  --border: rgba(0,0,0,0.1);
+  --success: #00A855;
+  --warning: #E6A800;
+  --error: #E53935;
+  --bg-dark: #F0F2FF;
+  --bg-card: rgba(255,255,255,0.85);
+  --shadow: 0 8px 32px rgba(91,79,245,0.12);
+}
+
+/* خلفية الصفحة */
+body.light-mode {
+  background: linear-gradient(135deg, #F0F2FF 0%, #E8ECFF 50%, #F5F0FF 100%);
+  color: #1A1A2E;
+}
+
+/* Landing page */
+body.light-mode #page-landing {
+  background: linear-gradient(135deg, #EEF0FF 0%, #E0E5FF 50%, #F0EAFF 100%);
+}
+
+/* صفحة التطبيق الرئيسية */
+body.light-mode #page-app {
+  background: linear-gradient(135deg, #F0F2FF 0%, #E8ECFF 100%);
+}
+
+/* الشريط الجانبي */
+body.light-mode .sidebar {
+  background: linear-gradient(180deg, #FFFFFF 0%, #F5F6FF 100%);
+  border-right: 1px solid rgba(91,79,245,0.15);
+  box-shadow: 4px 0 24px rgba(91,79,245,0.08);
+}
+
+body.light-mode .sidebar-header {
+  background: linear-gradient(135deg, #5B4FF5 0%, #7C6FFF 100%);
+}
+
+body.light-mode .sidebar-header * {
+  color: white !important;
+}
+
+body.light-mode .nav-item {
+  color: #3A3A5C;
+}
+
+body.light-mode .nav-item:hover,
+body.light-mode .nav-item.active {
+  background: linear-gradient(135deg, rgba(91,79,245,0.12) 0%, rgba(124,111,255,0.08) 100%);
+  color: #5B4FF5;
+}
+
+/* المحتوى الرئيسي */
+body.light-mode .main-content {
+  background: transparent;
+}
+
+/* البطاقات */
+body.light-mode .glass-card,
+body.light-mode .card,
+body.light-mode [class*="card"] {
+  background: rgba(255,255,255,0.9);
+  border: 1px solid rgba(91,79,245,0.12);
+  box-shadow: 0 4px 20px rgba(91,79,245,0.08);
+}
+
+/* الهيدر العلوي */
+body.light-mode .top-header,
+body.light-mode header {
+  background: rgba(255,255,255,0.95);
+  border-bottom: 1px solid rgba(91,79,245,0.1);
+  backdrop-filter: blur(20px);
+}
+
+/* الأزرار العامة */
+body.light-mode .btn-primary {
+  background: linear-gradient(135deg, #5B4FF5, #7C6FFF);
+  color: white;
+  box-shadow: 0 4px 15px rgba(91,79,245,0.3);
+}
+
+body.light-mode .icon-btn {
+  background: rgba(91,79,245,0.08);
+  color: #5B4FF5;
+  border: 1px solid rgba(91,79,245,0.15);
+}
+
+body.light-mode .icon-btn:hover {
+  background: rgba(91,79,245,0.15);
+}
+
+/* الـ modal */
+body.light-mode #zad-modal-overlay {
+  background: rgba(91,79,245,0.15);
+  backdrop-filter: blur(12px);
+}
+
+body.light-mode #zad-modal-box {
+  background: linear-gradient(160deg, #FFFFFF 0%, #F8F6FF 100%) !important;
+  border: 1.5px solid rgba(91,79,245,0.2) !important;
+  box-shadow: 0 24px 60px rgba(91,79,245,0.15) !important;
+  color: #1A1A2E !important;
+}
+
+/* داخل الـ modal */
+body.light-mode #zad-modal-box * {
+  color: inherit;
+}
+
+/* صفحة الدرس */
+body.light-mode .lesson-content-wrap {
+  background: transparent;
+}
+
+body.light-mode [style*="background:rgba(255,255,255,0.03)"],
+body.light-mode [style*="background: rgba(255,255,255,0.03)"] {
+  background: rgba(91,79,245,0.04) !important;
+}
+
+body.light-mode [style*="background:rgba(0,0,0,0.2)"],
+body.light-mode [style*="background: rgba(0,0,0,0.2)"] {
+  background: rgba(91,79,245,0.06) !important;
+}
+
+body.light-mode [style*="background:rgba(0,0,0,0.18)"],
+body.light-mode [style*="background: rgba(0,0,0,0.18)"] {
+  background: rgba(91,79,245,0.05) !important;
+}
+
+body.light-mode [style*="#141210"],
+body.light-mode [style*="#1C1917"],
+body.light-mode [style*="#242018"] {
+  background: #FFFFFF !important;
+}
+
+/* النصوص الكامدة */
+body.light-mode [style*="color:var(--text-muted)"],
+body.light-mode [style*="color: var(--text-muted)"] {
+  color: #5A5A7A !important;
+}
+
+/* الحدود */
+body.light-mode [style*="border:1px solid rgba(255,255,255,0.1)"],
+body.light-mode [style*="border: 1px solid rgba(255,255,255,0.1)"] {
+  border-color: rgba(91,79,245,0.15) !important;
+}
+
+body.light-mode [style*="border:1px solid var(--border)"],
+body.light-mode [style*="border: 1px solid var(--border)"] {
+  border-color: rgba(91,79,245,0.15) !important;
+}
+
+/* Lesson tabs */
+body.light-mode .tab-btn {
+  color: #5A5A7A;
+  background: rgba(91,79,245,0.05);
+}
+
+body.light-mode .tab-btn.active {
+  background: linear-gradient(135deg, #5B4FF5, #7C6FFF);
+  color: white;
+}
+
+/* Progress bar background */
+body.light-mode [style*="background:rgba(255,255,255,0.08)"] {
+  background: rgba(91,79,245,0.08) !important;
+}
+
+/* الـ input */
+body.light-mode input,
+body.light-mode textarea,
+body.light-mode select {
+  background: rgba(255,255,255,0.9);
+  border: 1px solid rgba(91,79,245,0.2);
+  color: #1A1A2E;
+}
+
+body.light-mode input::placeholder,
+body.light-mode textarea::placeholder {
+  color: #9090B0;
+}
+
+/* Subject cards */
+body.light-mode .subject-card {
+  background: rgba(255,255,255,0.9);
+  border: 1px solid rgba(91,79,245,0.1);
+}
+
+body.light-mode .subject-card:hover {
+  box-shadow: 0 12px 40px rgba(91,79,245,0.15);
+  transform: translateY(-4px);
+}
+
+/* Quiz */
+body.light-mode .quiz-option {
+  background: rgba(255,255,255,0.9);
+  border: 1.5px solid rgba(91,79,245,0.15);
+  color: #1A1A2E;
+}
+
+body.light-mode .quiz-option:hover {
+  background: rgba(91,79,245,0.08);
+  border-color: #5B4FF5;
+}
+
+/* Back button & nav */
+body.light-mode .back-btn {
+  background: rgba(91,79,245,0.08);
+  border: 1px solid rgba(91,79,245,0.2);
+  color: #5B4FF5;
+}
+
+/* الـ toast */
+body.light-mode .toast {
+  background: linear-gradient(135deg, #FFFFFF, #F5F6FF);
+  border: 1px solid rgba(91,79,245,0.2);
+  color: #1A1A2E;
+  box-shadow: 0 8px 32px rgba(91,79,245,0.15);
+}
+
+/* Type cards */
+body.light-mode .type-card-clickable {
+  background: rgba(255,255,255,0.9) !important;
+  box-shadow: 0 2px 12px rgba(91,79,245,0.08);
+}
+
+/* Mobile bottom bar */
+body.light-mode .mobile-bottom-bar {
+  background: rgba(255,255,255,0.95);
+  border-top: 1px solid rgba(91,79,245,0.1);
+  box-shadow: 0 -4px 20px rgba(91,79,245,0.08);
+}
+
+/* Scrollbar */
+body.light-mode ::-webkit-scrollbar-track {
+  background: #F0F2FF;
+}
+
+body.light-mode ::-webkit-scrollbar-thumb {
+  background: rgba(91,79,245,0.3);
+}
+
+body.light-mode ::-webkit-scrollbar-thumb:hover {
+  background: rgba(91,79,245,0.5);
+}
+
+/* OS Lab */
+body.light-mode .oslab-panel {
+  background: rgba(255,255,255,0.85);
+}
+
+/* Mind map container */
+body.light-mode [style*="background:rgba(0,0,0,0.2)"] {
+  background: rgba(91,79,245,0.04) !important;
+}
+
+/* الـ definition/keyterms boxes */
+body.light-mode [style*="background:rgba(255,255,255,0.04)"] {
+  background: rgba(91,79,245,0.04) !important;
+}
+
+/* خلفية الكروت الداكنة */
+body.light-mode [style*="background:rgba(0,0,0,0.3)"] {
+  background: rgba(91,79,245,0.06) !important;
+}
+
+/* النجوم والبروجريس */
+body.light-mode .progress-track {
+  background: rgba(91,79,245,0.1);
+}
+
+/* Settings panel */
+body.light-mode #settings-panel-overlay {
+  background: rgba(91,79,245,0.1);
+}
+
+body.light-mode #settings-panel-box {
+  background: linear-gradient(160deg, #FFFFFF 0%, #F8F6FF 100%);
+  border: 1.5px solid rgba(91,79,245,0.2);
+}
+
+/* Theme toggle button في الإعدادات */
+body.light-mode .theme-btn-light {
+  background: linear-gradient(135deg, #FFD93D, #FF9F43) !important;
+  color: white !important;
+  border-color: #FF9F43 !important;
+}
+
 </style>
 
 
@@ -15802,8 +16130,8 @@ function confirmDeleteAccount() {
       <div class="settings-row">
         <span>وضع الإضاءة</span>
         <div style="display:flex;gap:8px">
-          <button class="setting-toggle-btn" id="btn-dark" onclick="setTheme('dark')">🌙 داكن</button>
-          <button class="setting-toggle-btn" id="btn-light" onclick="setTheme('light')">☀️ فاتح</button>
+          <button id="theme-btn-dark" onclick="setTheme('dark')" style="padding:9px 18px;border-radius:12px;border:1.5px solid rgba(108,99,255,0.5);background:linear-gradient(135deg,#5B4FF5,#7C6FFF);color:white;font-family:var(--font);font-size:0.85rem;font-weight:700;cursor:pointer;box-shadow:0 4px 15px rgba(108,99,255,0.4);transition:all 0.2s">🌙 داكن</button>
+          <button id="theme-btn-light" onclick="setTheme('light')" style="padding:9px 18px;border-radius:12px;border:1.5px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.07);color:var(--text-muted);font-family:var(--font);font-size:0.85rem;font-weight:700;cursor:pointer;transition:all 0.2s">☀️ فاتح</button>
         </div>
       </div>
     </div>

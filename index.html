@@ -3087,7 +3087,7 @@ function commAnalyzeSpeech() {
           <div style="font-size:0.8rem;color:var(--text-muted)">متوسط التقييم</div>
           <div style="font-size:1.8rem;font-weight:900;color:${gc}">${avg}<span style="font-size:1rem">/100</span></div>
         </div>
-        <div style="text-align:left">
+        <div style="text-align:right;direction:rtl">
           <div style="font-weight:800;color:${gc}">${gl}</div>
           <div style="font-size:0.75rem;color:var(--text-muted)">${wc} كلمة | ${sc} جملة | متوسط ${avgWords} كلمة/جملة</div>
         </div>
@@ -9170,6 +9170,8 @@ body {
   max-width: 1000px;
   margin: 0 auto;
   width: 100%;
+  direction: rtl;
+  text-align: right;
 }
 
 /* Step-by-step animation */
@@ -11345,159 +11347,95 @@ function buildConceptLesson(lesson) {
   var c = lesson.content;
   var html = '';
 
-  // ── 1. Hero definition ────────────────────────────────────────────────────
   if (c.definition) {
-    html += '<div style="background:linear-gradient(135deg,rgba(108,99,255,0.18),rgba(156,140,255,0.08));border-right:4px solid var(--primary);border-radius:16px;padding:22px;margin-bottom:22px;font-size:1.05rem;line-height:1.8;position:relative;overflow:hidden">'
-      +'<div style="position:absolute;top:-20px;right:-20px;font-size:5rem;opacity:0.07">📐</div>'
-      +c.definition+'</div>';
+    html += '<div style="margin-bottom:22px;padding:20px;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:16px;direction:rtl;text-align:right"><div style="font-size:0.8rem;font-weight:700;color:var(--primary);margin-bottom:8px">📖 التعريف</div><div style="font-size:0.95rem;line-height:1.85;color:var(--text)">' + c.definition + '</div></div>';
   }
 
-  // ── 2. Why learn — horizontal scroll cards ────────────────────────────────
   if (c.whyLearn && c.whyLearn.length) {
-    html += '<div style="margin-bottom:22px">'
-      +'<div style="font-size:1.05rem;font-weight:800;margin-bottom:12px;display:flex;align-items:center;gap:8px"><span style="background:linear-gradient(135deg,#FFD600,#FF7043);-webkit-background-clip:text;-webkit-text-fill-color:transparent">💡</span> لماذا نتعلم هذا؟</div>'
-      +'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">';
+    html += '<div style="margin-bottom:22px"><div style="font-size:1.05rem;font-weight:800;margin-bottom:12px;direction:rtl;text-align:right"> لماذا نتعلم هذا؟</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">';
     c.whyLearn.forEach(function(w) {
       var icon = w.split(' ')[0];
       var text = w.substring(w.indexOf(' ')+1);
-      html += '<div style="background:rgba(255,214,0,0.07);border:1px solid rgba(255,214,0,0.2);border-radius:13px;padding:14px;display:flex;gap:10px;align-items:flex-start;transition:transform 0.2s" onmouseenter="this.style.transform=\'translateY(-3px)\'" onmouseleave="this.style.transform=\'none\'">'
-        +'<span style="font-size:1.4rem;flex-shrink:0">'+icon+'</span>'
-        +'<span style="font-size:0.88rem;line-height:1.5;color:var(--text)">'+text+'</span>'
-        +'</div>';
+      html += '<div style="background:rgba(255,214,0,0.07);border:1px solid rgba(255,214,0,0.2);border-radius:13px;padding:14px;display:flex;gap:10px;align-items:flex-start;direction:rtl;text-align:right;transition:transform 0.2s" onmouseenter="this.style.transform=\'translateY(-3px)\'" onmouseleave="this.style.transform=\'none\'"><span style="font-size:1.4rem;flex-shrink:0">' + icon + '</span><span style="font-size:0.88rem;line-height:1.6;color:var(--text)">' + text + '</span></div>';
     });
     html += '</div></div>';
   }
 
-  // ── 3. Types — visual cards with icons ───────────────────────────────────
   if (c.types && c.types.length) {
     var COLORS = ['#6C63FF','#00BFA5','#FF7043','#FFD600','#E91E63','#00B0FF'];
-    html += '<div style="margin-bottom:22px">'
-      +'<div style="font-size:1.05rem;font-weight:800;margin-bottom:12px">📌 الأنواع والتصنيفات</div>'
-      +'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px">';
+    html += '<div style="margin-bottom:22px"><div style="font-size:1.05rem;font-weight:800;margin-bottom:12px;direction:rtl;text-align:right">📌 الأنواع والتصنيفات</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px">';
     c.types.forEach(function(type, i) {
       var col = COLORS[i % COLORS.length];
       var safeType = encodeURIComponent(JSON.stringify(type));
-      html += '<div class="type-card-clickable"'
-        +' onclick="openTypeCardModal(decodeURIComponent(\''+safeType+'\'),\''+col+'\'")'
-        +' style="background:'+col+'0d;border:1.5px solid '+col+'30;border-radius:16px;padding:18px;'
-        +'transition:all 0.22s;cursor:pointer;position:relative;overflow:hidden;'
-        +'box-shadow:0 2px 8px rgba(0,0,0,0.1)"'
-        +' onmouseenter="this.style.transform=\'translateY(-6px) scale(1.02)\';this.style.boxShadow=\'0 12px 28px '+col+'35\'"'
-        +' onmouseleave="this.style.transform=\'none\';this.style.boxShadow=\'0 2px 8px rgba(0,0,0,0.1)\'">'
-        +'<div style="position:absolute;top:-8px;right:-8px;font-size:3.5rem;opacity:0.08">'+(type.icon||'📌')+'</div>'
-        +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">'
-        +'<div style="width:40px;height:40px;border-radius:12px;background:'+col+'25;display:flex;align-items:center;justify-content:center;font-size:1.5rem;flex-shrink:0">'+(type.icon||'📌')+'</div>'
-        +'<div style="font-weight:800;font-size:0.92rem;color:'+col+'">' +type.name+'</div>'
-        +'</div>'
-        +'<div style="font-size:0.83rem;color:var(--text-muted);line-height:1.6;margin-bottom:8px">'+type.desc+'</div>'
-        +'<div style="font-size:0.7rem;color:'+col+';opacity:0.8;display:flex;align-items:center;gap:4px">'
-        +'<span>👆</span> اضغط لرؤية مثال'
-        +'</div>'
-        +'</div>';
+      html += '<div class="type-card-clickable" onclick="openTypeCardModal(decodeURIComponent(\'' + safeType + '\'),\'' + col + '\')" style="background:' + col + '0d;border:1.5px solid ' + col + '30;border-radius:16px;padding:18px;direction:rtl;text-align:right;transition:all 0.22s;cursor:pointer;position:relative;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1)" onmouseenter="this.style.transform=\'translateY(-6px) scale(1.02)\';this.style.boxShadow=\'0 12px 28px ' + col + '35\'" onmouseleave="this.style.transform=\'none\';this.style.boxShadow=\'0 2px 8px rgba(0,0,0,0.1)\'"><div style="position:absolute;top:-8px;right:-8px;font-size:3.5rem;opacity:0.08">' + (type.icon||'📌') + '</div><div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><div style="width:40px;height:40px;border-radius:12px;background:' + col + '25;display:flex;align-items:center;justify-content:center;font-size:1.5rem;flex-shrink:0">' + (type.icon||'📌') + '</div><div style="font-weight:800;font-size:0.92rem;color:' + col + '">' + type.name + '</div></div><div style="font-size:0.83rem;color:var(--text-muted);line-height:1.7;margin-bottom:8px">' + type.desc + '</div><div style="font-size:0.7rem;color:' + col + ';opacity:0.8;display:flex;align-items:center;gap:4px"><span>👆</span> اضغط لرؤية مثال</div></div>';
     });
     html += '</div></div>';
   }
 
-  // ── 4. Formula / keyTerms — pill cards with copy ─────────────────────────
   if (c.keyTerms && c.keyTerms.length) {
-    html += '<div style="margin-bottom:22px">'
-      +'<div style="font-size:1.05rem;font-weight:800;margin-bottom:12px">🔑 المصطلحات والقوانين</div>'
-      +'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px">';
+    html += '<div style="margin-bottom:22px"><div style="font-size:1.05rem;font-weight:800;margin-bottom:12px;direction:rtl;text-align:right">🔑 المصطلحات والقوانين</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px">';
     c.keyTerms.forEach(function(kt) {
-      var isFormula = /[=+÷×∑√μσ]/.test(kt.def||'') || /[\^₀-₉]/.test(kt.def||'');
-      html += '<div style="background:'+(isFormula?'rgba(108,99,255,0.1)':'rgba(255,255,255,0.04)')+';border:1px solid '+(isFormula?'rgba(108,99,255,0.3)':'var(--border)')+';border-radius:13px;padding:14px;transition:border-color 0.2s" onmouseenter="this.style.borderColor=\'var(--primary)\'" onmouseleave="this.style.borderColor=\''+(isFormula?'rgba(108,99,255,0.3)':'var(--border)')+'\'">'
-        +'<div style="font-weight:800;color:var(--primary);font-size:0.88rem;margin-bottom:6px">'+kt.term+'</div>'
-        +(isFormula
-          ? '<div style="font-family:\'Fira Code\',monospace;font-size:0.9rem;background:rgba(0,0,0,0.3);padding:8px 12px;border-radius:8px;color:#79c0ff;direction:ltr;text-align:left;overflow-x:auto">'+kt.def+'</div>'
-          : '<div style="font-size:0.82rem;color:var(--text-muted);line-height:1.55">'+kt.def+'</div>'
-        )
-        +'</div>';
+      var def = kt.def || '';
+      var hasArabic = /[؀-ۿ]/.test(def);
+      var isFormula = !hasArabic && (/[=+÷×∑√μσ]/.test(def) || /[\^₀-₉]/.test(def));
+      html += '<div style="background:' + (isFormula?'rgba(108,99,255,0.1)':'rgba(255,255,255,0.04)') + ';border:1px solid ' + (isFormula?'rgba(108,99,255,0.3)':'var(--border)') + ';border-radius:13px;padding:14px;transition:border-color 0.2s;direction:rtl" onmouseenter="this.style.borderColor=\'var(--primary)\'" onmouseleave="this.style.borderColor=\'' + (isFormula?'rgba(108,99,255,0.3)':'var(--border)') + '\'"><div style="font-weight:800;color:var(--primary);font-size:0.88rem;margin-bottom:8px;text-align:right">' + kt.term + '</div>' + (isFormula ? '<div style="font-family:\'Fira Code\',monospace;font-size:0.9rem;background:rgba(0,0,0,0.3);padding:8px 12px;border-radius:8px;color:#79c0ff;direction:ltr;text-align:left;overflow-x:auto">' + def + '</div>' : '<div style="font-size:0.84rem;color:var(--text-muted);line-height:1.7;text-align:right;white-space:pre-line">' + def + '</div>') + '</div>';
     });
     html += '</div></div>';
   }
 
-  // ── 5. Steps / Components ─────────────────────────────────────────────────
   if (c.steps && c.steps.length) {
-    html += '<div style="margin-bottom:22px">'
-      +'<div style="font-size:1.05rem;font-weight:800;margin-bottom:14px">📋 الخطوات</div>';
+    html += '<div style="margin-bottom:22px"><div style="font-size:1.05rem;font-weight:800;margin-bottom:14px;direction:rtl;text-align:right">📋 الخطوات</div>';
     c.steps.forEach(function(step, i) {
-      html += '<div style="display:flex;gap:14px;padding:14px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:14px;margin-bottom:10px;align-items:flex-start">'
-        +'<div style="min-width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--secondary));display:flex;align-items:center;justify-content:center;font-weight:900;font-size:0.9rem;color:white;flex-shrink:0">'+(i+1)+'</div>'
-        +'<div style="flex:1">'
-        +(typeof step==='string' ? '<div style="font-size:0.9rem;line-height:1.6">'+step+'</div>'
-          : '<div style="font-weight:700;margin-bottom:4px">'+(step.name||step.title||'')+'</div><div style="font-size:0.83rem;color:var(--text-muted);line-height:1.55">'+(step.desc||step.description||'')+'</div>')
-        +'</div></div>';
+      html += '<div style="display:flex;gap:14px;padding:14px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:14px;margin-bottom:10px;align-items:flex-start;direction:rtl;text-align:right"><div style="min-width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--secondary));display:flex;align-items:center;justify-content:center;font-weight:900;font-size:0.9rem;color:white;flex-shrink:0">' + (i+1) + '</div><div style="flex:1">' + (typeof step==='string' ? '<div style="font-size:0.9rem;line-height:1.7">' + step + '</div>' : '<div style="font-weight:700;margin-bottom:4px">' + (step.name||step.title||'') + '</div><div style="font-size:0.83rem;color:var(--text-muted);line-height:1.6">' + (step.desc||step.description||'') + '</div>') + '</div></div>';
     });
     html += '</div>';
   }
 
   if (c.components && c.components.length) {
-    html += '<div style="margin-bottom:22px">'
-      +'<div style="font-size:1.05rem;font-weight:800;margin-bottom:14px">⚙️ المكونات</div>';
+    html += '<div style="margin-bottom:22px"><div style="font-size:1.05rem;font-weight:800;margin-bottom:14px;direction:rtl;text-align:right">⚙️ المكونات</div>';
     c.components.forEach(function(comp, i) {
-      html += '<div style="display:flex;gap:14px;padding:14px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:14px;margin-bottom:10px;align-items:flex-start">'
-        +'<div style="min-width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--secondary));display:flex;align-items:center;justify-content:center;font-weight:900;font-size:0.9rem;color:white;flex-shrink:0">'+(i+1)+'</div>'
-        +'<div><div style="font-weight:700;margin-bottom:4px">'+comp.name+'</div><div style="font-size:0.83rem;color:var(--text-muted);line-height:1.55">'+comp.desc+'</div></div>'
-        +'</div>';
+      html += '<div style="display:flex;gap:14px;padding:14px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:14px;margin-bottom:10px;align-items:flex-start;direction:rtl;text-align:right"><div style="min-width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--secondary));display:flex;align-items:center;justify-content:center;font-weight:900;font-size:0.9rem;color:white;flex-shrink:0">' + (i+1) + '</div><div><div style="font-weight:700;margin-bottom:4px">' + comp.name + '</div><div style="font-size:0.83rem;color:var(--text-muted);line-height:1.6">' + comp.desc + '</div></div></div>';
     });
     html += '</div>';
   }
 
-  // ── 6. Properties ─────────────────────────────────────────────────────────
   if (c.properties && c.properties.length) {
-    html += '<div style="background:rgba(0,191,165,0.08);border:1px solid rgba(0,191,165,0.25);border-radius:14px;padding:18px;margin-bottom:22px">'
-      +'<div style="font-size:1rem;font-weight:800;color:#00BFA5;margin-bottom:10px">✅ خصائص مهمة</div>'
-      +'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px">';
+    html += '<div style="background:rgba(0,191,165,0.08);border:1px solid rgba(0,191,165,0.25);border-radius:14px;padding:18px;margin-bottom:22px;direction:rtl;text-align:right"><div style="font-size:1rem;font-weight:800;color:#00BFA5;margin-bottom:10px">✅ خصائص مهمة</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px">';
     c.properties.forEach(function(p) {
-      html += '<div style="display:flex;gap:8px;align-items:flex-start;padding:6px 0">'
-        +'<span style="color:#00BFA5;font-weight:900;flex-shrink:0">✓</span>'
-        +'<span style="font-size:0.87rem;line-height:1.5">'+p+'</span>'
-        +'</div>';
+      html += '<div style="display:flex;gap:8px;align-items:flex-start;padding:6px 0"><span style="color:#00BFA5;font-weight:900;flex-shrink:0">✓</span><span style="font-size:0.87rem;line-height:1.6">' + p + '</span></div>';
     });
     html += '</div></div>';
   }
 
-  // ── 7. Real examples — story cards ────────────────────────────────────────
   if (c.realExamples && c.realExamples.length) {
-    html += '<div style="margin-bottom:22px">'
-      +'<div style="font-size:1.05rem;font-weight:800;margin-bottom:12px">🌍 أمثلة من الواقع</div>'
-      +'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px">';
+    html += '<div style="margin-bottom:22px"><div style="font-size:1.05rem;font-weight:800;margin-bottom:12px;direction:rtl;text-align:right">🌍 أمثلة من الواقع</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px">';
     c.realExamples.forEach(function(ex) {
-      html += '<div style="background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:15px;padding:18px;text-align:center;transition:all 0.2s;cursor:default" onmouseenter="this.style.transform=\'translateY(-4px)\';this.style.borderColor=\'var(--primary)\'" onmouseleave="this.style.transform=\'none\';this.style.borderColor=\'var(--border)\'">'
-        +'<div style="font-size:2.2rem;margin-bottom:10px">'+(ex.icon||'🌐')+'</div>'
-        +'<div style="font-weight:700;font-size:0.9rem;margin-bottom:6px">'+ex.title+'</div>'
-        +'<div style="font-size:0.78rem;color:var(--text-muted);line-height:1.5">'+ex.desc+'</div>'
-        +'</div>';
+      html += '<div style="background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:15px;padding:18px;text-align:center;direction:rtl;transition:all 0.2s;cursor:default" onmouseenter="this.style.transform=\'translateY(-4px)\';this.style.borderColor=\'var(--primary)\'" onmouseleave="this.style.transform=\'none\';this.style.borderColor=\'var(--border)\'"><div style="font-size:2.2rem;margin-bottom:10px">' + (ex.icon||'🌐') + '</div><div style="font-weight:700;font-size:0.9rem;margin-bottom:6px">' + ex.title + '</div><div style="font-size:0.78rem;color:var(--text-muted);line-height:1.6">' + ex.desc + '</div></div>';
     });
     html += '</div></div>';
   }
 
-  // ── 8. Visual diagram for types (SVG bar chart simulation) ────────────────
   if (c.types && c.types.length >= 2 && !c.steps) {
-    var COLORS = ['#6C63FF','#00BFA5','#FF7043','#FFD600'];
-    html += '<div style="margin-bottom:22px">'
-      +'<div style="font-size:1rem;font-weight:800;margin-bottom:12px;color:var(--primary)">📊 مقارنة بصرية</div>'
-      +'<div style="background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:16px;padding:18px;overflow-x:auto">'
-      +'<svg viewBox="0 0 500 160" style="width:100%;min-width:300px;max-height:160px" xmlns="http://www.w3.org/2000/svg">';
+    var COLORS2 = ['#6C63FF','#00BFA5','#FF7043','#FFD600'];
+    html += '<div style="margin-bottom:22px"><div style="font-size:1rem;font-weight:800;margin-bottom:12px;color:var(--primary);direction:rtl;text-align:right">📊 مقارنة بصرية</div><div style="background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:16px;padding:18px;overflow-x:auto"><svg viewBox="0 0 500 160" style="width:100%;min-width:300px;max-height:160px" xmlns="http://www.w3.org/2000/svg">';
     var barW = Math.min(80, Math.floor(460/c.types.length)-12);
     var spacing = Math.floor(500/c.types.length);
     c.types.forEach(function(type, i) {
-      var col = COLORS[i%COLORS.length];
+      var col = COLORS2[i%COLORS2.length];
       var h = 60 + (i%3)*20;
       var x = 30 + i*spacing;
-      html += '<rect x="'+x+'" y="'+(120-h)+'" width="'+barW+'" height="'+h+'" rx="8" fill="'+col+'" opacity="0.8"/>';
+      html += '<rect x="' + x + '" y="' + (120-h) + '" width="' + barW + '" height="' + h + '" rx="8" fill="' + col + '" opacity="0.8"/>';
       var lbl = (type.name||'').replace(/\(.+\)/,'').trim().slice(0,8);
-      html += '<text x="'+(x+barW/2)+'" y="140" text-anchor="middle" font-family="Cairo,sans-serif" font-size="10" fill="'+col+'">'+lbl+'</text>';
+      html += '<text x="' + (x+barW/2) + '" y="140" text-anchor="middle" font-family="Cairo,sans-serif" font-size="10" fill="' + col + '">' + lbl + '</text>';
     });
     html += '</svg></div></div>';
   }
 
-  // ── 9. Mind map ────────────────────────────────────────────────────────────
   if (c.mindMap) {
     html += buildMindMap(c.mindMap);
   }
 
-  return '<div class="lesson-content-wrap" style="padding:0">'+html+'</div>';
+  return '<div class="lesson-content-wrap" style="padding:0;direction:rtl">' + html + '</div>';
 }
 
 

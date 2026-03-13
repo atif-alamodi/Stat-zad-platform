@@ -6871,8 +6871,25 @@ function buildTypeModalContent(type, col, subjectTitle) {
     </div>`;
   }
 
+  // 3 interactive action buttons
+  const uid3 = 'tm-' + Math.random().toString(36).slice(2,8);
+  content += `<div id="${uid3}" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:16px;margin-bottom:12px">
+    <button data-action="image" style="padding:10px 6px;border-radius:11px;border:1px solid ${col}40;background:${col}12;color:${col};font-family:var(--font);font-size:0.82rem;font-weight:700;cursor:pointer;transition:all 0.2s" onmouseenter="this.style.background='${col}28'" onmouseleave="this.style.background='${col}12'">🖼️ صورة</button>
+    <button data-action="more" style="padding:10px 6px;border-radius:11px;border:1px solid rgba(255,255,255,0.14);background:rgba(255,255,255,0.05);color:var(--text);font-family:var(--font);font-size:0.82rem;font-weight:700;cursor:pointer;transition:all 0.2s" onmouseenter="this.style.background='rgba(255,255,255,0.12)'" onmouseleave="this.style.background='rgba(255,255,255,0.05)'">📖 شرح أكثر</button>
+    <button data-action="example" style="padding:10px 6px;border-radius:11px;border:1px solid rgba(0,191,165,0.35);background:rgba(0,191,165,0.1);color:#00BFA5;font-family:var(--font);font-size:0.82rem;font-weight:700;cursor:pointer;transition:all 0.2s" onmouseenter="this.style.background='rgba(0,191,165,0.22)'" onmouseleave="this.style.background='rgba(0,191,165,0.1)'">💡 مثال</button>
+  </div>`;
+  setTimeout(function() {
+    var wrap = document.getElementById(uid3);
+    if (!wrap) return;
+    wrap.querySelectorAll('[data-action]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        openInteractiveAction(this.dataset.action, type.name||name, type, 'modal', 'stats');
+      });
+    });
+  }, 80);
+
   content += `
-    <div style="display:flex;gap:8px;margin-top:16px">
+    <div style="display:flex;gap:8px">
       <button onclick="closeModal()" style="flex:1;padding:10px;border-radius:10px;border:1px solid var(--border);
         background:transparent;color:var(--text-muted);font-family:var(--font);
         font-size:0.85rem;cursor:pointer">إغلاق</button>
@@ -6886,108 +6903,243 @@ function buildTypeModalContent(type, col, subjectTitle) {
 
 // ── Visual Demo Generator ────────────────────────────────────
 function buildTypeVisualDemo(type, col) {
-  const name = (type.name || '').toLowerCase();
+  const txt = ((type.name||'') + ' ' + (type.desc||'')).toLowerCase();
 
-  // Bar Chart Demo
-  if (/bar|شريط|عمود|مخطط شريطي/.test(name+type.desc)) {
-    const data = [65, 42, 88, 35, 70];
+  // ── RANGE / المدى ──────────────────────────────────────────────
+  if (/مدى|range/.test(txt)) {
+    const data = [3, 7, 2, 9, 5, 1, 8];
+    const mn = Math.min(...data), mx = Math.max(...data);
+    const bars = data.map((v,i) => {
+      const h = Math.round(v/mx*70);
+      const isMin = v===mn, isMax = v===mx;
+      const bc = isMax ? '#FF5252' : isMin ? '#00BFA5' : col;
+      return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px">
+        <div style="font-size:0.65rem;color:${bc};font-weight:700">${v}</div>
+        <div style="width:100%;height:${h}px;background:${bc};border-radius:3px 3px 0 0;opacity:${isMax||isMin?1:0.5}"></div>
+      </div>`;
+    }).join('');
+    return `<div style="background:rgba(0,0,0,0.2);border-radius:12px;padding:14px;margin-bottom:14px">
+      <div style="font-size:0.75rem;font-weight:700;color:${col};margin-bottom:10px">📏 المدى = Max − Min = ${mx} − ${mn} = ${mx-mn}</div>
+      <div style="display:flex;align-items:flex-end;gap:5px;height:90px;margin-bottom:6px">${bars}</div>
+      <div style="display:flex;justify-content:space-between;font-size:0.72rem">
+        <span style="color:#00BFA5">▲ أصغر قيمة: ${mn}</span>
+        <span style="color:#FF5252">▲ أكبر قيمة: ${mx}</span>
+        <span style="color:${col};font-weight:700">المدى = ${mx-mn}</span>
+      </div>
+    </div>`;
+  }
+
+  // ── MEAN / المتوسط الحسابي ───────────────────────────────────────
+  if (/متوسط حسابي|mean/.test(txt)) {
+    const data = [4, 8, 6, 10, 2];
+    const sum = data.reduce((a,b)=>a+b,0);
+    const avg = sum/data.length;
+    const max = Math.max(...data);
+    const bars = data.map((v,i) => {
+      const h = Math.round(v/max*70);
+      const avgH = Math.round(avg/max*70);
+      return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px">
+        <div style="font-size:0.65rem;color:${col};font-weight:700">${v}</div>
+        <div style="width:100%;height:${h}px;background:${col};border-radius:3px 3px 0 0;opacity:0.7"></div>
+      </div>`;
+    }).join('');
+    const avgLinePos = Math.round(avg/max*70);
+    return `<div style="background:rgba(0,0,0,0.2);border-radius:12px;padding:14px;margin-bottom:14px">
+      <div style="font-size:0.75rem;font-weight:700;color:${col};margin-bottom:8px">📊 المتوسط = (${data.join('+')})/5 = ${sum}/${data.length} = ${avg}</div>
+      <div style="position:relative;display:flex;align-items:flex-end;gap:5px;height:90px;margin-bottom:6px">
+        ${bars}
+        <div style="position:absolute;left:0;right:0;bottom:${avgLinePos}px;border-top:2px dashed #FFD600;"></div>
+        <div style="position:absolute;right:-4px;bottom:${avgLinePos+2}px;font-size:0.68rem;color:#FFD600;white-space:nowrap">μ=${avg}</div>
+      </div>
+      <div style="font-size:0.72rem;color:var(--text-muted)">الخط الأصفر = المتوسط الحسابي</div>
+    </div>`;
+  }
+
+  // ── MEDIAN / الوسيط ──────────────────────────────────────────────
+  if (/وسيط|median/.test(txt)) {
+    const raw = [7, 2, 9, 4, 6, 1, 8];
+    const sorted = [...raw].sort((a,b)=>a-b);
+    const midIdx = Math.floor(sorted.length/2);
+    return `<div style="background:rgba(0,0,0,0.2);border-radius:12px;padding:14px;margin-bottom:14px">
+      <div style="font-size:0.75rem;font-weight:700;color:${col};margin-bottom:10px">🔢 البيانات مرتبة تصاعدياً</div>
+      <div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-bottom:10px">
+        ${sorted.map((v,i) => `<div style="width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:0.9rem;border:2px solid ${i===midIdx?'#FFD600':col+'50'};background:${i===midIdx?'rgba(255,214,0,0.2)':col+'15'};color:${i===midIdx?'#FFD600':col}">${v}</div>`).join('')}
+      </div>
+      <div style="text-align:center;font-size:0.82rem;color:#FFD600;font-weight:700">الوسيط = ${sorted[midIdx]} (القيمة في المنتصف)</div>
+    </div>`;
+  }
+
+  // ── MODE / المنوال ───────────────────────────────────────────────
+  if (/منوال|mode/.test(txt)) {
+    const data = [3,5,2,5,7,5,3,8,3];
+    const freq = {};
+    data.forEach(v => freq[v]=(freq[v]||0)+1);
+    const maxF = Math.max(...Object.values(freq));
+    return `<div style="background:rgba(0,0,0,0.2);border-radius:12px;padding:14px;margin-bottom:14px">
+      <div style="font-size:0.75rem;font-weight:700;color:${col};margin-bottom:10px">📊 جدول التكرار</div>
+      <div style="display:flex;gap:8px;align-items:flex-end;justify-content:center;flex-wrap:wrap">
+        ${Object.entries(freq).sort((a,b)=>+a[0]-+b[0]).map(([v,f]) => {
+          const isMode = f===maxF;
+          const h = Math.round(f/maxF*70);
+          return `<div style="display:flex;flex-direction:column;align-items:center;gap:3px">
+            <div style="font-size:0.68rem;font-weight:700;color:${isMode?'#FFD600':col}">${f}×</div>
+            <div style="width:34px;height:${h}px;background:${isMode?'#FFD600':col};border-radius:4px 4px 0 0;opacity:${isMode?1:0.5}"></div>
+            <div style="font-size:0.78rem;font-weight:700;color:${isMode?'#FFD600':col}">${v}</div>
+            ${isMode?`<div style="font-size:0.6rem;color:#FFD600">منوال</div>`:''}
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+  }
+
+  // ── VARIANCE / التباين ───────────────────────────────────────────
+  if (/تباين|variance/.test(txt)) {
+    const data = [2,4,4,4,5,5,7,9];
+    const mean = data.reduce((a,b)=>a+b,0)/data.length;
+    const deviations = data.map(v => +(v-mean).toFixed(1));
+    return `<div style="background:rgba(0,0,0,0.2);border-radius:12px;padding:14px;margin-bottom:14px">
+      <div style="font-size:0.75rem;font-weight:700;color:${col};margin-bottom:8px">📐 الانحراف عن المتوسط (μ=${mean})</div>
+      <div style="display:flex;gap:4px;justify-content:center;flex-wrap:wrap;margin-bottom:8px">
+        ${data.map((v,i)=>{
+          const dev = deviations[i];
+          const bc = dev>0?'#FF5252':dev<0?'#00BFA5':'#FFD600';
+          return `<div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+            <div style="font-size:0.7rem;color:${bc};font-weight:700">${dev>0?'+':''}${dev}</div>
+            <div style="width:28px;height:28px;border-radius:6px;background:${bc}25;border:1px solid ${bc}60;display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700;color:${bc}">${v}</div>
+          </div>`;
+        }).join('')}
+      </div>
+      <div style="font-size:0.72rem;color:var(--text-muted);text-align:center">الأحمر = فوق المتوسط | الأزرق = تحت المتوسط</div>
+    </div>`;
+  }
+
+  // ── STD DEV / الانحراف المعياري ─────────────────────────────────
+  if (/انحراف معياري|std|standard deviation/.test(txt)) {
+    const pts = [-2,-1,0,1,2];
+    const heights = [8,20,34,20,8];
+    const max = 34;
+    return `<div style="background:rgba(0,0,0,0.2);border-radius:12px;padding:14px;margin-bottom:14px">
+      <div style="font-size:0.75rem;font-weight:700;color:${col};margin-bottom:8px">🔔 منحنى التوزيع الطبيعي</div>
+      <svg viewBox="0 0 220 80" style="width:100%;max-height:90px" xmlns="http://www.w3.org/2000/svg">
+        <path d="M10,70 Q30,70 55,55 Q80,40 110,10 Q140,40 165,55 Q190,70 210,70" fill="${col}20" stroke="${col}" stroke-width="2.5" fill-opacity="0.4"/>
+        <line x1="110" y1="10" x2="110" y2="70" stroke="#FFD600" stroke-width="1.5" stroke-dasharray="4,3"/>
+        <line x1="70" y1="10" x2="70" y2="70" stroke="rgba(255,255,255,0.25)" stroke-width="1" stroke-dasharray="3,3"/>
+        <line x1="150" y1="10" x2="150" y2="70" stroke="rgba(255,255,255,0.25)" stroke-width="1" stroke-dasharray="3,3"/>
+        <text x="110" y="78" text-anchor="middle" font-size="8" fill="#FFD600" font-family="Cairo">μ</text>
+        <text x="70" y="78" text-anchor="middle" font-size="8" fill="rgba(255,255,255,0.5)" font-family="Cairo">μ-σ</text>
+        <text x="150" y="78" text-anchor="middle" font-size="8" fill="rgba(255,255,255,0.5)" font-family="Cairo">μ+σ</text>
+        <text x="105" y="8" font-size="7" fill="${col}" font-family="Cairo">68%</text>
+      </svg>
+      <div style="font-size:0.72rem;color:var(--text-muted);text-align:center">68% من البيانات تقع بين μ±σ</div>
+    </div>`;
+  }
+
+  // ── CORRELATION / الارتباط ───────────────────────────────────────
+  if (/ارتباط|correlation/.test(txt)) {
+    const pts = [[10,12],[20,22],[30,28],[40,42],[50,48],[60,55],[70,65]];
+    const dots = pts.map(([x,y])=>`<circle cx="${Math.round(x*2.8+5)}" cy="${Math.round(85-y*1.15)}" r="5" fill="${col}" opacity="0.85"/>`).join('');
+    return `<div style="background:rgba(0,0,0,0.2);border-radius:12px;padding:14px;margin-bottom:14px">
+      <div style="font-size:0.75rem;font-weight:700;color:${col};margin-bottom:8px">📈 ارتباط طردي موجب — كلما زاد X زاد Y</div>
+      <svg viewBox="0 0 210 100" style="width:100%;max-height:110px" xmlns="http://www.w3.org/2000/svg">
+        <line x1="12" y1="5" x2="12" y2="90" stroke="rgba(255,255,255,0.2)" stroke-width="1.5"/>
+        <line x1="12" y1="90" x2="205" y2="90" stroke="rgba(255,255,255,0.2)" stroke-width="1.5"/>
+        <line x1="15" y1="85" x2="200" y2="15" stroke="#FFD600" stroke-width="1.5" stroke-dasharray="5,3" opacity="0.6"/>
+        ${dots}
+        <text x="105" y="100" text-anchor="middle" font-size="7" fill="rgba(255,255,255,0.4)" font-family="Cairo">المتغير X</text>
+      </svg>
+    </div>`;
+  }
+
+  // ── IQR / الربيعي ───────────────────────────────────────────────
+  if (/iqr|ربيعي|interquartile/.test(txt)) {
+    const data = [1,3,5,7,8,9,10,12,14,15];
+    const q1 = data[Math.floor(data.length*0.25)];
+    const q3 = data[Math.floor(data.length*0.75)];
+    const iqr = q3-q1;
+    return `<div style="background:rgba(0,0,0,0.2);border-radius:12px;padding:14px;margin-bottom:14px">
+      <div style="font-size:0.75rem;font-weight:700;color:${col};margin-bottom:10px">📦 مخطط الصندوق (Box Plot) — IQR = Q3 − Q1 = ${q3}−${q1} = ${iqr}</div>
+      <svg viewBox="0 0 220 60" style="width:100%;max-height:70px" xmlns="http://www.w3.org/2000/svg">
+        <line x1="15" y1="30" x2="55" y2="30" stroke="${col}" stroke-width="2"/>
+        <rect x="55" y="15" width="90" height="30" rx="4" fill="${col}20" stroke="${col}" stroke-width="2"/>
+        <line x1="100" y1="15" x2="100" y2="45" stroke="#FFD600" stroke-width="2.5"/>
+        <line x1="145" y1="30" x2="200" y2="30" stroke="${col}" stroke-width="2"/>
+        <text x="15" y="56" font-size="8" fill="${col}" font-family="Cairo" text-anchor="middle">${data[0]}</text>
+        <text x="55" y="56" font-size="8" fill="${col}" font-family="Cairo" text-anchor="middle">Q1=${q1}</text>
+        <text x="100" y="56" font-size="8" fill="#FFD600" font-family="Cairo" text-anchor="middle">Q2</text>
+        <text x="145" y="56" font-size="8" fill="${col}" font-family="Cairo" text-anchor="middle">Q3=${q3}</text>
+        <text x="200" y="56" font-size="8" fill="${col}" font-family="Cairo" text-anchor="middle">${data[data.length-1]}</text>
+      </svg>
+    </div>`;
+  }
+
+  // ── HISTOGRAM / مدرج تكراري ────────────────────────────────────
+  if (/histogram|تكرار|توزيع|مدرج/.test(txt)) {
+    const data = [5,12,22,18,14,8,3];
+    const max = Math.max(...data);
+    return `<div style="background:rgba(0,0,0,0.2);border-radius:12px;padding:14px;margin-bottom:14px">
+      <div style="font-size:0.75rem;font-weight:700;color:${col};margin-bottom:10px">📊 مدرج تكراري (الأعمدة متلاصقة)</div>
+      <div style="display:flex;align-items:flex-end;gap:1px;height:80px">
+        ${data.map((v,i)=>`<div style="flex:1;height:${Math.round(v/max*70)}px;background:${col};opacity:${0.5+v/max*0.5}"></div>`).join('')}
+      </div>
+    </div>`;
+  }
+
+  // ── BAR CHART / مخطط شريطي ─────────────────────────────────────
+  if (/bar|شريط|عمود|مخطط شريطي/.test(txt)) {
+    const data = [65,42,88,35,70];
     const labels = ['يناير','فبراير','مارس','أبريل','مايو'];
     const max = Math.max(...data);
-    return `
-    <div style="background:rgba(0,0,0,0.2);border-radius:12px;padding:14px;margin-bottom:14px">
-      <div style="font-size:0.75rem;font-weight:700;color:${col};margin-bottom:10px">📊 مثال مرئي — مخطط شريطي</div>
-      <div style="display:flex;align-items:flex-end;gap:8px;height:90px;padding-bottom:20px;position:relative">
-        ${data.map((v,i)=>`
-          <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px">
-            <div style="font-size:0.68rem;color:${col};font-weight:700">${v}</div>
-            <div style="width:100%;height:${Math.round(v/max*70)}px;
-              background:linear-gradient(180deg,${col},${col}88);border-radius:4px 4px 0 0;
-              transition:height 0.5s ${i*0.1}s;animation:growBar${i} 0.6s ${i*0.1}s ease backwards">
-            </div>
-            <div style="font-size:0.65rem;color:var(--text-muted);white-space:nowrap">${labels[i]}</div>
-          </div>`).join('')}
+    return `<div style="background:rgba(0,0,0,0.2);border-radius:12px;padding:14px;margin-bottom:14px">
+      <div style="font-size:0.75rem;font-weight:700;color:${col};margin-bottom:10px">📊 مخطط شريطي</div>
+      <div style="display:flex;align-items:flex-end;gap:8px;height:90px">
+        ${data.map((v,i)=>`<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px">
+          <div style="font-size:0.65rem;color:${col};font-weight:700">${v}</div>
+          <div style="width:100%;height:${Math.round(v/max*70)}px;background:linear-gradient(180deg,${col},${col}88);border-radius:3px 3px 0 0"></div>
+          <div style="font-size:0.6rem;color:var(--text-muted)">${labels[i]}</div>
+        </div>`).join('')}
       </div>
     </div>`;
   }
 
-  // Histogram Demo
-  if (/histogram|تكرار|توزيع|مدرج/.test(name+type.desc)) {
-    const data = [5, 12, 22, 18, 14, 8, 3];
-    const labels = ['10','20','30','40','50','60','70'];
-    const max = Math.max(...data);
-    return `
-    <div style="background:rgba(0,0,0,0.2);border-radius:12px;padding:14px;margin-bottom:14px">
-      <div style="font-size:0.75rem;font-weight:700;color:${col};margin-bottom:10px">📊 مثال — مدرج تكراري (الأعمدة متلاصقة)</div>
-      <div style="display:flex;align-items:flex-end;gap:1px;height:80px;padding-bottom:20px">
-        ${data.map((v,i)=>`
-          <div style="flex:1;display:flex;flex-direction:column;align-items:center">
-            <div style="width:100%;height:${Math.round(v/max*65)}px;
-              background:${col};opacity:${0.5+v/max*0.5};
-              border-radius:${i===0?'3px 0 0 0':'0'} ${i===data.length-1?'0 3px 0 0':'0'} 0 0">
-            </div>
-            <div style="font-size:0.6rem;color:var(--text-muted);margin-top:2px">${labels[i]}</div>
-          </div>`).join('')}
-      </div>
-      <div style="font-size:0.72rem;color:var(--text-muted);text-align:center">ملاحظة: لا توجد مسافة بين الأعمدة (متلاصقة)</div>
-    </div>`;
-  }
-
-  // Scatter Plot Demo
-  if (/scatter|تشتت|انتشار/.test(name+type.desc)) {
-    const pts = [[20,15],[35,28],[50,42],[65,55],[80,70],[30,50],[55,20],[70,80]];
-    const svgPts = pts.map(([x,y])=>`<circle cx="${Math.round(x*2.4+10)}" cy="${Math.round(80-y*0.7)}" r="5" fill="${col}" opacity="0.8"/>`).join('');
-    return `
-    <div style="background:rgba(0,0,0,0.2);border-radius:12px;padding:14px;margin-bottom:14px">
-      <div style="font-size:0.75rem;font-weight:700;color:${col};margin-bottom:8px">📍 مثال — مخطط التشتت</div>
-      <svg viewBox="0 0 210 90" style="width:100%;max-height:110px" xmlns="http://www.w3.org/2000/svg">
-        <line x1="12" y1="5" x2="12" y2="82" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
-        <line x1="12" y1="82" x2="205" y2="82" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
-        ${svgPts}
-        <text x="105" y="90" text-anchor="middle" font-size="7" fill="rgba(255,255,255,0.4)" font-family="Cairo">المتغير X (المستقل)</text>
-        <text x="4" y="45" text-anchor="middle" font-size="7" fill="rgba(255,255,255,0.4)" font-family="Cairo" transform="rotate(-90,4,45)">Y</text>
-      </svg>
-      <div style="font-size:0.72rem;color:var(--text-muted);text-align:center">كل نقطة = مشاهدة واحدة</div>
-    </div>`;
-  }
-
-  // Pie Chart Demo
-  if (/pie|دائري|كعكة/.test(name+type.desc)) {
-    return `
-    <div style="background:rgba(0,0,0,0.2);border-radius:12px;padding:14px;margin-bottom:14px">
-      <div style="font-size:0.75rem;font-weight:700;color:${col};margin-bottom:8px">🥧 مثال — مخطط دائري</div>
-      <div style="display:flex;align-items:center;gap:14px">
-        <svg viewBox="0 0 100 100" style="width:90px;height:90px" xmlns="http://www.w3.org/2000/svg">
+  // ── PIE CHART / دائري ──────────────────────────────────────────
+  if (/pie|دائر|نسب/.test(txt)) {
+    return `<div style="background:rgba(0,0,0,0.2);border-radius:12px;padding:14px;margin-bottom:14px">
+      <div style="font-size:0.75rem;font-weight:700;color:${col};margin-bottom:8px">🥧 مخطط دائري</div>
+      <div style="display:flex;align-items:center;gap:16px">
+        <svg viewBox="0 0 100 100" style="width:80px;height:80px" xmlns="http://www.w3.org/2000/svg">
           <circle cx="50" cy="50" r="45" fill="none" stroke="${col}" stroke-width="25" stroke-dasharray="70 30" stroke-dashoffset="25" opacity="0.9"/>
-          <circle cx="50" cy="50" r="45" fill="none" stroke="#00BFA5" stroke-width="25" stroke-dasharray="20 80" stroke-dashoffset="-45" opacity="0.9"/>
-          <circle cx="50" cy="50" r="45" fill="none" stroke="#FF7043" stroke-width="25" stroke-dasharray="10 90" stroke-dashoffset="-65" opacity="0.9"/>
-          <circle cx="50" cy="50" r="22" fill="#1C1917"/>
+          <circle cx="50" cy="50" r="45" fill="none" stroke="#FF7043" stroke-width="25" stroke-dasharray="20 80" stroke-dashoffset="-65" opacity="0.9"/>
+          <circle cx="50" cy="50" r="45" fill="none" stroke="#FFD600" stroke-width="25" stroke-dasharray="10 90" stroke-dashoffset="-85" opacity="0.9"/>
         </svg>
-        <div style="font-size:0.75rem">
-          <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px"><span style="width:10px;height:10px;border-radius:50%;background:${col};display:block"></span> قسم أ — 70%</div>
-          <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px"><span style="width:10px;height:10px;border-radius:50%;background:#00BFA5;display:block"></span> قسم ب — 20%</div>
-          <div style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:50%;background:#FF7043;display:block"></span> قسم ج — 10%</div>
+        <div style="font-size:0.75rem;display:flex;flex-direction:column;gap:5px">
+          <span>🟣 قسم أ — 70%</span><span style="color:#FF7043">🟠 قسم ب — 20%</span><span style="color:#FFD600">🟡 قسم ج — 10%</span>
         </div>
       </div>
     </div>`;
   }
 
-  // Line Chart Demo
-  if (/line|خطي|اتجاه|trend/.test(name+type.desc)) {
+  // ── LINE CHART ─────────────────────────────────────────────────
+  if (/line|خطي|زمني|اتجاه/.test(txt)) {
     const pts = [[0,30],[40,45],[80,25],[120,60],[160,50],[200,70]];
     const path = 'M '+pts.map(([x,y])=>`${x+5},${75-y}`).join(' L ');
-    return `
-    <div style="background:rgba(0,0,0,0.2);border-radius:12px;padding:14px;margin-bottom:14px">
-      <div style="font-size:0.75rem;font-weight:700;color:${col};margin-bottom:8px">📈 مثال — مخطط خطي</div>
-      <svg viewBox="0 0 215 85" style="width:100%;max-height:90px" xmlns="http://www.w3.org/2000/svg">
+    return `<div style="background:rgba(0,0,0,0.2);border-radius:12px;padding:14px;margin-bottom:14px">
+      <div style="font-size:0.75rem;font-weight:700;color:${col};margin-bottom:8px">📈 مخطط خطي — تتبع التغيير عبر الزمن</div>
+      <svg viewBox="0 0 215 85" style="width:100%;max-height:95px" xmlns="http://www.w3.org/2000/svg">
         <path d="${path}" fill="none" stroke="${col}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-        <path d="${path} L 205,85 L 5,85 Z" fill="${col}" opacity="0.08"/>
         ${pts.map(([x,y])=>`<circle cx="${x+5}" cy="${75-y}" r="4" fill="${col}" stroke="#1C1917" stroke-width="2"/>`).join('')}
       </svg>
     </div>`;
   }
 
-  // Default - text example
-  return '';
+  // ── DEFAULT: show simple bar ────────────────────────────────────
+  const sampleData = [4,7,3,8,5,6,2];
+  const mx2 = Math.max(...sampleData);
+  return `<div style="background:rgba(0,0,0,0.2);border-radius:12px;padding:14px;margin-bottom:14px">
+    <div style="font-size:0.75rem;font-weight:700;color:${col};margin-bottom:10px">📊 بيانات توضيحية</div>
+    <div style="display:flex;align-items:flex-end;gap:6px;height:80px">
+      ${sampleData.map(v=>`<div style="flex:1;height:${Math.round(v/mx2*70)}px;background:${col};border-radius:3px 3px 0 0;opacity:0.75"></div>`).join('')}
+    </div>
+  </div>`;
 }
 
 // ── REPLACE buildConceptLesson types section ─────────────────
@@ -8028,6 +8180,48 @@ const ZAD_DIAGRAMS = {
     return [d1];
   },
 
+  rangeDiagrams() {
+    const d1 = this.svg(320, 160, `
+      <text x="160" y="22" text-anchor="middle" fill="#E8A020" font-size="13" font-weight="bold" font-family="Cairo">📏 المدى = Max − Min</text>
+      <!-- Bar chart highlighting min/max -->
+      <rect x="25"  y="90" width="35" height="50" fill="#00BFA5" rx="3"/>
+      <rect x="75"  y="70" width="35" height="70" fill="#6C63FF" rx="3"/>
+      <rect x="125" y="50" width="35" height="90" fill="#6C63FF" rx="3"/>
+      <rect x="175" y="40" width="35" height="100" fill="#FF5252" rx="3"/>
+      <rect x="225" y="60" width="35" height="80" fill="#6C63FF" rx="3"/>
+      <rect x="275" y="110" width="35" height="30" fill="#00BFA5" rx="3"/>
+      <!-- Min label -->
+      <text x="43" y="88" text-anchor="middle" fill="#00BFA5" font-size="10" font-weight="bold" font-family="Cairo">Min=2</text>
+      <!-- Max label -->
+      <text x="193" y="38" text-anchor="middle" fill="#FF5252" font-size="10" font-weight="bold" font-family="Cairo">Max=9</text>
+      <!-- Arrow showing range -->
+      <line x1="43" y1="145" x2="193" y2="145" stroke="#FFD600" stroke-width="2.5" marker-end="url(#arrowR)"/>
+      <defs><marker id="arrowR" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#FFD600"/></marker></defs>
+      <text x="118" y="158" text-anchor="middle" fill="#FFD600" font-size="11" font-weight="bold" font-family="Cairo">المدى = 9 − 2 = 7</text>
+      <!-- baseline -->
+      <line x1="20" y1="140" x2="315" y2="140" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+    `);
+    const d2 = this.svg(320, 170, `
+      <text x="160" y="22" text-anchor="middle" fill="#E8A020" font-size="12" font-weight="bold" font-family="Cairo">📊 مثال: درجات الاختبار</text>
+      <text x="160" y="42" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="10" font-family="Cairo">البيانات: 45، 60، 72، 80، 95</text>
+      <!-- Number line -->
+      <line x1="30" y1="90" x2="290" y2="90" stroke="rgba(255,255,255,0.3)" stroke-width="2"/>
+      <circle cx="50"  cy="90" r="8" fill="#00BFA5"/><text x="50"  y="110" text-anchor="middle" fill="#00BFA5" font-size="10" font-family="Cairo">45</text>
+      <circle cx="110" cy="90" r="8" fill="#6C63FF"/><text x="110" y="110" text-anchor="middle" fill="#6C63FF" font-size="10" font-family="Cairo">60</text>
+      <circle cx="160" cy="90" r="8" fill="#6C63FF"/><text x="160" y="110" text-anchor="middle" fill="#6C63FF" font-size="10" font-family="Cairo">72</text>
+      <circle cx="210" cy="90" r="8" fill="#6C63FF"/><text x="210" y="110" text-anchor="middle" fill="#6C63FF" font-size="10" font-family="Cairo">80</text>
+      <circle cx="270" cy="90" r="8" fill="#FF5252"/><text x="270" y="110" text-anchor="middle" fill="#FF5252" font-size="10" font-family="Cairo">95</text>
+      <!-- Range arrow -->
+      <line x1="50" y1="130" x2="270" y2="130" stroke="#FFD600" stroke-width="2" marker-end="url(#arr2)"/>
+      <line x1="50" y1="124" x2="50" y2="136" stroke="#FFD600" stroke-width="2"/>
+      <defs><marker id="arr2" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#FFD600"/></marker></defs>
+      <text x="160" y="152" text-anchor="middle" fill="#FFD600" font-size="12" font-weight="bold" font-family="Cairo">المدى = 95 − 45 = 50</text>
+      <text x="160" y="168" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-size="9" font-family="Cairo">الأخضر = أصغر قيمة | الأحمر = أكبر قيمة</text>
+    `);
+    return [d1, d2];
+  },
+
+
   frequencyDiagrams() {
     const d1 = this.svg(320, 175, `
       <rect width="320" height="175" fill="#141210" rx="12"/>
@@ -8475,6 +8669,13 @@ const ZAD_DIAGRAMS = {
 // Random example banks (shuffled on each call)
 const ZAD_EXAMPLES = {
   // Statistics
+  range: [
+    'درجات 5 طلاب: 45، 60، 72، 80، 95 → المدى = 95 − 45 = 50',
+    'درجات حرارة أسبوع: 18، 22، 19، 25، 30 → المدى = 30 − 18 = 12 درجة',
+    'أطوال فريق كرة: 170، 175، 180، 185، 195 سم → المدى = 195 − 170 = 25 سم',
+    'رواتب موظفين: 4000، 6000، 8000، 12000 ريال → المدى = 8000 ريال',
+    'عمر مجموعة: 18، 22، 25، 30، 35 سنة → المدى = 17 سنة',
+  ],
   mean: [
     'درجات 5 طلاب: 60,70,80,90,100 → المتوسط = (60+70+80+90+100)÷5 = 80',
     'أطوال 4 أشخاص: 160,170,175,183 سم → x̄ = 688÷4 = 172 سم',
@@ -8789,49 +8990,49 @@ function refreshExample(cardId, exId, topicKey, col) {
 
 // ── INTERACTIVE ACTION BUTTONS for Type Cards ─────────────
 function buildInteractiveButtons(typeData, col, cardId) {
-  const topicKey = detectTopicKey(typeData);
-  const safeData = encodeURIComponent(JSON.stringify(typeData));
-  const safeCol = col.replace(/'/g, "\\'");
+  const uid = 'ibtn-' + (cardId || Math.random().toString(36).slice(2,8));
+  // Store data safely — will wire onclick after render
+  setTimeout(function() {
+    var el = document.getElementById(uid);
+    if (!el) return;
+    el.querySelectorAll('[data-action]').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        openInteractiveAction(this.dataset.action, typeData.name||'', typeData, cardId, detectTopicKey(typeData));
+      });
+    });
+  }, 60);
 
-  return `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:12px;
-    border-top:1px solid rgba(255,255,255,0.07);padding-top:10px">
-    <button onclick="openInteractiveAction('image',${JSON.stringify(typeData.name||'')},${JSON.stringify(typeData)},'${cardId}','${topicKey}')"
-      style="padding:8px 4px;border-radius:9px;border:1px solid ${col}35;
-        background:${col}12;color:${col};font-family:var(--font);
-        font-size:0.75rem;font-weight:700;cursor:pointer;transition:all 0.2s"
-      onmouseover="this.style.background='${col}25'" onmouseout="this.style.background='${col}12'">
-      🖼️ صورة
-    </button>
-    <button onclick="openInteractiveAction('more',${JSON.stringify(typeData.name||'')},${JSON.stringify(typeData)},'${cardId}','${topicKey}')"
-      style="padding:8px 4px;border-radius:9px;border:1px solid rgba(255,255,255,0.12);
-        background:rgba(255,255,255,0.04);color:var(--text);font-family:var(--font);
-        font-size:0.75rem;font-weight:700;cursor:pointer;transition:all 0.2s"
-      onmouseover="this.style.background='rgba(255,255,255,0.08)'" onmouseout="this.style.background='rgba(255,255,255,0.04)'">
-      📖 شرح أكثر
-    </button>
-    <button onclick="openInteractiveAction('example',${JSON.stringify(typeData.name||'')},${JSON.stringify(typeData)},'${cardId}','${topicKey}')"
-      style="padding:8px 4px;border-radius:9px;border:1px solid rgba(0,191,165,0.3);
-        background:rgba(0,191,165,0.08);color:#00BFA5;font-family:var(--font);
-        font-size:0.75rem;font-weight:700;cursor:pointer;transition:all 0.2s"
-      onmouseover="this.style.background='rgba(0,191,165,0.15)'" onmouseout="this.style.background='rgba(0,191,165,0.08)'">
-      💡 مثال
-    </button>
-  </div>`;
+  return '<div id="' + uid + '" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:12px;border-top:1px solid rgba(255,255,255,0.07);padding-top:10px">' +
+    '<button data-action="image" style="padding:8px 4px;border-radius:9px;border:1px solid ' + col + '35;background:' + col + '12;color:' + col + ';font-family:var(--font);font-size:0.75rem;font-weight:700;cursor:pointer;transition:all 0.2s" onmouseenter="this.style.background=\'' + col + '30\'" onmouseleave="this.style.background=\'' + col + '12\'">🖼️ صورة</button>' +
+    '<button data-action="more" style="padding:8px 4px;border-radius:9px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.04);color:var(--text);font-family:var(--font);font-size:0.75rem;font-weight:700;cursor:pointer;transition:all 0.2s" onmouseenter="this.style.background=\'rgba(255,255,255,0.12)\'" onmouseleave="this.style.background=\'rgba(255,255,255,0.04)\'">📖 شرح أكثر</button>' +
+    '<button data-action="example" style="padding:8px 4px;border-radius:9px;border:1px solid rgba(0,191,165,0.3);background:rgba(0,191,165,0.08);color:#00BFA5;font-family:var(--font);font-size:0.75rem;font-weight:700;cursor:pointer;transition:all 0.2s" onmouseenter="this.style.background=\'rgba(0,191,165,0.18)\'" onmouseleave="this.style.background=\'rgba(0,191,165,0.08)\'">💡 مثال</button>' +
+    '</div>';
 }
 
 function detectTopicKey(typeData) {
   const name = (typeData?.name || '').toLowerCase();
   const desc = (typeData?.desc || '').toLowerCase();
   const combined = name + ' ' + desc;
-  if (/mean|متوسط/.test(combined)) return 'mean';
+  if (/range|مدى/.test(combined)) return 'range';
+  if (/mean|متوسط حسابي/.test(combined)) return 'mean';
   if (/median|وسيط/.test(combined)) return 'median';
   if (/mode|منوال/.test(combined)) return 'mode';
-  if (/std|انحراف/.test(combined)) return 'std';
+  if (/std|انحراف معياري/.test(combined)) return 'std';
+  if (/variance|تباين/.test(combined)) return 'variance';
+  if (/iqr|interquartile|ربيعي/.test(combined)) return 'iqr';
+  if (/correlation|ارتباط/.test(combined)) return 'correlation';
   if (/histogram|مدرج/.test(combined)) return 'histogram';
+  if (/scatter|تشتت/.test(combined)) return 'scatter';
+  if (/sampling|عينة/.test(combined)) return 'sampling';
   if (/variable|متغير/.test(combined)) return 'variables';
   if (/loop|حلقة/.test(combined)) return 'loops';
+  if (/function|دالة/.test(combined)) return 'functions';
+  if (/list|قائمة/.test(combined)) return 'lists';
   if (/process|عملية/.test(combined)) return 'process';
   if (/memory|ذاكرة/.test(combined)) return 'memory';
+  if (/kernel|نواة/.test(combined)) return 'kernel';
+  if (/schedule|جدولة/.test(combined)) return 'scheduling';
   return name.replace(/\s+/g,'_');
 }
 

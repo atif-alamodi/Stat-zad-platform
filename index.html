@@ -7570,7 +7570,7 @@ function addTypeCardClickHandlers() {
     card.style.cursor = 'pointer';
     card.addEventListener('click', function() {
       try {
-        const typeData = JSON.parse(this.dataset.typeCard);
+        const typeData = JSON.parse(this.dataset.typeCard.replace(/&quot;/g,'"'));
         const col = this.dataset.typeColor || '#6C63FF';
         openModal(
           (typeData.icon||'📌') + ' ' + typeData.name,
@@ -12357,6 +12357,8 @@ function openLesson(subjectId, lessonId) {
   // Scroll to top and animate
   window.scrollTo({ top: 0, behavior: 'smooth' });
   setTimeout(animateSteps, 300);
+  // Wire type card clicks after DOM render
+  setTimeout(addTypeCardClickHandlers, 120);
 }
 
 function buildLessonBody(lesson, subject) {

@@ -5215,79 +5215,106 @@ function readFileAsBase64(file) {
 
 function buildEnhancedMindMap(mm, lessonTitle) {
   if (!mm || !mm.branches) return '';
-  
+
   const PALETTE = ['#6C63FF','#00BFA5','#FF7043','#FFD600','#E91E63','#00B0FF','#8BC34A','#FF5722'];
-  const branches = mm.branches;
-  const center = (mm.center || lessonTitle || '').slice(0, 25);
-  
-  // SVG mind map
-  const W = 600, H = 360, cx = 300, cy = 180, R = 120;
-  let svgLines = '', svgNodes = '';
-  
+  const branches = mm.branches || [];
+  const center   = (mm.center || lessonTitle || '').slice(0, 18);
+  const n        = branches.length;
+
+  // ── SVG Mind Map ────────────────────────────────────────────────
+  // Use a wider canvas so nothing gets clipped
+  const W = 700, H = 420, cx = 350, cy = 210;
+  // Radius scales with branch count
+  const R  = n <= 3 ? 130 : n <= 5 ? 120 : 110;
+  const RC = R + 85; // children radius
+
+  let lines = '', nodes = '';
+
   branches.forEach((b, i) => {
     const col = b.color || PALETTE[i % PALETTE.length];
-    const ang = (2 * Math.PI * i / branches.length) - Math.PI / 2;
-    const bx = Math.round(cx + R * Math.cos(ang));
-    const by = Math.round(cy + R * Math.sin(ang));
-    const lbl = (b.label || '').replace(/</g,'&lt;');
-    const rw = Math.min(Math.max(lbl.length * 5.5 + 18, 42), 88);
-    
-    svgLines += `<line x1="${cx}" y1="${cy}" x2="${bx}" y2="${by}" 
-      stroke="${col}" stroke-width="2.5" stroke-opacity="0.5" stroke-dasharray="8,4"/>`;
-    svgNodes += `<ellipse cx="${bx}" cy="${by}" rx="${rw}" ry="22" fill="${col}22" stroke="${col}" stroke-width="2"/>
-      <text x="${bx}" y="${by+5}" text-anchor="middle" font-family="Cairo,sans-serif" 
-        font-size="11.5" fill="${col}" font-weight="900">${lbl}</text>`;
-    
-    (b.children || []).forEach((ch, j) => {
-      const cs = String(ch).replace(/</g,'&lt;');
-      const spread = (b.children.length - 1) / 2;
-      const ca = ang + (j - spread) * 0.4;
-      const chx = Math.round(cx + (R + 72) * Math.cos(ca));
-      const chy = Math.round(cy + (R + 72) * Math.sin(ca));
-      svgLines += `<line x1="${bx}" y1="${by}" x2="${chx}" y2="${chy}" 
-        stroke="${col}" stroke-width="1.2" stroke-opacity="0.35"/>`;
-      svgNodes += `<text x="${chx}" y="${chy}" text-anchor="middle" dominant-baseline="middle" 
-        font-family="Cairo,sans-serif" font-size="10" fill="${col}cc">${cs}</text>`;
+    const ang  = (2 * Math.PI * i / n) - Math.PI / 2;
+    const bx   = Math.round(cx + R * Math.cos(ang));
+    const by   = Math.round(cy + R * Math.sin(ang));
+
+    // Keep branch label short for SVG (full text in cards below)
+    const lbl  = (b.label || '').replace(/</g,'&lt;').slice(0, 14);
+    const brx  = Math.min(Math.max(lbl.length * 5 + 16, 44), 82);
+
+    // Branch connector
+    lines += `<line x1="${cx}" y1="${cy}" x2="${bx}" y2="${by}"
+      stroke="${col}" stroke-width="2.5" stroke-opacity="0.55" stroke-dasharray="7,4"/>`;
+
+    // Branch ellipse + label
+    nodes += `<ellipse cx="${bx}" cy="${by}" rx="${brx}" ry="20"
+      fill="${col}28" stroke="${col}" stroke-width="2.2"/>
+    <text x="${bx}" y="${by+5}" text-anchor="middle" dominant-baseline="middle"
+      font-family="Cairo,sans-serif" font-size="11.5" fill="${col}" font-weight="900">${lbl}</text>`;
+
+    // Children – spread evenly around the branch angle
+    const children = b.children || [];
+    const spreadRad = Math.min(0.55, 1.2 / Math.max(children.length, 1));
+    const totalSpread = spreadRad * (children.length - 1);
+
+    children.forEach((ch, j) => {
+      const cs   = String(ch).replace(/</g,'&lt;').slice(0, 16);
+      const ca   = ang + (j - (children.length - 1) / 2) * spreadRad;
+      const chx  = Math.round(cx + RC * Math.cos(ca));
+      const chy  = Math.round(cy + RC * Math.sin(ca));
+      const crx  = Math.min(Math.max(cs.length * 4.5 + 10, 32), 72);
+
+      // Clamp to SVG bounds with padding
+      const safex = Math.max(crx + 4, Math.min(W - crx - 4, chx));
+      const safey = Math.max(14, Math.min(H - 14, chy));
+
+      lines += `<line x1="${bx}" y1="${by}" x2="${safex}" y2="${safey}"
+        stroke="${col}" stroke-width="1.3" stroke-opacity="0.4"/>`;
+      nodes += `<rect x="${safex - crx}" y="${safey - 12}" width="${crx * 2}" height="23"
+        rx="11" fill="${col}18" stroke="${col}55" stroke-width="1.2"/>
+      <text x="${safex}" y="${safey + 4}" text-anchor="middle" dominant-baseline="middle"
+        font-family="Cairo,sans-serif" font-size="10" fill="${col}">${cs}</text>`;
     });
   });
-  
-  // Cards below
-  let cards = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:12px">`;
-  branches.forEach((b, i) => {
-    const col = b.color || PALETTE[i % PALETTE.length];
-    cards += `<div style="background:${col}10;border:1.5px solid ${col}30;border-radius:12px;padding:10px;
-      cursor:pointer;transition:all 0.2s" 
-      onmouseover="this.style.background='${col}22';this.style.transform='scale(1.02)'"
-      onmouseout="this.style.background='${col}10';this.style.transform='scale(1)'">
-      <div style="font-weight:800;font-size:0.8rem;color:${col};margin-bottom:5px;
-        padding-bottom:4px;border-bottom:1px solid ${col}25">${b.label}</div>
-      <div style="display:flex;flex-wrap:wrap;gap:3px">
-        ${(b.children||[]).map(ch=>`<span style="font-size:0.68rem;padding:2px 7px;
-          background:${col}18;border-radius:20px;color:var(--text)">${ch}</span>`).join('')}
-      </div>
+
+  const svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg"
+    style="width:100%;display:block;overflow:visible">
+    <!-- Background glow -->
+    <radialGradient id="mmBg" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#6C63FF" stop-opacity="0.06"/>
+      <stop offset="100%" stop-color="#6C63FF" stop-opacity="0"/>
+    </radialGradient>
+    <ellipse cx="${cx}" cy="${cy}" rx="280" ry="180" fill="url(#mmBg)"/>
+    ${lines}
+    ${nodes}
+    <!-- Center node -->
+    <ellipse cx="${cx}" cy="${cy}" rx="60" ry="26" fill="#6C63FF" opacity="0.92"/>
+    <text x="${cx}" y="${cy + 4}" text-anchor="middle" dominant-baseline="middle"
+      font-family="Cairo,sans-serif" font-size="12" fill="white" font-weight="900">${center}</text>
+  </svg>`;
+
+  // ── Branch Cards (full text, no truncation) ──────────────────────
+  const cards = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-top:14px;direction:rtl">
+      ${branches.map((b, i) => {
+        const col = b.color || PALETTE[i % PALETTE.length];
+        const children = b.children || [];
+        return `<div style="background:${col}0e;border:1.5px solid ${col}35;border-radius:14px;padding:12px 10px;direction:rtl">
+          <div style="font-weight:800;font-size:0.82rem;color:${col};margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid ${col}25;white-space:normal;word-break:break-word">${b.label || ''}</div>
+          <div style="display:flex;flex-direction:column;gap:5px">
+            ${children.map(ch => `<div style="font-size:0.76rem;line-height:1.55;color:var(--text);padding:3px 7px;background:${col}12;border-radius:8px;white-space:normal;word-break:break-word;direction:rtl">${ch}</div>`).join('')}
+          </div>
+        </div>`;
+      }).join('')}
     </div>`;
-  });
-  cards += '</div>';
-  
+
   return `
-    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(108,99,255,0.2);
-      border-radius:18px;padding:16px;margin-top:16px">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(108,99,255,0.2);border-radius:18px;padding:14px;margin-top:8px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;direction:rtl">
         <span style="font-size:1.2rem">🧠</span>
-        <span style="font-weight:800;font-size:0.92rem">الخريطة الذهنية — ${center}</span>
-        <span style="font-size:0.72rem;color:var(--text-muted);margin-right:auto">
-          ${branches.length} فروع | ${branches.reduce((s,b)=>s+(b.children||[]).length,0)} عناصر
-        </span>
+        <span style="font-weight:800;font-size:0.9rem">${mm.center || lessonTitle || ''}</span>
+        <span style="font-size:0.7rem;color:var(--text-muted);margin-right:auto">${n} فروع | ${branches.reduce((s,b)=>s+(b.children||[]).length,0)} عنصراً</span>
       </div>
-      <div style="background:rgba(0,0,0,0.2);border-radius:12px;padding:10px;overflow:hidden">
-        <svg viewBox="0 0 ${W} ${H}" style="width:100%;max-height:280px;overflow:visible" 
-          xmlns="http://www.w3.org/2000/svg">
-          ${svgLines}
-          ${svgNodes}
-          <ellipse cx="${cx}" cy="${cy}" rx="55" ry="26" fill="#6C63FF" opacity="0.9"/>
-          <text x="${cx}" y="${cy+5}" text-anchor="middle" font-family="Cairo,sans-serif" 
-            font-size="11" fill="white" font-weight="900">${center}</text>
-        </svg>
+      <div style="background:rgba(0,0,0,0.18);border-radius:12px;padding:8px;overflow:hidden">
+        ${svg}
       </div>
       ${cards}
     </div>`;
@@ -6800,105 +6827,264 @@ function closeModal() {
 
 // ── Type Card Modal Content Builder ─────────────────────────
 function buildTypeModalContent(type, col, subjectTitle) {
+  // Store globally for button handlers
+  window._ZAD_MODAL_TYPE = type;
+  window._ZAD_MODAL_COL  = col;
+
   const name = type.name || type.title || '';
   const desc = type.desc || type.description || '';
   const icon = type.icon || '📌';
-  const examples = type.examples || type.example || [];
   const formula = type.formula || '';
-  const when = type.when || type.whenToUse || '';
-  const vs = type.vs || '';
-  const notUse = type.notUse || '';
+  const when   = type.when || type.whenToUse || '';
 
-  let content = `
-    <!-- Icon + description -->
-    <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px">
-      <div style="width:52px;height:52px;border-radius:14px;
-        background:${col}20;border:2px solid ${col}40;
-        display:flex;align-items:center;justify-content:center;font-size:1.8rem;flex-shrink:0">
-        ${icon}
+  // Build the three tab contents immediately
+  const tabOverview = buildModalTabOverview(type, col);
+  const tabImage    = buildModalTabImage(type, col);
+  const tabMore     = buildModalTabMore(type, col);
+  const tabExample  = buildModalTabExample(type, col);
+
+  return `
+    <!-- Icon + name + desc -->
+    <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:16px;direction:rtl">
+      <div style="width:48px;height:48px;border-radius:12px;background:${col}22;border:2px solid ${col}40;display:flex;align-items:center;justify-content:center;font-size:1.6rem;flex-shrink:0">${icon}</div>
+      <div style="flex:1">
+        <div style="font-weight:900;font-size:0.98rem;margin-bottom:4px;direction:rtl">${name}</div>
+        <div style="font-size:0.83rem;color:var(--text-muted);line-height:1.65;direction:rtl">${desc}</div>
       </div>
-      <div>
-        <div style="font-weight:900;font-size:1rem;margin-bottom:4px">${name}</div>
-        <div style="font-size:0.82rem;color:var(--text-muted);line-height:1.6">${desc}</div>
-      </div>
+    </div>
+
+    <!-- Tab bar -->
+    <div id="zmod-tabs" style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-bottom:14px;background:rgba(255,255,255,0.03);border-radius:12px;padding:4px;border:1px solid rgba(255,255,255,0.06)">
+      <button id="zmod-btn-image"   onclick="zmodSwitch('image')"   style="padding:9px 4px;border-radius:9px;border:none;font-family:var(--font);font-size:0.78rem;font-weight:700;cursor:pointer;transition:all 0.2s;background:linear-gradient(135deg,${col},${col}cc);color:white">🖼️ صورة</button>
+      <button id="zmod-btn-more"    onclick="zmodSwitch('more')"    style="padding:9px 4px;border-radius:9px;border:none;font-family:var(--font);font-size:0.78rem;font-weight:700;cursor:pointer;transition:all 0.2s;background:transparent;color:var(--text-muted)">📖 شرح أكثر</button>
+      <button id="zmod-btn-example" onclick="zmodSwitch('example')" style="padding:9px 4px;border-radius:9px;border:none;font-family:var(--font);font-size:0.78rem;font-weight:700;cursor:pointer;transition:all 0.2s;background:transparent;color:var(--text-muted)">💡 مثال</button>
+    </div>
+
+    <!-- Tab content panels (all pre-rendered, toggle display) -->
+    <div id="zmod-panel-image">${tabImage}</div>
+    <div id="zmod-panel-more" style="display:none">${tabMore}</div>
+    <div id="zmod-panel-example" style="display:none">${tabExample}</div>
+
+    <!-- Footer buttons -->
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button onclick="closeModal()" style="flex:1;padding:11px;border-radius:11px;border:1px solid rgba(255,255,255,0.12);background:transparent;color:var(--text-muted);font-family:var(--font);font-size:0.85rem;cursor:pointer">إغلاق</button>
+      <button onclick="closeModal()" style="flex:2;padding:11px;border-radius:11px;border:none;background:${col};color:white;font-family:var(--font);font-size:0.85rem;font-weight:800;cursor:pointer;box-shadow:0 4px 14px ${col}50">✅ فهمت!</button>
     </div>`;
+}
+
+function zmodSwitch(tab) {
+  const col = window._ZAD_MODAL_COL || '#6C63FF';
+  ['image','more','example'].forEach(t => {
+    const panel = document.getElementById('zmod-panel-'+t);
+    const btn   = document.getElementById('zmod-btn-'+t);
+    if (!panel || !btn) return;
+    if (t === tab) {
+      panel.style.display = 'block';
+      btn.style.background = 'linear-gradient(135deg,'+col+','+col+'cc)';
+      btn.style.color = 'white';
+    } else {
+      panel.style.display = 'none';
+      btn.style.background = 'transparent';
+      btn.style.color = 'var(--text-muted)';
+    }
+  });
+}
+
+// ── TAB: IMAGE (visual diagram) ──────────────────────────────────────
+function buildModalTabImage(type, col) {
+  const visual = buildTypeVisualDemo(type, col);
+  const diagrams = (typeof ZAD_DIAGRAMS !== 'undefined') ? ZAD_DIAGRAMS.generate(type.name||'', type.type||'', type) : [];
+  const svgContent = diagrams && diagrams.length > 0 ? diagrams[0] : '';
+  return `
+    <div style="direction:rtl">
+      ${visual}
+      ${svgContent ? `<div style="background:rgba(0,0,0,0.18);border-radius:12px;padding:12px;margin-top:10px;overflow:hidden">${svgContent}</div>` : ''}
+      <div style="text-align:center;margin-top:10px;font-size:0.78rem;color:var(--text-muted)">📌 الرسم يوضح المفهوم بصرياً</div>
+    </div>`;
+}
+
+// ── TAB: MORE EXPLANATION (simplified) ─────────────────────────────
+function buildModalTabMore(type, col) {
+  const name   = type.name || '';
+  const desc   = type.desc || '';
+  const formula= type.formula || '';
+  const when   = type.when || '';
+  const notUse = type.notUse || '';
+  const steps  = type.steps || type.howTo || [];
+
+  let html = `<div style="direction:rtl;display:flex;flex-direction:column;gap:12px">`;
+
+  // Simple explanation box
+  html += `<div style="background:${col}10;border:1.5px solid ${col}30;border-radius:14px;padding:14px">
+    <div style="font-size:0.75rem;font-weight:800;color:${col};margin-bottom:7px">📖 بكلمات بسيطة جداً</div>
+    <div style="font-size:0.88rem;line-height:1.8;color:var(--text)">${buildSimpleExplanation(type)}</div>
+  </div>`;
+
+  // Formula if exists
+  if (formula) {
+    html += `<div style="background:rgba(0,0,0,0.3);border-radius:12px;padding:14px;border:1px solid rgba(126,231,135,0.3);text-align:center">
+      <div style="font-size:0.72rem;color:rgba(126,231,135,0.8);margin-bottom:6px;direction:rtl">📐 القانون</div>
+      <div style="font-family:monospace;font-size:1.05rem;color:#7ee787;letter-spacing:1px;direction:ltr">${formula}</div>
+    </div>`;
+  }
+
+  // Steps if exists
+  if (steps && steps.length > 0) {
+    html += `<div style="background:rgba(255,255,255,0.03);border-radius:12px;padding:14px;border:1px solid rgba(255,255,255,0.07)">
+      <div style="font-size:0.75rem;font-weight:800;color:${col};margin-bottom:10px">🪜 خطوات التطبيق</div>`;
+    steps.forEach((step, i) => {
+      const s = typeof step === 'string' ? step : (step.step||step.desc||JSON.stringify(step));
+      html += `<div style="display:flex;gap:10px;margin-bottom:8px;align-items:flex-start">
+        <div style="width:22px;height:22px;border-radius:50%;background:${col};color:white;display:flex;align-items:center;justify-content:center;font-size:0.72rem;font-weight:800;flex-shrink:0;margin-top:1px">${i+1}</div>
+        <div style="font-size:0.83rem;line-height:1.6;flex:1">${s}</div>
+      </div>`;
+    });
+    html += `</div>`;
+  }
 
   // When to use
   if (when) {
-    content += `
-    <div style="background:${col}10;border:1px solid ${col}30;border-radius:12px;padding:12px;margin-bottom:14px">
-      <div style="font-size:0.75rem;font-weight:800;color:${col};margin-bottom:6px">📅 متى تستخدمه؟</div>
-      <div style="font-size:0.85rem;line-height:1.6">${when}</div>
+    html += `<div style="background:rgba(0,191,165,0.08);border:1px solid rgba(0,191,165,0.25);border-radius:12px;padding:12px">
+      <div style="font-size:0.75rem;font-weight:800;color:#00BFA5;margin-bottom:5px">✅ متى تستخدمه؟</div>
+      <div style="font-size:0.83rem;line-height:1.7">${when}</div>
     </div>`;
   }
 
-  // Formula
-  if (formula) {
-    content += `
-    <div style="background:rgba(0,0,0,0.3);border-radius:10px;padding:12px;margin-bottom:14px;
-      border:1px solid rgba(255,255,255,0.08);font-family:monospace;text-align:center;direction:ltr">
-      <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:5px;direction:rtl">📐 الصيغة الرياضية</div>
-      <div style="color:#7ee787;font-size:1rem;letter-spacing:1px">${formula}</div>
-    </div>`;
-  }
-
-  // Visual Example (AI-generated or from data)
-  const exList = Array.isArray(examples) ? examples : (examples ? [examples] : []);
-  if (exList.length > 0) {
-    content += `
-    <div style="margin-bottom:14px">
-      <div style="font-size:0.78rem;font-weight:700;color:var(--text-muted);margin-bottom:8px">
-        💡 أمثلة عملية
-      </div>
-      ${exList.map(ex => `
-        <div style="display:flex;gap:10px;margin-bottom:8px;align-items:flex-start;
-          background:rgba(255,255,255,0.04);border-radius:10px;padding:10px">
-          <span style="color:${col};flex-shrink:0;font-size:0.9rem">▸</span>
-          <span style="font-size:0.84rem;line-height:1.6">${typeof ex==='string'?ex:JSON.stringify(ex)}</span>
-        </div>`).join('')}
-    </div>`;
-  }
-
-  // Visual chart demo
-  content += buildTypeVisualDemo(type, col);
-
+  // Not use
   if (notUse) {
-    content += `
-    <div style="background:rgba(255,82,82,0.07);border:1px solid rgba(255,82,82,0.2);
-      border-radius:10px;padding:10px;margin-top:10px">
-      <div style="font-size:0.75rem;font-weight:800;color:#FF5252;margin-bottom:4px">⚠️ لا تستخدمه عندما:</div>
-      <div style="font-size:0.82rem;line-height:1.6">${notUse}</div>
+    html += `<div style="background:rgba(255,82,82,0.07);border:1px solid rgba(255,82,82,0.2);border-radius:12px;padding:12px">
+      <div style="font-size:0.75rem;font-weight:800;color:#FF5252;margin-bottom:5px">⚠️ انتبه</div>
+      <div style="font-size:0.83rem;line-height:1.7">${notUse}</div>
     </div>`;
   }
 
-  // 3 interactive action buttons
-  const uid3 = 'tm-' + Math.random().toString(36).slice(2,8);
-  content += `<div id="${uid3}" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:16px;margin-bottom:12px">
-    <button data-action="image" style="padding:10px 6px;border-radius:11px;border:1px solid ${col}40;background:${col}12;color:${col};font-family:var(--font);font-size:0.82rem;font-weight:700;cursor:pointer;transition:all 0.2s" onmouseenter="this.style.background='${col}28'" onmouseleave="this.style.background='${col}12'">🖼️ صورة</button>
-    <button data-action="more" style="padding:10px 6px;border-radius:11px;border:1px solid rgba(255,255,255,0.14);background:rgba(255,255,255,0.05);color:var(--text);font-family:var(--font);font-size:0.82rem;font-weight:700;cursor:pointer;transition:all 0.2s" onmouseenter="this.style.background='rgba(255,255,255,0.12)'" onmouseleave="this.style.background='rgba(255,255,255,0.05)'">📖 شرح أكثر</button>
-    <button data-action="example" style="padding:10px 6px;border-radius:11px;border:1px solid rgba(0,191,165,0.35);background:rgba(0,191,165,0.1);color:#00BFA5;font-family:var(--font);font-size:0.82rem;font-weight:700;cursor:pointer;transition:all 0.2s" onmouseenter="this.style.background='rgba(0,191,165,0.22)'" onmouseleave="this.style.background='rgba(0,191,165,0.1)'">💡 مثال</button>
-  </div>`;
-  setTimeout(function() {
-    var wrap = document.getElementById(uid3);
-    if (!wrap) return;
-    wrap.querySelectorAll('[data-action]').forEach(function(btn) {
-      btn.addEventListener('click', function() {
-        openInteractiveAction(this.dataset.action, type.name||name, type, 'modal', 'stats');
-      });
+  html += `</div>`;
+  return html;
+}
+
+// ── TAB: EXAMPLE (practical, step-by-step) ─────────────────────────
+function buildModalTabExample(type, col) {
+  const name = type.name || '';
+  const examples = type.examples || type.example || [];
+  const exList = Array.isArray(examples) ? examples : (examples ? [examples] : []);
+
+  // Get from ZAD_EXAMPLES
+  const topicKey = detectTopicKey(type);
+  const bankExamples = (typeof ZAD_EXAMPLES !== 'undefined' && ZAD_EXAMPLES[topicKey]) ? ZAD_EXAMPLES[topicKey] : [];
+  const builtinExample = buildConcreteExample(type, col);
+
+  let html = `<div style="direction:rtl;display:flex;flex-direction:column;gap:12px">`;
+
+  // Built-in step-by-step example
+  html += builtinExample;
+
+  // Additional examples from bank
+  if (bankExamples.length > 0) {
+    const pick = bankExamples.slice(0, 3);
+    html += `<div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:14px">
+      <div style="font-size:0.75rem;font-weight:800;color:${col};margin-bottom:10px">📋 أمثلة إضافية</div>`;
+    pick.forEach((ex, i) => {
+      html += `<div style="display:flex;gap:8px;margin-bottom:8px;padding:8px;background:${col}08;border-radius:8px">
+        <span style="color:${col};font-size:0.85rem;flex-shrink:0">${i+1}.</span>
+        <span style="font-size:0.82rem;line-height:1.65">${typeof ex==='string'?ex:(ex.title||JSON.stringify(ex))}</span>
+      </div>`;
     });
-  }, 80);
+    html += `</div>`;
+  }
 
-  content += `
-    <div style="display:flex;gap:8px">
-      <button onclick="closeModal()" style="flex:1;padding:10px;border-radius:10px;border:1px solid var(--border);
-        background:transparent;color:var(--text-muted);font-family:var(--font);
-        font-size:0.85rem;cursor:pointer">إغلاق</button>
-      <button onclick="closeModal()" style="flex:2;padding:10px;border-radius:10px;border:none;
-        background:${col};color:white;font-family:var(--font);
-        font-size:0.85rem;font-weight:700;cursor:pointer">✅ فهمت!</button>
+  // Examples from lesson data
+  if (exList.length > 0) {
+    html += `<div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:14px">
+      <div style="font-size:0.75rem;font-weight:800;color:${col};margin-bottom:8px">🌟 من المنهج</div>`;
+    exList.slice(0,2).forEach(ex => {
+      const txt = typeof ex==='string' ? ex : (ex.title ? `${ex.title}: ${ex.desc||''}` : JSON.stringify(ex));
+      html += `<div style="font-size:0.83rem;line-height:1.7;margin-bottom:6px;padding-right:8px;border-right:2px solid ${col}">▸ ${txt}</div>`;
+    });
+    html += `</div>`;
+  }
+
+  html += `</div>`;
+  return html;
+}
+
+// ── HELPERS ──────────────────────────────────────────────────────────
+function buildSimpleExplanation(type) {
+  const name = (type.name||'').toLowerCase();
+  const desc = type.desc || '';
+  // Try to give a super-simple analogy
+  if (/مدى|range/.test(name+desc)) return 'تخيّل أطفالاً في الفصل. أطول طفل <strong>160 سم</strong> وأقصر طفل <strong>130 سم</strong>. الفرق بينهم هو <strong>المدى = 30 سم</strong>. بهذا تعرف كم التشتت في الطول.';
+  if (/متوسط حسابي|mean/.test(name+desc)) return 'لو اشتريت ٣ أكياس فيها <strong>5 تفاحات، 3 تفاحات، 7 تفاحات</strong>. المجموع = 15. المتوسط = 15÷3 = <strong>5 تفاحات</strong> في كل كيس. هذا هو المتوسط الحسابي!';
+  if (/وسيط|median/.test(name+desc)) return 'رتّب ٥ طلاب حسب الدرجة: 40، 60، <strong>70</strong>، 85، 95. القيمة الوسطى (المنتصف) = <strong>70</strong>. هذا هو الوسيط — نصف الطلاب فوقه ونصفهم تحته.';
+  if (/منوال|mode/.test(name+desc)) return 'في صف فيه هذه الدرجات: 70، 80، <strong>90، 90، 90</strong>، 75. الرقم <strong>90</strong> تكرر أكثر من غيره. إذن المنوال = <strong>90</strong>.';
+  if (/انحراف معياري|std/.test(name+desc)) return 'لو متوسط طول الفريق 170 سم. واحد 165 واحد 175 — الانحراف = <strong>5 سم</strong> فقط (متقاربون). لو واحد 150 وآخر 190 — الانحراف = <strong>20 سم</strong> (متشتتون). كلما كبر الانحراف كلما تشتتت البيانات أكثر.';
+  if (/تباين|variance/.test(name+desc)) return 'التباين = مربع الانحراف المعياري. يُقيس كيف تتفرق الأرقام عن المتوسط. التباين الكبير يعني بيانات متشتتة جداً.';
+  if (/ارتباط|correlation/.test(name+desc)) return 'هل طول الشخص يرتبط بوزنه؟ عادةً كلما طال الشخص زاد وزنه → ارتباط طردي. أما درجة الحرارة مع مبيعات المعطف → كلما برد الجو زاد البيع → ارتباط عكسي.';
+  return desc || 'هذا المفهوم يساعدك على تحليل البيانات وفهمها بشكل أعمق.';
+}
+
+function buildConcreteExample(type, col) {
+  const name = (type.name||'').toLowerCase();
+  const desc = (type.desc||'').toLowerCase();
+  const txt = name + ' ' + desc;
+
+  if (/مدى|range/.test(txt)) {
+    return `<div style="background:${col}10;border:1.5px solid ${col}35;border-radius:14px;padding:16px">
+      <div style="font-weight:800;color:${col};margin-bottom:12px;font-size:0.85rem">📝 مثال محلول خطوة بخطوة</div>
+      <div style="font-size:0.83rem;color:var(--text-muted);margin-bottom:10px">درجات 6 طلاب في الاختبار:</div>
+      <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:12px">
+        ${[45,60,72,80,95,55].map((v,i)=>`<div style="width:38px;height:38px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:0.85rem;background:${v===95?col+'30':v===45?'rgba(0,191,165,0.15)':'rgba(255,255,255,0.06)'};border:2px solid ${v===95?col:v===45?'#00BFA5':'rgba(255,255,255,0.1)'};color:${v===95?col:v===45?'#00BFA5':'var(--text)'}">${v}</div>`).join('')}
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;font-size:0.83rem">
+        <div style="padding:7px 12px;background:rgba(0,0,0,0.2);border-radius:8px">🔴 أكبر قيمة (Max) = <strong style="color:${col}">95</strong></div>
+        <div style="padding:7px 12px;background:rgba(0,0,0,0.2);border-radius:8px">🟢 أصغر قيمة (Min) = <strong style="color:#00BFA5">45</strong></div>
+        <div style="padding:10px 12px;background:${col}18;border:2px solid ${col}40;border-radius:10px;font-weight:800;font-size:0.9rem">📏 المدى = 95 − 45 = <span style="color:${col}">50</span></div>
+        <div style="padding:7px 12px;background:rgba(255,255,255,0.04);border-radius:8px;color:var(--text-muted)">✏️ تفسير: الفجوة بين أعلى وأدنى درجة هي 50 درجة</div>
+      </div>
     </div>`;
-
-  return content;
+  }
+  if (/متوسط حسابي|mean/.test(txt)) {
+    const data=[60,70,80,90,100]; const sum=data.reduce((a,b)=>a+b,0); const avg=sum/data.length;
+    return `<div style="background:${col}10;border:1.5px solid ${col}35;border-radius:14px;padding:16px">
+      <div style="font-weight:800;color:${col};margin-bottom:10px;font-size:0.85rem">📝 مثال: درجات 5 طلاب</div>
+      <div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-bottom:10px">${data.map(v=>`<div style="width:38px;height:38px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:0.82rem;background:${col}20;border:1px solid ${col}40;color:${col}">${v}</div>`).join('')}</div>
+      <div style="display:flex;flex-direction:column;gap:6px;font-size:0.83rem">
+        <div style="padding:7px 12px;background:rgba(0,0,0,0.2);border-radius:8px">∑ المجموع = ${data.join('+')} = <strong>${sum}</strong></div>
+        <div style="padding:7px 12px;background:rgba(0,0,0,0.2);border-radius:8px">n عدد القيم = <strong>${data.length}</strong></div>
+        <div style="padding:10px 12px;background:${col}18;border:2px solid ${col}40;border-radius:10px;font-weight:800">x̄ = ${sum} ÷ ${data.length} = <span style="color:${col}">${avg}</span></div>
+      </div>
+    </div>`;
+  }
+  if (/وسيط|median/.test(txt)) {
+    const raw=[3,7,1,9,5]; const sorted=[...raw].sort((a,b)=>a-b); const mid=Math.floor(sorted.length/2);
+    return `<div style="background:${col}10;border:1.5px solid ${col}35;border-radius:14px;padding:16px">
+      <div style="font-weight:800;color:${col};margin-bottom:10px;font-size:0.85rem">📝 مثال: البيانات ${raw.join('، ')}</div>
+      <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:8px">الخطوة 1: رتّب تصاعدياً</div>
+      <div style="display:flex;gap:6px;justify-content:center;margin-bottom:10px">${sorted.map((v,i)=>`<div style="width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:0.9rem;background:${i===mid?'rgba(255,214,0,0.2)':col+'15'};border:2px solid ${i===mid?'#FFD600':col+'40'};color:${i===mid?'#FFD600':col}">${v}</div>`).join('')}</div>
+      <div style="padding:10px 12px;background:rgba(255,214,0,0.1);border:2px solid rgba(255,214,0,0.4);border-radius:10px;font-weight:800;text-align:center">الوسيط = <span style="color:#FFD600">${sorted[mid]}</span> (القيمة في المنتصف)</div>
+    </div>`;
+  }
+  if (/منوال|mode/.test(txt)) {
+    const data=[3,5,2,5,7,5,3]; const freq={}; data.forEach(v=>freq[v]=(freq[v]||0)+1); const mx=Math.max(...Object.values(freq)); const modes=Object.keys(freq).filter(k=>freq[k]===mx);
+    return `<div style="background:${col}10;border:1.5px solid ${col}35;border-radius:14px;padding:16px">
+      <div style="font-weight:800;color:${col};margin-bottom:10px;font-size:0.85rem">📝 مثال: البيانات ${data.join('، ')}</div>
+      <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:10px">${Object.entries(freq).sort((a,b)=>+a[0]-+b[0]).map(([v,f])=>`<div style="display:flex;align-items:center;gap:8px"><span style="width:28px;text-align:center;font-weight:800;color:${+f===mx?'#FFD600':col}">${v}</span><div style="flex:1;height:18px;border-radius:4px;background:${+f===mx?'rgba(255,214,0,0.3)':col+'20'};border:1px solid ${+f===mx?'rgba(255,214,0,0.5)':col+'30'}" style="width:${f/mx*100}%"></div><span style="font-size:0.75rem;color:var(--text-muted)">${f} مرات</span></div>`).join('')}</div>
+      <div style="padding:10px 12px;background:rgba(255,214,0,0.1);border:2px solid rgba(255,214,0,0.4);border-radius:10px;font-weight:800;text-align:center">المنوال = <span style="color:#FFD600">${modes.join(' و ')}</span> (تكرر ${mx} مرات)</div>
+    </div>`;
+  }
+  // Generic fallback
+  const exs = type.examples || type.example || [];
+  const exList = Array.isArray(exs) ? exs : (exs ? [exs] : []);
+  if (exList.length > 0) {
+    const ex = exList[0];
+    const txt2 = typeof ex === 'string' ? ex : (ex.title ? `${ex.title}: ${ex.desc||''}` : JSON.stringify(ex));
+    return `<div style="background:${col}10;border:1.5px solid ${col}35;border-radius:14px;padding:16px">
+      <div style="font-weight:800;color:${col};margin-bottom:8px;font-size:0.85rem">💡 مثال</div>
+      <div style="font-size:0.85rem;line-height:1.8">${txt2}</div>
+    </div>`;
+  }
+  return `<div style="background:${col}10;border:1.5px solid ${col}35;border-radius:14px;padding:16px">
+    <div style="font-size:0.85rem;color:var(--text-muted);text-align:center">طبّق المفهوم على بيانات من حياتك اليومية!</div>
+  </div>`;
 }
 
 // ── Visual Demo Generator ────────────────────────────────────
@@ -7289,35 +7475,40 @@ function toggleInfoCard(uid) {
 // ── Enhanced Mind Map Modal ──────────────────────────────────
 function openMindMapModal(mmData, title, col) {
   const color = col || '#6C63FF';
+  const PALETTE = ['#6C63FF','#00BFA5','#FF7043','#FFD600','#E91E63','#00B0FF'];
+
+  const branchesHTML = (mmData.branches||[]).map((b,i) => {
+    const bc = b.color || PALETTE[i % 6];
+    const children = b.children || [];
+    return `<div style="background:${bc}0e;border:1.5px solid ${bc}35;border-radius:14px;padding:14px;direction:rtl">
+      <div style="font-weight:800;font-size:0.88rem;color:${bc};margin-bottom:10px;padding-bottom:7px;border-bottom:1px solid ${bc}30;word-break:break-word">${b.label||''}</div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        ${children.map(ch => `<div style="display:flex;gap:7px;align-items:flex-start">
+          <span style="color:${bc};font-size:0.85rem;flex-shrink:0;margin-top:1px">▸</span>
+          <span style="font-size:0.83rem;line-height:1.65;word-break:break-word;direction:rtl">${ch}</span>
+        </div>`).join('')}
+      </div>
+    </div>`;
+  }).join('');
+
   const content = `
-    <div style="margin:-4px">
+    <div style="direction:rtl">
       ${buildEnhancedMindMap(mmData, title)}
-      <!-- Branches detail list -->
-      <div style="margin-top:14px">
-        <div style="font-weight:800;font-size:0.88rem;margin-bottom:10px;color:${color}">
-          🔍 تفصيل الفروع
+      <div style="margin-top:18px">
+        <div style="font-weight:800;font-size:0.9rem;margin-bottom:12px;color:${color};direction:rtl">📋 تفصيل الفروع الكاملة</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">
+          ${branchesHTML}
         </div>
-        ${(mmData.branches||[]).map((b,i)=>{
-          const bc = b.color || ['#6C63FF','#00BFA5','#FF7043','#FFD600','#E91E63','#00B0FF'][i%6];
-          return `<div style="background:${bc}10;border:1px solid ${bc}25;border-radius:10px;
-            padding:10px 14px;margin-bottom:6px">
-            <div style="font-weight:800;font-size:0.83rem;color:${bc};margin-bottom:6px">${b.label}</div>
-            <div style="display:flex;flex-wrap:wrap;gap:5px">
-              ${(b.children||[]).map(ch=>`
-                <span style="padding:3px 10px;background:${bc}18;border:1px solid ${bc}30;
-                  border-radius:20px;font-size:0.75rem;color:var(--text)">${ch}</span>`).join('')}
-            </div>
-          </div>`;
-        }).join('')}
       </div>
     </div>`;
 
-  openModal('🧠 ' + title, content, color);
+  openModal('🧠 ' + (title || mmData.center || 'الخريطة الذهنية'), content, color);
 }
 
 // ── Patch: buildAllMindMaps with expand button ───────────────
 const _origBuildAllMindMaps = typeof buildAllMindMaps === 'function' ? buildAllMindMaps : null;
 function buildAllMindMaps(subject) {
+  window._ZAD_MM = window._ZAD_MM || {};
   let out = '<div style="display:flex;flex-direction:column;gap:20px">';
   let found = 0;
   const PALETTE = ['#6C63FF','#00BFA5','#FF7043','#FFD600','#E91E63','#00B0FF'];
@@ -7325,28 +7516,26 @@ function buildAllMindMaps(subject) {
   subject.chapters.forEach(ch => {
     ch.lessons.forEach(lesson => {
       const mm = lesson.content && lesson.content.mindMap;
-      if (!mm) return;
+      if (!mm || !mm.branches || !mm.branches.length) return;
       found++;
       const col = PALETTE[found % PALETTE.length];
-      const safeId = 'mm_' + lesson.id.replace(/[^a-z0-9]/gi,'_');
+      const safeId = 'mm_' + lesson.id.replace(/[^a-z0-9]/gi,'_') + '_' + found;
+      window._ZAD_MM[safeId] = { mm, title: lesson.title, col };
 
-      out += `<div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);
-        border-radius:18px;padding:16px">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
+      out += `<div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:18px;padding:16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px;direction:rtl">
           <div>
             <div style="font-size:0.68rem;color:var(--text-muted);margin-bottom:2px">${ch.title}</div>
             <div style="font-size:0.92rem;font-weight:800">${lesson.title}</div>
           </div>
-          <button class="mindmap-expand-btn" 
-            onclick='openMindMapModal(${JSON.stringify(mm)},${JSON.stringify(lesson.title)},"${col}")'
+          <button class="mindmap-expand-btn" onclick="openMindMapById('${safeId}')"
             style="padding:7px 16px;border-radius:10px;border:1px solid ${col}40;
               background:${col}12;color:${col};font-family:var(--font);
               font-size:0.78rem;font-weight:700;cursor:pointer">
             🔍 عرض موسّع
           </button>
         </div>
-        <div style="cursor:pointer" 
-          onclick='openMindMapModal(${JSON.stringify(mm)},${JSON.stringify(lesson.title)},"${col}")'>
+        <div style="cursor:pointer" onclick="openMindMapById('${safeId}')">
           ${buildEnhancedMindMap(mm, lesson.title)}
         </div>
         <div style="font-size:0.72rem;color:var(--text-muted);text-align:center;margin-top:8px">
@@ -7363,6 +7552,12 @@ function buildAllMindMaps(subject) {
       <div style="font-weight:700;margin-bottom:6px">لا توجد خرائط ذهنية لهذه المادة</div>
     </div>`;
   return out;
+}
+
+function openMindMapById(safeId) {
+  const entry = (window._ZAD_MM || {})[safeId];
+  if (!entry) return;
+  openMindMapModal(entry.mm, entry.title, entry.col);
 }
 
 // ── Patch: buildConceptLesson types with click ───────────────
@@ -7382,6 +7577,8 @@ function addTypeCardClickHandlers() {
           buildTypeModalContent(typeData, col, ''),
           col
         );
+        // Default to image tab
+        setTimeout(() => zmodSwitch('image'), 60);
       } catch(e) { console.error(e); }
     });
   });
@@ -8990,24 +9187,25 @@ function refreshExample(cardId, exId, topicKey, col) {
 
 // ── INTERACTIVE ACTION BUTTONS for Type Cards ─────────────
 function buildInteractiveButtons(typeData, col, cardId) {
-  const uid = 'ibtn-' + (cardId || Math.random().toString(36).slice(2,8));
-  // Store data safely — will wire onclick after render
-  setTimeout(function() {
-    var el = document.getElementById(uid);
-    if (!el) return;
-    el.querySelectorAll('[data-action]').forEach(function(btn) {
-      btn.addEventListener('click', function(e) {
-        e.stopPropagation();
-        openInteractiveAction(this.dataset.action, typeData.name||'', typeData, cardId, detectTopicKey(typeData));
-      });
-    });
-  }, 60);
+  // Store data globally for onclick handlers
+  const gkey = 'zib_' + (cardId || Math.random().toString(36).slice(2,6));
+  window._ZAD_CARDS = window._ZAD_CARDS || {};
+  window._ZAD_CARDS[gkey] = typeData;
 
-  return '<div id="' + uid + '" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:12px;border-top:1px solid rgba(255,255,255,0.07);padding-top:10px">' +
-    '<button data-action="image" style="padding:8px 4px;border-radius:9px;border:1px solid ' + col + '35;background:' + col + '12;color:' + col + ';font-family:var(--font);font-size:0.75rem;font-weight:700;cursor:pointer;transition:all 0.2s" onmouseenter="this.style.background=\'' + col + '30\'" onmouseleave="this.style.background=\'' + col + '12\'">🖼️ صورة</button>' +
-    '<button data-action="more" style="padding:8px 4px;border-radius:9px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.04);color:var(--text);font-family:var(--font);font-size:0.75rem;font-weight:700;cursor:pointer;transition:all 0.2s" onmouseenter="this.style.background=\'rgba(255,255,255,0.12)\'" onmouseleave="this.style.background=\'rgba(255,255,255,0.04)\'">📖 شرح أكثر</button>' +
-    '<button data-action="example" style="padding:8px 4px;border-radius:9px;border:1px solid rgba(0,191,165,0.3);background:rgba(0,191,165,0.08);color:#00BFA5;font-family:var(--font);font-size:0.75rem;font-weight:700;cursor:pointer;transition:all 0.2s" onmouseenter="this.style.background=\'rgba(0,191,165,0.18)\'" onmouseleave="this.style.background=\'rgba(0,191,165,0.08)\'">💡 مثال</button>' +
+  return '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:12px;border-top:1px solid rgba(255,255,255,0.07);padding-top:10px">' +
+    '<button onclick="openTypeModalWithTab(\''+gkey+'\',\'image\')" style="padding:9px 4px;border-radius:9px;border:1px solid '+col+'35;background:'+col+'12;color:'+col+';font-family:var(--font);font-size:0.75rem;font-weight:700;cursor:pointer;transition:all 0.2s" onmouseenter="this.style.background=\''+col+'28\'" onmouseleave="this.style.background=\''+col+'12\'">🖼️ صورة</button>' +
+    '<button onclick="openTypeModalWithTab(\''+gkey+'\',\'more\')"  style="padding:9px 4px;border-radius:9px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.04);color:var(--text);font-family:var(--font);font-size:0.75rem;font-weight:700;cursor:pointer;transition:all 0.2s" onmouseenter="this.style.background=\'rgba(255,255,255,0.12)\'" onmouseleave="this.style.background=\'rgba(255,255,255,0.04)\'">📖 شرح أكثر</button>' +
+    '<button onclick="openTypeModalWithTab(\''+gkey+'\',\'example\')" style="padding:9px 4px;border-radius:9px;border:1px solid rgba(0,191,165,0.3);background:rgba(0,191,165,0.08);color:#00BFA5;font-family:var(--font);font-size:0.75rem;font-weight:700;cursor:pointer;transition:all 0.2s" onmouseenter="this.style.background=\'rgba(0,191,165,0.2)\'" onmouseleave="this.style.background=\'rgba(0,191,165,0.08)\'">💡 مثال</button>' +
     '</div>';
+}
+
+function openTypeModalWithTab(gkey, tab) {
+  var typeData = (window._ZAD_CARDS||{})[gkey];
+  if (!typeData) return;
+  var COLORS = ['#6C63FF','#00BFA5','#FF7043','#FFD600','#E91E63','#00B0FF'];
+  var col = typeData.color || COLORS[Math.floor(Math.random()*COLORS.length)];
+  openModal((typeData.icon||'📌')+' '+(typeData.name||''), buildTypeModalContent(typeData, col, ''), col);
+  setTimeout(function() { zmodSwitch(tab); }, 60);
 }
 
 function detectTopicKey(typeData) {

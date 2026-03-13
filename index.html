@@ -12026,55 +12026,43 @@ function buildLessonsTab(subject, subjectId) {
 
 function buildMindMap(mm) {
   if (!mm || !mm.branches) return '';
+  var branches = mm.branches || [];
+  var center = mm.center || '';
+  var n = branches.length;
+  var PALETTE = ['#6C63FF','#00BFA5','#FF7043','#FFD600','#E91E63','#00B0FF','#8BC34A','#FF5722'];
 
-  const PALETTE = ['#6C63FF','#00BFA5','#FF7043','#FFD600','#E91E63','#00B0FF','#8BC34A','#FF5722'];
-  const branches = mm.branches || [];
-  const center   = mm.center || '';
-  const n        = branches.length;
+  // العقدة المركزية
+  var html = '<div style="margin-top:20px;direction:rtl">';
+  html += '<div style="font-size:0.95rem;font-weight:700;margin-bottom:12px;color:var(--primary);direction:rtl;text-align:right">🧠 الخريطة الذهنية</div>';
+  html += '<div style="display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#6C63FF,#4C46CC);border-radius:14px;padding:12px 20px;margin-bottom:14px;box-shadow:0 4px 18px rgba(108,99,255,0.3);direction:rtl;text-align:center">';
+  html += '<span style="font-size:1.2rem;margin-left:8px">🧠</span>';
+  html += '<span style="font-weight:900;font-size:0.95rem;color:white">' + center + '</span>';
+  html += '</div>';
 
-  const branchCards = branches.map((b, i) => {
-    const col      = b.color || PALETTE[i % PALETTE.length];
-    const children = b.children || [];
+  // شبكة الفروع
+  var cols = n <= 2 ? n : 2;
+  html += '<div style="display:grid;grid-template-columns:repeat(' + cols + ',1fr);gap:10px;direction:rtl">';
 
-    const childrenHTML = children.map(ch =>
-      `<div style="font-size:0.78rem;line-height:1.65;color:var(--text);
-        padding:5px 10px;margin-bottom:4px;
-        background:${col}14;border-radius:8px;
-        border-right:3px solid ${col}70;
-        word-break:break-word;white-space:normal;direction:rtl;text-align:right">
-        ${String(ch)}
-      </div>`
-    ).join('');
+  for (var i = 0; i < branches.length; i++) {
+    var b = branches[i];
+    var col = b.color || PALETTE[i % PALETTE.length];
+    var children = b.children || [];
 
-    return `<div style="background:${col}0e;border:2px solid ${col}40;
-      border-radius:14px;padding:12px;direction:rtl;text-align:right">
-      <div style="font-weight:800;font-size:0.84rem;color:${col};
-        margin-bottom:8px;padding-bottom:7px;
-        border-bottom:1.5px solid ${col}35;
-        word-break:break-word;white-space:normal">
-        ${b.label || ''}
-      </div>
-      <div style="display:flex;flex-direction:column;gap:3px">
-        ${childrenHTML}
-      </div>
-    </div>`;
-  }).join('');
+    html += '<div style="background:' + col + '14;border:2px solid ' + col + '40;border-radius:14px;padding:12px;direction:rtl;text-align:right">';
+    html += '<div style="font-weight:800;font-size:0.84rem;color:' + col + ';margin-bottom:8px;padding-bottom:7px;border-bottom:1.5px solid ' + col + '35;word-break:break-word;white-space:normal">';
+    html += (b.label || '') + '</div>';
+    html += '<div style="display:flex;flex-direction:column;gap:4px">';
 
-  const cols = n <= 2 ? n : n <= 4 ? 2 : 2;
+    for (var j = 0; j < children.length; j++) {
+      var ch = String(children[j]);
+      html += '<div style="font-size:0.78rem;line-height:1.6;color:var(--text);padding:5px 10px;background:' + col + '18;border-radius:8px;border-right:3px solid ' + col + '60;word-break:break-word;white-space:normal;direction:rtl;text-align:right">' + ch + '</div>';
+    }
 
-  return `<div style="margin-top:20px;direction:rtl">
-    <div style="font-size:0.95rem;font-weight:700;margin-bottom:12px;color:var(--primary);direction:rtl">🧠 الخريطة الذهنية</div>
-    <div style="display:flex;align-items:center;justify-content:center;
-      background:linear-gradient(135deg,#6C63FF,#4C46CC);
-      border-radius:14px;padding:12px 20px;margin-bottom:14px;
-      box-shadow:0 4px 18px #6C63FF44;direction:rtl">
-      <span style="font-size:1.2rem;margin-left:8px">🧠</span>
-      <span style="font-weight:900;font-size:0.95rem;color:white">${center}</span>
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:10px;direction:rtl">
-      ${branchCards}
-    </div>
-  </div>`;
+    html += '</div></div>';
+  }
+
+  html += '</div></div>';
+  return html;
 }
 
 // buildAllMindMaps moved to features patch

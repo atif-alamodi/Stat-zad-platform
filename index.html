@@ -12025,59 +12025,56 @@ function buildLessonsTab(subject, subjectId) {
 
 
 function buildMindMap(mm) {
-  if (!mm) return '';
-  var branches = mm.branches || [];
-  var center = (mm.center || '').replace(/</g,'&lt;');
-  var W=560, H=320, cx=280, cy=160, R=118;
-  var svg = '';
-  var PALETTE=['#6C63FF','#00BFA5','#FF7043','#FFD600','#E91E63','#00B0FF'];
+  if (!mm || !mm.branches) return '';
 
-  for(var i=0;i<branches.length;i++){
-    var b=branches[i];
-    var col=b.color||PALETTE[i%PALETTE.length];
-    var ang=(2*Math.PI*i/branches.length)-Math.PI/2;
-    var bx=Math.round(cx+R*Math.cos(ang));
-    var by=Math.round(cy+R*Math.sin(ang));
-    var lbl=(b.label||'').replace(/</g,'&lt;');
-    svg+='<line x1="'+cx+'" y1="'+cy+'" x2="'+bx+'" y2="'+by+'" stroke="'+col+'" stroke-width="2.5" stroke-opacity="0.45" stroke-dasharray="8,4"/>';
-    var rw=Math.min(Math.max(lbl.length*5.2+20,44),92);
-    svg+='<ellipse cx="'+bx+'" cy="'+by+'" rx="'+rw+'" ry="20" fill="'+col+'22" stroke="'+col+'" stroke-width="2"/>';
-    svg+='<text x="'+bx+'" y="'+(by+5)+'" text-anchor="middle" font-family="Cairo,sans-serif" font-size="11" fill="'+col+'" font-weight="800">'+lbl+'</text>';
-    var ch=b.children||[];
-    for(var j=0;j<ch.length;j++){
-      var cs=String(ch[j]).replace(/</g,'&lt;');
-      var spread=(ch.length-1)/2;
-      var ca=ang+(j-spread)*0.42;
-      var chx=Math.round(cx+(R+66)*Math.cos(ca));
-      var chy=Math.round(cy+(R+66)*Math.sin(ca));
-      svg+='<line x1="'+bx+'" y1="'+by+'" x2="'+chx+'" y2="'+chy+'" stroke="'+col+'" stroke-width="1" stroke-opacity="0.3"/>';
-      svg+='<text x="'+chx+'" y="'+chy+'" text-anchor="middle" dominant-baseline="middle" font-family="Cairo,sans-serif" font-size="9.5" fill="'+col+'cc">'+cs+'</text>';
-    }
-  }
+  const PALETTE = ['#6C63FF','#00BFA5','#FF7043','#FFD600','#E91E63','#00B0FF','#8BC34A','#FF5722'];
+  const branches = mm.branches || [];
+  const center   = mm.center || '';
+  const n        = branches.length;
 
-  var cards='';
-  for(var i=0;i<branches.length;i++){
-    var b=branches[i];
-    var col=b.color||PALETTE[i%PALETTE.length];
-    var chips='';
-    var ch=b.children||[];
-    for(var j=0;j<ch.length;j++){
-      chips+='<span style="font-size:0.68rem;padding:2px 7px;background:'+col+'18;border-radius:20px;color:var(--text)">'+String(ch[j])+'</span>';
-    }
-    cards+='<div style="background:'+col+'12;border:1.5px solid '+col+'35;border-radius:12px;padding:10px">';
-    cards+='<div style="font-weight:800;font-size:0.8rem;color:'+col+';margin-bottom:5px;padding-bottom:4px;border-bottom:1px solid '+col+'22">'+b.label+'</div>';
-    cards+='<div style="display:flex;flex-wrap:wrap;gap:4px">'+chips+'</div></div>';
-  }
+  const branchCards = branches.map((b, i) => {
+    const col      = b.color || PALETTE[i % PALETTE.length];
+    const children = b.children || [];
 
-  return '<div style="margin-top:20px"><div style="font-size:0.95rem;font-weight:700;margin-bottom:10px;color:var(--primary)">🧠 الخريطة الذهنية</div>'
-    +'<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(108,99,255,0.2);border-radius:16px;padding:14px;overflow:hidden">'
-    +'<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;max-height:250px;overflow:visible" xmlns="http://www.w3.org/2000/svg">'
-    +svg
-    +'<ellipse cx="'+cx+'" cy="'+cy+'" rx="60" ry="28" fill="#6C63FF" opacity="0.9"/>'
-    +'<text x="'+cx+'" y="'+(cy+5)+'" text-anchor="middle" font-family="Cairo,sans-serif" font-size="12.5" fill="white" font-weight="900">'+center+'</text>'
-    +'</svg>'
-    +'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-top:10px">'+cards+'</div>'
-    +'</div></div>';
+    const childrenHTML = children.map(ch =>
+      `<div style="font-size:0.78rem;line-height:1.65;color:var(--text);
+        padding:5px 10px;margin-bottom:4px;
+        background:${col}14;border-radius:8px;
+        border-right:3px solid ${col}70;
+        word-break:break-word;white-space:normal;direction:rtl;text-align:right">
+        ${String(ch)}
+      </div>`
+    ).join('');
+
+    return `<div style="background:${col}0e;border:2px solid ${col}40;
+      border-radius:14px;padding:12px;direction:rtl;text-align:right">
+      <div style="font-weight:800;font-size:0.84rem;color:${col};
+        margin-bottom:8px;padding-bottom:7px;
+        border-bottom:1.5px solid ${col}35;
+        word-break:break-word;white-space:normal">
+        ${b.label || ''}
+      </div>
+      <div style="display:flex;flex-direction:column;gap:3px">
+        ${childrenHTML}
+      </div>
+    </div>`;
+  }).join('');
+
+  const cols = n <= 2 ? n : n <= 4 ? 2 : 2;
+
+  return `<div style="margin-top:20px;direction:rtl">
+    <div style="font-size:0.95rem;font-weight:700;margin-bottom:12px;color:var(--primary);direction:rtl">🧠 الخريطة الذهنية</div>
+    <div style="display:flex;align-items:center;justify-content:center;
+      background:linear-gradient(135deg,#6C63FF,#4C46CC);
+      border-radius:14px;padding:12px 20px;margin-bottom:14px;
+      box-shadow:0 4px 18px #6C63FF44;direction:rtl">
+      <span style="font-size:1.2rem;margin-left:8px">🧠</span>
+      <span style="font-weight:900;font-size:0.95rem;color:white">${center}</span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:10px;direction:rtl">
+      ${branchCards}
+    </div>
+  </div>`;
 }
 
 // buildAllMindMaps moved to features patch

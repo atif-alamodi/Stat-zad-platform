@@ -2661,6 +2661,629 @@ window.getQuestionCount = getQuestionCount;
 // Communication Skills Lab — مختبر مهارات التواصل
 // ═══════════════════════════════════════════════════════════════════════════
 
+
+// ═══════════════════════════════════════════════════════════════════
+// 🖥️  OS VISUAL LAB  — buildOSLab()
+// ═══════════════════════════════════════════════════════════════════
+
+function buildOSLab() {
+  return `
+  <div style="direction:rtl">
+    <!-- Tab bar -->
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:20px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:16px;padding:6px">
+      ${[
+        {id:'layers',  icon:'🏗️',  label:'طبقات OS'},
+        {id:'process', icon:'⚙️',  label:'دورة العملية'},
+        {id:'sched',   icon:'📅',  label:'جدولة المعالج'},
+        {id:'memory',  icon:'🧠',  label:'إدارة الذاكرة'},
+        {id:'fs',      icon:'📁',  label:'نظام الملفات'},
+        {id:'ipc',     icon:'🔗',  label:'تواصل العمليات'},
+      ].map(t=>`<button id="oslab-tab-${t.id}" onclick="oslabSwitch('${t.id}')"
+        style="flex:1;min-width:90px;padding:9px 10px;border-radius:11px;border:none;cursor:pointer;
+               font-family:var(--font);font-size:0.8rem;font-weight:700;transition:all 0.2s;
+               background:transparent;color:var(--text-muted)">${t.icon} ${t.label}</button>`).join('')}
+    </div>
+
+    <!-- Panels -->
+    <div id="oslab-layers"  class="oslab-panel">${buildOSLayersPanel()}</div>
+    <div id="oslab-process" class="oslab-panel" style="display:none">${buildOSProcessPanel()}</div>
+    <div id="oslab-sched"   class="oslab-panel" style="display:none">${buildOSSchedPanel()}</div>
+    <div id="oslab-memory"  class="oslab-panel" style="display:none">${buildOSMemoryPanel()}</div>
+    <div id="oslab-fs"      class="oslab-panel" style="display:none">${buildOSFSPanel()}</div>
+    <div id="oslab-ipc"     class="oslab-panel" style="display:none">${buildOSIPCPanel()}</div>
+  </div>
+  `;
+}
+
+function oslabSwitch(tab) {
+  document.querySelectorAll('.oslab-panel').forEach(p => p.style.display = 'none');
+  document.querySelectorAll('[id^="oslab-tab-"]').forEach(b => {
+    b.style.background = 'transparent';
+    b.style.color = 'var(--text-muted)';
+  });
+  document.getElementById('oslab-' + tab).style.display = 'block';
+  const btn = document.getElementById('oslab-tab-' + tab);
+  if (btn) {
+    btn.style.background = 'linear-gradient(135deg,#00BFA5,#0097A7)';
+    btn.style.color = 'white';
+    btn.style.boxShadow = '0 4px 14px rgba(0,191,165,0.3)';
+  }
+  // Run init animations
+  if (tab === 'sched') oslabInitSched();
+  if (tab === 'memory') oslabInitMemory();
+  if (tab === 'process') oslabAnimateProcess();
+}
+
+// ── 1. OS LAYERS ────────────────────────────────────────────────────
+function buildOSLayersPanel() {
+  const layers = [
+    { label: 'التطبيقات (Applications)',   icon: '📱', color: '#6C63FF', desc: 'المتصفح، Word، الألعاب، كل ما يراه المستخدم' },
+    { label: 'واجهة المستخدم (Shell/GUI)', icon: '🖥️', color: '#FF7043', desc: 'سطر الأوامر أو الواجهة الرسومية — بوابة التفاعل مع OS' },
+    { label: 'خدمات النظام (System Calls)',icon: '📞', color: '#FFD600', desc: 'طلبات البرامج من الـ Kernel: افتح ملف، أرسل بيانات...' },
+    { label: 'النواة (Kernel)',             icon: '⚙️', color: '#00BFA5', desc: 'قلب OS — يتحكم في المعالج والذاكرة والأجهزة' },
+    { label: 'برامج التشغيل (Drivers)',    icon: '🔌', color: '#E91E63', desc: 'تُترجم أوامر الـ Kernel لكل جهاز: بطاقة شبكة، شاشة، USB' },
+    { label: 'العتاد (Hardware)',           icon: '💾', color: '#00B0FF', desc: 'CPU، RAM، القرص الصلب، الشاشة — الأجهزة الفعلية' },
+  ];
+  return `
+    <div style="text-align:center;margin-bottom:20px">
+      <div style="font-size:1.1rem;font-weight:800;color:#00BFA5">🏗️ طبقات نظام التشغيل</div>
+      <div style="font-size:0.82rem;color:var(--text-muted);margin-top:4px">اضغط على أي طبقة لرؤية تفاصيلها</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;max-width:600px;margin:0 auto" id="os-layers-stack">
+      ${layers.map((l,i)=>`
+        <div onclick="oslabLayerClick(${i})" id="oslayer-${i}"
+          style="padding:16px 22px;border-radius:14px;border:2px solid ${l.color}30;
+                 background:${l.color}12;cursor:pointer;transition:all 0.25s;
+                 display:flex;align-items:center;gap:14px;direction:rtl"
+          onmouseenter="this.style.borderColor='${l.color}';this.style.transform='scale(1.02)'"
+          onmouseleave="oslabLayerReset(${i})">
+          <div style="font-size:1.8rem;flex-shrink:0">${l.icon}</div>
+          <div style="flex:1;text-align:right">
+            <div style="font-weight:800;color:${l.color};font-size:0.92rem">${l.label}</div>
+            <div id="oslayer-desc-${i}" style="font-size:0.8rem;color:var(--text-muted);margin-top:3px;display:none;line-height:1.6">${l.desc}</div>
+          </div>
+          <div style="width:12px;height:12px;border-radius:50%;background:${l.color};flex-shrink:0;
+                      box-shadow:0 0 8px ${l.color}80"></div>
+        </div>`).join('')}
+    </div>
+    <div style="margin-top:24px;background:rgba(0,191,165,0.06);border:1px solid rgba(0,191,165,0.2);border-radius:14px;padding:16px;text-align:center;direction:rtl">
+      <div style="font-weight:700;color:#00BFA5;margin-bottom:8px">💡 كيف تعمل الطبقات معاً؟</div>
+      <div style="font-size:0.85rem;color:var(--text-muted);line-height:1.8">
+        عندما تضغط "فتح ملف" في Word ← Word يُرسل System Call ← الـ Kernel يُوجّه الطلب للـ Driver ← Driver يقرأ من القرص ← البيانات ترجع صعوداً
+      </div>
+    </div>`;
+}
+
+const _oslayerColors = ['#6C63FF','#FF7043','#FFD600','#00BFA5','#E91E63','#00B0FF'];
+function oslabLayerClick(i) {
+  const desc = document.getElementById('oslayer-desc-'+i);
+  const el = document.getElementById('oslayer-'+i);
+  if (!desc || !el) return;
+  const isOpen = desc.style.display !== 'none';
+  // Close all
+  for(let j=0;j<6;j++) {
+    const d = document.getElementById('oslayer-desc-'+j);
+    const e = document.getElementById('oslayer-'+j);
+    if(d) d.style.display='none';
+    if(e) { e.style.borderColor=_oslayerColors[j]+'30'; e.style.transform=''; }
+  }
+  if (!isOpen) {
+    desc.style.display = 'block';
+    el.style.borderColor = _oslayerColors[i];
+    el.style.transform = 'scale(1.02)';
+  }
+}
+function oslabLayerReset(i) {
+  const desc = document.getElementById('oslayer-desc-'+i);
+  const el = document.getElementById('oslayer-'+i);
+  if (desc && desc.style.display === 'none' && el) {
+    el.style.borderColor = _oslayerColors[i]+'30';
+    el.style.transform = '';
+  }
+}
+
+// ── 2. PROCESS LIFECYCLE ────────────────────────────────────────────
+function buildOSProcessPanel() {
+  return `
+    <div style="text-align:center;margin-bottom:20px;direction:rtl">
+      <div style="font-size:1.1rem;font-weight:800;color:#00BFA5">⚙️ دورة حياة العملية (Process Lifecycle)</div>
+      <div style="font-size:0.82rem;color:var(--text-muted);margin-top:4px">شاهد كيف تنتقل العملية بين الحالات</div>
+    </div>
+
+    <!-- State diagram SVG -->
+    <div style="background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:16px;padding:20px;margin-bottom:20px;overflow-x:auto">
+      <svg id="os-process-svg" viewBox="0 0 680 220" style="width:100%;min-width:500px;max-height:220px" xmlns="http://www.w3.org/2000/svg">
+        <!-- Circles -->
+        <circle id="pstate-new"  cx="60"  cy="110" r="42" fill="#6C63FF22" stroke="#6C63FF" stroke-width="2.5"/>
+        <circle id="pstate-ready" cx="210" cy="60"  r="42" fill="#FFD60022" stroke="#FFD600" stroke-width="2.5"/>
+        <circle id="pstate-run"  cx="380" cy="110" r="42" fill="#00BFA522" stroke="#00BFA5" stroke-width="2.5"/>
+        <circle id="pstate-wait" cx="210" cy="170" r="42" fill="#FF704322" stroke="#FF7043" stroke-width="2.5"/>
+        <circle id="pstate-term" cx="560" cy="110" r="42" fill="#E91E6322" stroke="#E91E63" stroke-width="2.5"/>
+        <!-- Labels -->
+        <text x="60"  y="105" text-anchor="middle" font-family="Cairo,sans-serif" font-size="11" fill="#6C63FF" font-weight="700">جديدة</text>
+        <text x="60"  y="120" text-anchor="middle" font-family="Cairo,sans-serif" font-size="9"  fill="#6C63FF">New</text>
+        <text x="210" y="55"  text-anchor="middle" font-family="Cairo,sans-serif" font-size="11" fill="#FFD600" font-weight="700">جاهزة</text>
+        <text x="210" y="70"  text-anchor="middle" font-family="Cairo,sans-serif" font-size="9"  fill="#FFD600">Ready</text>
+        <text x="380" y="105" text-anchor="middle" font-family="Cairo,sans-serif" font-size="11" fill="#00BFA5" font-weight="700">تنفيذ</text>
+        <text x="380" y="120" text-anchor="middle" font-family="Cairo,sans-serif" font-size="9"  fill="#00BFA5">Running</text>
+        <text x="210" y="165" text-anchor="middle" font-family="Cairo,sans-serif" font-size="11" fill="#FF7043" font-weight="700">انتظار</text>
+        <text x="210" y="180" text-anchor="middle" font-family="Cairo,sans-serif" font-size="9"  fill="#FF7043">Waiting</text>
+        <text x="560" y="105" text-anchor="middle" font-family="Cairo,sans-serif" font-size="11" fill="#E91E63" font-weight="700">منتهية</text>
+        <text x="560" y="120" text-anchor="middle" font-family="Cairo,sans-serif" font-size="9"  fill="#E91E63">Terminated</text>
+        <!-- Arrows -->
+        <defs><marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#ffffff50"/></marker></defs>
+        <line x1="102" y1="90"  x2="168" y2="68"  stroke="#ffffff40" stroke-width="1.5" marker-end="url(#arr)"/>
+        <line x1="252" y1="68"  x2="338" y2="98"  stroke="#ffffff40" stroke-width="1.5" marker-end="url(#arr)"/>
+        <line x1="338" y1="122" x2="252" y2="152" stroke="#ffffff40" stroke-width="1.5" marker-end="url(#arr)"/>
+        <line x1="168" y1="152" x2="252" y2="122" stroke="#ffffff40" stroke-width="1.5" marker-end="url(#arr)"/>
+        <line x1="422" y1="110" x2="518" y2="110" stroke="#ffffff40" stroke-width="1.5" marker-end="url(#arr)"/>
+        <line x1="338" y1="98"  x2="252" y2="68"  stroke="#ffffff25" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arr)"/>
+        <!-- Arrow labels -->
+        <text x="128" y="73"  font-family="Cairo,sans-serif" font-size="8" fill="#ffffff60" text-anchor="middle">قبول</text>
+        <text x="295" y="72"  font-family="Cairo,sans-serif" font-size="8" fill="#ffffff60" text-anchor="middle">جدولة</text>
+        <text x="300" y="148" font-family="Cairo,sans-serif" font-size="8" fill="#ffffff60" text-anchor="middle">انتظار IO</text>
+        <text x="186" y="132" font-family="Cairo,sans-serif" font-size="8" fill="#ffffff60" text-anchor="middle">IO اكتمل</text>
+        <text x="470" y="105" font-family="Cairo,sans-serif" font-size="8" fill="#ffffff60" text-anchor="middle">انتهاء</text>
+        <!-- Moving process dot -->
+        <circle id="proc-dot" cx="60" cy="110" r="8" fill="#00FF88" opacity="0.9">
+          <animate id="proc-anim" attributeName="cx" values="60;210;380;210;380;560" keyTimes="0;0.2;0.4;0.6;0.8;1" dur="6s" begin="indefinite" fill="freeze"/>
+          <animate attributeName="cy" values="110;60;110;170;110;110" keyTimes="0;0.2;0.4;0.6;0.8;1" dur="6s" begin="indefinite" fill="freeze"/>
+        </circle>
+      </svg>
+    </div>
+
+    <!-- States description cards -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;direction:rtl">
+      ${[
+        {state:'New — جديدة',    color:'#6C63FF', desc:'العملية تُنشأ لأول مرة ولم تدخل الذاكرة بعد'},
+        {state:'Ready — جاهزة', color:'#FFD600', desc:'في الذاكرة وتنتظر دورها في المعالج'},
+        {state:'Running — تنفيذ',color:'#00BFA5', desc:'المعالج يُنفّذها الآن — عملية واحدة فقط!'},
+        {state:'Waiting — انتظار',color:'#FF7043',desc:'تنتظر عملية IO (قرص، شبكة) وتُخلي المعالج'},
+        {state:'Terminated — انتهاء',color:'#E91E63',desc:'اكتملت ويتم تحرير كل موارد الذاكرة'},
+      ].map(s=>`<div style="background:${s.color}12;border:1px solid ${s.color}40;border-radius:12px;padding:12px;text-align:right">
+        <div style="font-weight:800;font-size:0.82rem;color:${s.color};margin-bottom:5px">${s.state}</div>
+        <div style="font-size:0.78rem;color:var(--text-muted);line-height:1.6">${s.desc}</div>
+      </div>`).join('')}
+    </div>
+    <div style="text-align:center;margin-top:16px">
+      <button onclick="oslabAnimateProcess()" style="padding:10px 24px;background:linear-gradient(135deg,#00BFA5,#0097A7);border:none;border-radius:12px;color:white;font-family:var(--font);font-weight:700;cursor:pointer;font-size:0.88rem">▶ تشغيل الرسم المتحرك</button>
+    </div>`;
+}
+
+function oslabAnimateProcess() {
+  const anim = document.getElementById('proc-anim');
+  if (anim) { anim.beginElement(); }
+}
+
+// ── 3. CPU SCHEDULING ───────────────────────────────────────────────
+function buildOSSchedPanel() {
+  return `
+    <div style="text-align:center;margin-bottom:18px;direction:rtl">
+      <div style="font-size:1.1rem;font-weight:800;color:#00BFA5">📅 خوارزميات جدولة المعالج</div>
+      <div style="font-size:0.82rem;color:var(--text-muted);margin-top:4px">أدخل العمليات وشاهد ترتيب التنفيذ</div>
+    </div>
+
+    <!-- Algorithm selector -->
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;direction:rtl;justify-content:center">
+      ${[['fcfs','FCFS أولاً حضر أولاً'],['sjf','SJF الأقصر أولاً'],['rr','Round Robin']].map(([id,lbl])=>
+        `<button id="sched-btn-${id}" onclick="oslabSetAlgo('${id}')"
+          style="padding:9px 18px;border-radius:12px;border:2px solid rgba(0,191,165,0.3);
+                 background:rgba(0,191,165,0.08);color:var(--text-muted);font-family:var(--font);
+                 font-size:0.83rem;font-weight:700;cursor:pointer;transition:all 0.2s">${lbl}</button>`).join('')}
+    </div>
+
+    <!-- Quantum for RR -->
+    <div id="sched-rr-opt" style="display:none;text-align:center;margin-bottom:14px;direction:rtl">
+      <label style="font-size:0.85rem;color:var(--text-muted)">الكوانتم (ms): </label>
+      <input id="sched-quantum" type="number" value="2" min="1" max="10"
+        style="width:60px;padding:6px;border-radius:8px;border:1px solid var(--border);
+               background:rgba(255,255,255,0.06);color:var(--text);font-family:var(--font);
+               text-align:center;font-size:0.9rem">
+    </div>
+
+    <!-- Process input table -->
+    <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:14px;direction:rtl">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;margin-bottom:10px;font-size:0.8rem;font-weight:700;color:var(--text-muted);text-align:center">
+        <div>العملية</div><div>وقت الوصول</div><div>وقت التنفيذ</div><div></div>
+      </div>
+      <div id="sched-rows" style="display:flex;flex-direction:column;gap:6px"></div>
+      <button onclick="oslabAddProcess()" style="margin-top:10px;padding:8px 18px;border-radius:10px;border:1px dashed rgba(0,191,165,0.4);background:rgba(0,191,165,0.06);color:#00BFA5;font-family:var(--font);font-size:0.83rem;font-weight:700;cursor:pointer;width:100%">+ إضافة عملية</button>
+    </div>
+
+    <div style="text-align:center;margin-bottom:16px">
+      <button onclick="oslabRunSched()" style="padding:11px 32px;background:linear-gradient(135deg,#00BFA5,#0097A7);border:none;border-radius:12px;color:white;font-family:var(--font);font-weight:800;font-size:0.9rem;cursor:pointer">⚡ تشغيل الجدولة</button>
+    </div>
+
+    <!-- Gantt chart output -->
+    <div id="sched-output" style="direction:rtl"></div>`;
+}
+
+let _schedAlgo = 'fcfs';
+let _schedProcesses = [];
+
+function oslabInitSched() {
+  _schedAlgo = 'fcfs';
+  _schedProcesses = [
+    {name:'P1', arrival:0, burst:6},
+    {name:'P2', arrival:2, burst:4},
+    {name:'P3', arrival:4, burst:2},
+  ];
+  oslabRenderSchedRows();
+  oslabSetAlgo('fcfs');
+}
+
+function oslabSetAlgo(algo) {
+  _schedAlgo = algo;
+  ['fcfs','sjf','rr'].forEach(a => {
+    const b = document.getElementById('sched-btn-'+a);
+    if(b) { b.style.background = a===algo ? 'linear-gradient(135deg,#00BFA5,#0097A7)' : 'rgba(0,191,165,0.08)'; b.style.color = a===algo ? 'white' : 'var(--text-muted)'; b.style.borderColor = a===algo ? '#00BFA5' : 'rgba(0,191,165,0.3)'; }
+  });
+  const rrOpt = document.getElementById('sched-rr-opt');
+  if (rrOpt) rrOpt.style.display = algo === 'rr' ? 'block' : 'none';
+}
+
+function oslabAddProcess() {
+  _schedProcesses.push({name:'P'+(++_schedProcesses.length+1), arrival:0, burst:3});
+  oslabRenderSchedRows();
+}
+
+function oslabRenderSchedRows() {
+  const container = document.getElementById('sched-rows');
+  if (!container) return;
+  container.innerHTML = _schedProcesses.map((p,i) => `
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;align-items:center">
+      <input value="${p.name}" onchange="_schedProcesses[${i}].name=this.value"
+        style="padding:7px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.06);color:var(--text);font-family:var(--font);text-align:center;font-size:0.85rem">
+      <input type="number" value="${p.arrival}" min="0" onchange="_schedProcesses[${i}].arrival=+this.value"
+        style="padding:7px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.06);color:var(--text);font-family:var(--font);text-align:center;font-size:0.85rem">
+      <input type="number" value="${p.burst}" min="1" onchange="_schedProcesses[${i}].burst=+this.value"
+        style="padding:7px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.06);color:var(--text);font-family:var(--font);text-align:center;font-size:0.85rem">
+      <button onclick="_schedProcesses.splice(${i},1);oslabRenderSchedRows()" style="width:28px;height:28px;border-radius:8px;border:none;background:rgba(255,82,82,0.15);color:#FF5252;cursor:pointer;font-size:1rem">×</button>
+    </div>`).join('');
+}
+
+function oslabRunSched() {
+  const procs = _schedProcesses.map(p=>({...p, remaining:p.burst}));
+  let timeline = [];
+  const quantum = parseInt(document.getElementById('sched-quantum')?.value||2);
+
+  if (_schedAlgo === 'fcfs') {
+    let t = 0;
+    [...procs].sort((a,b)=>a.arrival-b.arrival).forEach(p => {
+      if (t < p.arrival) t = p.arrival;
+      timeline.push({name:p.name, start:t, end:t+p.burst});
+      t += p.burst;
+    });
+  } else if (_schedAlgo === 'sjf') {
+    let t = 0, done = 0, q = [];
+    const sorted = [...procs].sort((a,b)=>a.arrival-b.arrival);
+    while(done < procs.length) {
+      sorted.forEach(p=>{ if(p.arrival<=t && !p._done && !q.includes(p)) q.push(p); });
+      if(!q.length){t++;continue;}
+      q.sort((a,b)=>a.burst-b.burst);
+      const p=q.shift(); p._done=true; done++;
+      timeline.push({name:p.name, start:t, end:t+p.burst}); t+=p.burst;
+    }
+  } else {
+    let t = 0, done = 0, queue = [], idx = 0;
+    const sorted = [...procs].sort((a,b)=>a.arrival-b.arrival);
+    while(done < procs.length) {
+      while(idx < sorted.length && sorted[idx].arrival <= t) queue.push(sorted[idx++]);
+      if(!queue.length){t++;if(idx<sorted.length) continue; else break;}
+      const p = queue.shift();
+      const run = Math.min(quantum, p.remaining);
+      timeline.push({name:p.name, start:t, end:t+run});
+      t += run; p.remaining -= run;
+      while(idx < sorted.length && sorted[idx].arrival <= t) queue.push(sorted[idx++]);
+      if(p.remaining > 0) queue.push(p); else done++;
+    }
+  }
+
+  // Compute stats
+  const stats = {};
+  _schedProcesses.forEach(p => stats[p.name]={burst:p.burst,arrival:p.arrival,finish:0,wait:0,turnaround:0});
+  timeline.forEach(t=>{ if(t.end > (stats[t.name]?.finish||0)) stats[t.name].finish=t.end; });
+  Object.keys(stats).forEach(n=>{ stats[n].turnaround=stats[n].finish-stats[n].arrival; stats[n].wait=stats[n].turnaround-stats[n].burst; });
+
+  const total = timeline[timeline.length-1]?.end || 1;
+  const colors = ['#6C63FF','#00BFA5','#FF7043','#FFD600','#E91E63','#00B0FF'];
+  const colorMap = {};
+  _schedProcesses.forEach((p,i)=>colorMap[p.name]=colors[i%colors.length]);
+
+  const gantt = `
+    <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:14px;padding:16px">
+      <div style="font-weight:800;margin-bottom:14px;color:#00BFA5;direction:rtl">📊 مخطط Gantt</div>
+      <div style="display:flex;align-items:stretch;gap:0;border-radius:10px;overflow:hidden;margin-bottom:8px;min-height:48px">
+        ${timeline.map(seg=>`
+          <div style="flex:${seg.end-seg.start};background:${colorMap[seg.name]};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:0.82rem;color:white;min-width:24px;border-left:1px solid rgba(255,255,255,0.15)">
+            ${seg.name}
+          </div>`).join('')}
+      </div>
+      <div style="display:flex;gap:0;font-size:0.72rem;color:var(--text-muted)">
+        ${timeline.map(seg=>`<div style="flex:${seg.end-seg.start};text-align:left;padding-left:3px">${seg.start}</div>`).join('')}
+        <div style="width:24px;text-align:right">${total}</div>
+      </div>
+
+      <!-- Stats table -->
+      <div style="margin-top:16px;overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:0.82rem;direction:rtl">
+          <thead>
+            <tr style="color:var(--text-muted);border-bottom:1px solid var(--border)">
+              <th style="padding:8px;text-align:right">العملية</th>
+              <th style="padding:8px;text-align:center">وقت الوصول</th>
+              <th style="padding:8px;text-align:center">وقت التنفيذ</th>
+              <th style="padding:8px;text-align:center">وقت الانتهاء</th>
+              <th style="padding:8px;text-align:center">زمن الدوران</th>
+              <th style="padding:8px;text-align:center">وقت الانتظار</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${Object.entries(stats).map(([name,s])=>`
+              <tr style="border-bottom:1px solid rgba(255,255,255,0.05)">
+                <td style="padding:8px;font-weight:700;color:${colorMap[name]}">${name}</td>
+                <td style="padding:8px;text-align:center">${s.arrival}</td>
+                <td style="padding:8px;text-align:center">${s.burst}</td>
+                <td style="padding:8px;text-align:center">${s.finish}</td>
+                <td style="padding:8px;text-align:center;color:#FFD600">${s.turnaround}</td>
+                <td style="padding:8px;text-align:center;color:#FF7043">${s.wait}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+        <div style="margin-top:10px;display:flex;gap:20px;justify-content:center;font-size:0.83rem;color:var(--text-muted);flex-wrap:wrap">
+          <span>متوسط زمن الدوران: <strong style="color:#FFD600">${(Object.values(stats).reduce((s,v)=>s+v.turnaround,0)/Object.keys(stats).length).toFixed(1)} ms</strong></span>
+          <span>متوسط وقت الانتظار: <strong style="color:#FF7043">${(Object.values(stats).reduce((s,v)=>s+v.wait,0)/Object.keys(stats).length).toFixed(1)} ms</strong></span>
+        </div>
+      </div>
+    </div>`;
+
+  const out = document.getElementById('sched-output');
+  if(out) out.innerHTML = gantt;
+}
+
+// ── 4. MEMORY MANAGEMENT ────────────────────────────────────────────
+function buildOSMemoryPanel() {
+  return `
+    <div style="text-align:center;margin-bottom:18px;direction:rtl">
+      <div style="font-size:1.1rem;font-weight:800;color:#00BFA5">🧠 إدارة الذاكرة (Memory Management)</div>
+      <div style="font-size:0.82rem;color:var(--text-muted);margin-top:4px">شاهد كيف يُوزّع الـ OS ذاكرة RAM بين البرامج</div>
+    </div>
+
+    <!-- Memory map -->
+    <div style="display:flex;gap:16px;flex-wrap:wrap;direction:rtl">
+      <div style="flex:1;min-width:200px">
+        <div style="font-size:0.85rem;font-weight:700;color:var(--text-muted);margin-bottom:10px;text-align:right">خريطة الذاكرة (RAM 16 MB)</div>
+        <div id="os-mem-map" style="border:2px solid var(--border);border-radius:12px;overflow:hidden;height:360px;position:relative;background:rgba(0,0,0,0.2)"></div>
+        <div style="display:flex;justify-content:space-between;font-size:0.72rem;color:var(--text-muted);margin-top:4px"><span>0 MB</span><span>16 MB</span></div>
+      </div>
+
+      <div style="flex:1;min-width:200px;direction:rtl">
+        <div style="font-size:0.85rem;font-weight:700;color:var(--text-muted);margin-bottom:10px;text-align:right">تخصيص الذاكرة</div>
+        <div id="os-mem-list" style="display:flex;flex-direction:column;gap:8px"></div>
+        <button onclick="oslabAddMemBlock()" style="margin-top:12px;width:100%;padding:9px;border-radius:10px;border:1px dashed rgba(0,191,165,0.4);background:rgba(0,191,165,0.06);color:#00BFA5;font-family:var(--font);font-weight:700;cursor:pointer;font-size:0.83rem">+ تحميل برنامج</button>
+        <button onclick="oslabClearMem()" style="margin-top:6px;width:100%;padding:9px;border-radius:10px;border:1px dashed rgba(255,82,82,0.3);background:rgba(255,82,82,0.06);color:#FF5252;font-family:var(--font);font-weight:700;cursor:pointer;font-size:0.83rem">🗑️ إعادة تعيين</button>
+        <div id="os-mem-stats" style="margin-top:14px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:12px;padding:12px;font-size:0.83rem;direction:rtl"></div>
+      </div>
+    </div>
+
+    <!-- Concepts -->
+    <div style="margin-top:20px;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;direction:rtl">
+      ${[
+        {title:'التجزئة (Fragmentation)',color:'#FF7043',desc:'مساحات صغيرة غير مستغلة تتراكم — كأن تُريد مقعداً لـ 4 أشخاص لكن الكراسي متفرقة!'},
+        {title:'Paging — التصفيح',color:'#6C63FF',desc:'تقسيم الذاكرة لصفحات متساوية الحجم — تُحلّ مشكلة التجزئة الخارجية'},
+        {title:'Virtual Memory',color:'#00BFA5',desc:'توهيم البرنامج بأن لديه ذاكرة أكبر مما هو موجود فعلياً — يستخدم القرص كامتداد'},
+        {title:'Swap Space',color:'#FFD600',desc:'جزء من القرص يعمل كـ RAM احتياطي عند امتلاء الذاكرة الفعلية'},
+      ].map(c=>`<div style="background:${c.color}10;border:1px solid ${c.color}30;border-radius:12px;padding:12px;direction:rtl">
+        <div style="font-weight:800;color:${c.color};font-size:0.82rem;margin-bottom:5px">${c.title}</div>
+        <div style="font-size:0.78rem;color:var(--text-muted);line-height:1.6">${c.desc}</div>
+      </div>`).join('')}
+    </div>`;
+}
+
+let _memBlocks = [];
+const _memColors = ['#6C63FF','#00BFA5','#FF7043','#FFD600','#E91E63','#00B0FF','#FF9800'];
+const _memNames = ['Chrome','Word','Excel','Photoshop','VLC','Spotify','VSCode','Discord','Zoom'];
+let _memNext = 0;
+
+function oslabInitMemory() {
+  _memBlocks = [
+    {name:'Kernel OS', size:2, color:'#E91E63', locked:true},
+    {name:'Chrome', size:4, color:'#00BFA5'},
+    {name:'Word', size:2, color:'#6C63FF'},
+  ];
+  _memNext = 3;
+  oslabRenderMemory();
+}
+
+function oslabAddMemBlock() {
+  const name = _memNames[_memNext % _memNames.length];
+  const size = Math.floor(Math.random()*3)+1;
+  _memBlocks.push({name, size, color:_memColors[(_memNext)%_memColors.length]});
+  _memNext++;
+  oslabRenderMemory();
+}
+
+function oslabClearMem() {
+  _memBlocks = [{name:'Kernel OS', size:2, color:'#E91E63', locked:true}];
+  _memNext = 0;
+  oslabRenderMemory();
+}
+
+function oslabFreeBlock(i) {
+  if (_memBlocks[i]?.locked) return;
+  _memBlocks.splice(i,1);
+  oslabRenderMemory();
+}
+
+function oslabRenderMemory() {
+  const total = 16;
+  const used = _memBlocks.reduce((s,b)=>s+b.size,0);
+  const free = total - used;
+
+  const map = document.getElementById('os-mem-map');
+  const list = document.getElementById('os-mem-list');
+  const stats = document.getElementById('os-mem-stats');
+  if (!map || !list || !stats) return;
+
+  // Draw memory map (vertical)
+  let mapHTML = '';
+  let pct = 0;
+  _memBlocks.forEach(b => {
+    const h = (b.size/total*100).toFixed(1);
+    mapHTML += `<div style="height:${h}%;background:${b.color};display:flex;align-items:center;justify-content:center;
+      font-size:0.75rem;font-weight:700;color:white;text-shadow:0 1px 3px rgba(0,0,0,0.5);
+      border-bottom:1px solid rgba(255,255,255,0.15);min-height:20px;position:relative">
+      ${b.name} (${b.size}MB)
+    </div>`;
+    pct += b.size;
+  });
+  if (free > 0) {
+    mapHTML += `<div style="flex:1;height:${(free/total*100).toFixed(1)}%;background:repeating-linear-gradient(45deg,rgba(255,255,255,0.02),rgba(255,255,255,0.02) 4px,transparent 4px,transparent 10px);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.3);font-size:0.8rem;min-height:20px">
+      حر ${free}MB</div>`;
+  }
+  map.innerHTML = mapHTML;
+
+  // Process list
+  list.innerHTML = _memBlocks.map((b,i)=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:rgba(255,255,255,0.03);border:1px solid ${b.color}40;border-radius:10px">
+      <div style="width:12px;height:12px;border-radius:3px;background:${b.color};flex-shrink:0"></div>
+      <div style="flex:1;font-size:0.83rem;font-weight:700;color:${b.color};text-align:right">${b.name}</div>
+      <div style="font-size:0.78rem;color:var(--text-muted)">${b.size} MB</div>
+      ${b.locked ? '<div style="font-size:0.7rem;color:#E91E63">🔒</div>' : `<button onclick="oslabFreeBlock(${i})" style="width:22px;height:22px;border-radius:6px;border:none;background:rgba(255,82,82,0.15);color:#FF5252;cursor:pointer;font-size:0.8rem">×</button>`}
+    </div>`).join('');
+
+  const usedPct = Math.round(used/total*100);
+  stats.innerHTML = `
+    <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+      <span style="color:var(--text-muted)">مُستخدم</span>
+      <strong style="color:#FF7043">${used} / ${total} MB (${usedPct}%)</strong>
+    </div>
+    <div style="height:8px;border-radius:4px;background:rgba(255,255,255,0.08);overflow:hidden">
+      <div style="height:100%;width:${usedPct}%;background:${usedPct>85?'#FF5252':usedPct>60?'#FFD600':'#00BFA5'};border-radius:4px;transition:width 0.4s"></div>
+    </div>
+    <div style="margin-top:8px;font-size:0.78rem;color:var(--text-muted)">متاح: <strong style="color:#00BFA5">${free} MB</strong> ${free<2?'⚠️ تحذير: ذاكرة منخفضة!':''}</div>`;
+}
+
+// ── 5. FILE SYSTEM ──────────────────────────────────────────────────
+function buildOSFSPanel() {
+  const tree = [
+    {name:'/ (الجذر)', icon:'🖥️', color:'#00BFA5', level:0, children:[
+      {name:'bin/', icon:'⚙️', color:'#FFD600', level:1, desc:'أوامر النظام الأساسية: ls, cp, mv, rm'},
+      {name:'home/', icon:'🏠', color:'#6C63FF', level:1, desc:'مجلدات المستخدمين', children:[
+        {name:'atif/', icon:'👤', color:'#6C63FF', level:2, desc:'مجلدك الشخصي'},
+        {name:'guest/', icon:'👤', color:'#6C63FF', level:2, desc:'مستخدم ضيف'},
+      ]},
+      {name:'etc/', icon:'📋', color:'#FF7043', level:1, desc:'ملفات إعدادات النظام'},
+      {name:'var/', icon:'📊', color:'#E91E63', level:1, desc:'البيانات المتغيرة: سجلات، قواعد بيانات'},
+      {name:'proc/', icon:'⚡', color:'#00B0FF', level:1, desc:'معلومات العمليات الحية — يُحدَّث لحظياً!'},
+      {name:'dev/', icon:'🔌', color:'#FF9800', level:1, desc:'ملفات تمثّل الأجهزة المتصلة بالنظام'},
+    ]},
+  ];
+
+  function renderTree(nodes) {
+    return nodes.map(n=>`
+      <div style="margin-bottom:4px">
+        <div onclick="oslabFSToggle('${n.name.replace(/\//g,'')}')" style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);cursor:pointer;transition:all 0.2s;margin-right:${n.level*20}px"
+          onmouseenter="this.style.borderColor='${n.color}50';this.style.background='${n.color}10'"
+          onmouseleave="this.style.borderColor='rgba(255,255,255,0.06)';this.style.background='rgba(255,255,255,0.03)'">
+          <span style="font-size:1.1rem">${n.icon}</span>
+          <span style="font-weight:700;color:${n.color};font-size:0.88rem">${n.name}</span>
+          ${n.desc ? `<span style="font-size:0.75rem;color:var(--text-muted);margin-right:auto">${n.desc}</span>` : ''}
+        </div>
+        ${n.children ? `<div id="fstree-${n.name.replace(/\//g,'')}">${renderTree(n.children)}</div>` : ''}
+      </div>`).join('');
+  }
+
+  return `
+    <div style="text-align:center;margin-bottom:18px;direction:rtl">
+      <div style="font-size:1.1rem;font-weight:800;color:#00BFA5">📁 نظام الملفات (File System)</div>
+      <div style="font-size:0.82rem;color:var(--text-muted);margin-top:4px">بنية المجلدات في Linux — اضغط للاستكشاف</div>
+    </div>
+
+    <div style="direction:rtl">${renderTree(tree)}</div>
+
+    <div style="margin-top:20px;display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;direction:rtl">
+      ${[
+        {title:'FAT32',  color:'#FFD600', desc:'نظام قديم لـ Windows — بسيط وسريع لكن يقتصر على ملفات أقل من 4GB'},
+        {title:'NTFS',   color:'#6C63FF', desc:'نظام Windows الحديث — يدعم الأذونات والتشفير وملفات كبيرة'},
+        {title:'ext4',   color:'#00BFA5', desc:'نظام Linux الرئيسي — سريع وموثوق مع دعم journaling'},
+        {title:'APFS',   color:'#FF7043', desc:'نظام Apple الحديث — محسّن لـ SSD مع تشفير مدمج'},
+      ].map(f=>`<div style="background:${f.color}10;border:1px solid ${f.color}30;border-radius:12px;padding:12px;direction:rtl">
+        <div style="font-weight:800;color:${f.color};margin-bottom:5px">${f.title}</div>
+        <div style="font-size:0.78rem;color:var(--text-muted);line-height:1.6">${f.desc}</div>
+      </div>`).join('')}
+    </div>`;
+}
+
+function oslabFSToggle(id) {
+  const el = document.getElementById('fstree-'+id);
+  if (el) el.style.display = el.style.display==='none' ? 'block' : 'none';
+}
+
+// ── 6. IPC / COMMUNICATION ──────────────────────────────────────────
+function buildOSIPCPanel() {
+  return `
+    <div style="text-align:center;margin-bottom:18px;direction:rtl">
+      <div style="font-size:1.1rem;font-weight:800;color:#00BFA5">🔗 تواصل العمليات (IPC)</div>
+      <div style="font-size:0.82rem;color:var(--text-muted);margin-top:4px">كيف تتشارك العمليات البيانات؟</div>
+    </div>
+
+    <!-- IPC methods -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-bottom:24px;direction:rtl">
+      ${[
+        {title:'الأنابيب (Pipes)',icon:'🔀',color:'#6C63FF',desc:'نقل البيانات بشكل تسلسلي من عملية لأخرى — مثل أنبوب مياه',example:'ls | grep txt'},
+        {title:'المقابس (Sockets)',icon:'🌐',color:'#00BFA5',desc:'تواصل عبر الشبكة بين أجهزة مختلفة — أساس الإنترنت',example:'HTTP, FTP, SSH'},
+        {title:'الذاكرة المشتركة',icon:'🧠',color:'#FFD600',desc:'منطقة RAM مشتركة بين العمليات — الأسرع لكن يحتاج تنسيقاً',example:'Shared Memory Seg'},
+        {title:'الإشارات (Signals)',icon:'📡',color:'#FF7043',desc:'رسائل قصيرة لإيقاف أو إشعار العمليات',example:'SIGKILL, SIGTERM'},
+        {title:'قوائم الرسائل',icon:'📬',color:'#E91E63',desc:'صندوق بريد بين العمليات — FIFO أو بالأولوية',example:'Message Queue MQ'},
+        {title:'Semaphores',icon:'🚦',color:'#00B0FF',desc:'قفل مزامنة لمنع تعارض العمليات على مورد مشترك',example:'sem_wait/sem_post'},
+      ].map(m=>`
+        <div style="background:${m.color}0e;border:1px solid ${m.color}35;border-radius:14px;padding:16px;direction:rtl;transition:all 0.2s"
+          onmouseenter="this.style.transform='translateY(-4px)';this.style.borderColor='${m.color}'"
+          onmouseleave="this.style.transform='';this.style.borderColor='${m.color}35'">
+          <div style="font-size:1.6rem;margin-bottom:8px">${m.icon}</div>
+          <div style="font-weight:800;color:${m.color};font-size:0.88rem;margin-bottom:6px">${m.title}</div>
+          <div style="font-size:0.78rem;color:var(--text-muted);line-height:1.6;margin-bottom:8px">${m.desc}</div>
+          <div style="font-family:monospace;font-size:0.75rem;background:rgba(0,0,0,0.25);padding:4px 8px;border-radius:6px;color:${m.color}">${m.example}</div>
+        </div>`).join('')}
+    </div>
+
+    <!-- Deadlock explainer -->
+    <div style="background:rgba(255,82,82,0.07);border:1px solid rgba(255,82,82,0.25);border-radius:14px;padding:18px;direction:rtl">
+      <div style="font-weight:800;color:#FF5252;margin-bottom:10px;font-size:0.95rem">💀 الإغلاق التام (Deadlock)</div>
+      <div style="font-size:0.85rem;color:var(--text-muted);line-height:1.8;margin-bottom:14px">
+        يحدث عندما تنتظر عمليتان بعضهما البعض دون أن تستطيع أي منهما الاستمرار — كسيارتين وجهاً لوجه في ممر ضيق!
+      </div>
+      <div style="display:flex;align-items:center;justify-content:center;gap:0;flex-wrap:wrap">
+        <div style="background:rgba(108,99,255,0.15);border:2px solid #6C63FF;border-radius:12px;padding:14px 20px;text-align:center;min-width:110px">
+          <div style="font-size:1.5rem">⚙️</div>
+          <div style="font-weight:700;color:#6C63FF;font-size:0.85rem">P1</div>
+          <div style="font-size:0.72rem;color:var(--text-muted)">تمتلك A<br>تريد B</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:0 10px">
+          <div style="font-size:1.2rem;color:#FF5252">⟵ ينتظر</div>
+          <div style="font-size:1.2rem;color:#FF5252">ينتظر ⟶</div>
+        </div>
+        <div style="background:rgba(0,191,165,0.15);border:2px solid #00BFA5;border-radius:12px;padding:14px 20px;text-align:center;min-width:110px">
+          <div style="font-size:1.5rem">⚙️</div>
+          <div style="font-weight:700;color:#00BFA5;font-size:0.85rem">P2</div>
+          <div style="font-size:0.72rem;color:var(--text-muted)">تمتلك B<br>تريد A</div>
+        </div>
+      </div>
+      <div style="margin-top:12px;font-size:0.82rem;color:#FFD600;text-align:center;font-weight:700">
+        الحل: Banker's Algorithm أو إلغاء إحدى العمليات أو انتزاع مواردها
+      </div>
+    </div>`;
+}
+
+// Auto-init on first show
+setTimeout(()=>{
+  const tab = document.getElementById('oslab-tab-layers');
+  if(tab) {
+    oslabSwitch('layers');
+  }
+}, 100);
+
+
 function buildCommLab() {
   return `
   <div id="comm-lab" style="direction:rtl">
@@ -10974,6 +11597,7 @@ function showSubject(subjectId, activeTab) {
   if (activeTab === 'lab') {
     if (subjectId === 'communication') body = buildCommLab();
     else if (subjectId === 'english') body = buildEnglishLab();
+    else if (subjectId === 'os') body = buildOSLab();
     else body = buildEmbeddedLab(subjectId);
   }
   if (activeTab === 'upload') body = buildUploadTab(subjectId);
@@ -14735,6 +15359,9 @@ function confirmDeleteAccount() {
   justify-content: center;
 }
 #delete-confirm-overlay.show { display: flex; }
+
+/* ══ OS Lab Styles ══ */
+.oslab-panel { animation: fadeIn 0.3s ease; }
 </style>
 
 

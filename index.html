@@ -9274,8 +9274,11 @@ function saveAILessonForUser(lesson, subjectId, uploadId, originalFileName) {
   };
   ZAD_UPLOADS.save(bundle);
 
-  showToast('✅ تم حفظ الملف في حسابك — ابحث عنه في تبويب الدروس', 'success');
-  // Navigation handled by refreshAllTabsWithAILesson
+  showToast('✅ تم حفظ الدرس في حسابك!', 'success');
+  // Immediately refresh curriculum section on dashboard
+  if (typeof refreshUserCurriculumSection === 'function') {
+    setTimeout(refreshUserCurriculumSection, 200);
+  }
 }
 
 function restoreUserUploads() {
@@ -10887,22 +10890,23 @@ function refreshAllTabsWithAILesson(lesson, subjectId) {
 
   showToast('✅ تم إنشاء الدرس! اضغط "عرض في الدروس"', 'success');
 
-  // Auto-navigate to lessons tab after 4 seconds
-  setTimeout(function() {
-    if (subjectId && typeof showSubject === 'function') {
+  // Navigate to lessons tab immediately
+  if (subjectId && typeof showSubject === 'function') {
+    setTimeout(function() {
       showSubject(subjectId, 'lessons');
-    }
-  }, 4000);
+      // Also refresh dashboard curriculum section
+      refreshUserCurriculumSection();
+    }, 500);
+  }
 
-  // Auto-clear output after 5 seconds
+  // Clear output after 3 seconds
   setTimeout(function() {
     var out2 = document.getElementById('ai-gen-output');
-    if (out2) {
-      out2.style.transition = 'opacity 0.5s';
-      out2.style.opacity = '0';
-      setTimeout(function(){ if(out2){out2.innerHTML='';out2.style.opacity='1';out2.style.transition='';} }, 500);
+    var bar2 = document.getElementById('ai-gen-progress');
+    if (out2) { out2.style.transition='opacity 0.5s'; out2.style.opacity='0';
+      setTimeout(function(){ if(out2){out2.innerHTML='';out2.style.opacity='1';out2.style.transition='';} if(bar2)bar2.style.display='none'; }, 500);
     }
-  }, 5000);
+  }, 3000);
 }
 
 function buildUploadSuccessCard(lesson, subjectId) {
@@ -13449,6 +13453,9 @@ function renderProgressChart() {
 function showSubject(subjectId, activeTab) {
   if (typeof trackUserActivity === 'function') trackUserActivity('subject:'+subjectId);
   if (!window._MM_DONE) { injectAllMindMaps(); window._MM_DONE = true; }
+  // Always restore user lessons before showing subject
+  if (typeof restoreCustomSubjects === 'function') restoreCustomSubjects();
+  if (typeof restoreUserLessons === 'function') restoreUserLessons();
   APP.currentSubject = subjectId;
   const subject = CURRICULUM[subjectId];
   if (!subject) return;
@@ -17870,7 +17877,7 @@ function buildUserCurriculumSection() {
       '<span style="font-size:1.3rem">'+fileIcon(u.fileName||u.title||'')+'</span>'+
       '<div style="flex:1;min-width:0">'+
         '<div style="font-size:0.82rem;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+
-          (u.title||u.fileName||'—')+'</div>'+
+          (u.lesson&&u.lesson.title ? u.lesson.title : (u.title||u.fileName||'—'))+'</div>'+
         '<div style="font-size:0.68rem;color:var(--text-muted);display:flex;gap:6px;flex-wrap:wrap;margin-top:2px">'+
           '<span>'+subjLabel+'</span>'+
           '<span>•</span>'+
@@ -17950,13 +17957,14 @@ async function handleCurriculumUpload(input) {
   var subjectId = await pickSubjectModal();
   if (!subjectId) return;
 
-  showUploadStatus('loading', '⏳ جاري رفع ومعالجة "' + file.name + '"...');
+  showUploadStatus('loading', '⏳ جاري معالجة "' + file.name + '" بالذكاء الاصطناعي...');
   try {
     await processUploadedFile(file, subjectId);
-    setTimeout(refreshUserCurriculumSection, 2000);
+    // Immediately refresh dashboard section
+    refreshUserCurriculumSection();
   } catch(err) {
-    if (err && (err.message==='NO_API_KEY'||err.message==='BACKEND_NOT_CONFIGURED')) return;
-    showUploadStatus('error', 'خطأ: ' + (err?err.message:''));
+    if (err && (err.message==='NO_API_KEY'||err.message==='BACKEND_NOT_CONFIGURED'||err.message==='INVALID_API_KEY')) return;
+    showUploadStatus('error', 'خطأ في المعالجة: ' + (err?err.message:''));
   }
 }
 
@@ -19716,6 +19724,15 @@ function deleteAILesson(lessonId, uploadId, subjectId) {
     if (typeof refreshUserCurriculumSection === 'function') refreshUserCurriculumSection();
   };
 }
+
+// Auto-refresh curriculum section when page becomes visible
+document.addEventListener('visibilitychange', function() {
+  if (!document.hidden && APP.student.email) {
+    if (typeof refreshUserCurriculumSection === 'function') {
+      setTimeout(refreshUserCurriculumSection, 300);
+    }
+  }
+});
 </script>
 
 

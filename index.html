@@ -12406,6 +12406,24 @@ body {
         </div>
         <div style="font-size: 5rem; opacity: 0.3;">🎓</div>
       </div>
+
+      <!-- API Key Banner -->
+      <div id="api-key-banner" style="background:linear-gradient(135deg,rgba(108,99,255,0.12),rgba(167,139,250,0.08));
+        border:1.5px solid rgba(108,99,255,0.3);border-radius:18px;padding:14px 16px;margin-bottom:16px;
+        display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <div style="font-size:1.5rem">🔑</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:800;font-size:0.88rem;margin-bottom:2px">مفتاح Groq API</div>
+          <div id="api-banner-status" style="font-size:0.75rem;color:var(--text-muted)">جارٍ التحقق...</div>
+        </div>
+        <button onclick="showApiKeyFromDashboard()"
+          style="padding:8px 16px;border-radius:10px;border:none;cursor:pointer;
+          background:linear-gradient(135deg,var(--primary),#a78bfa);color:white;
+          font-family:var(--font);font-size:0.8rem;font-weight:700;white-space:nowrap">
+          إدخال المفتاح
+        </button>
+      </div>
+
       
       <!-- Stats -->
       <div class="stats-grid">
@@ -13041,6 +13059,7 @@ function showSection(name) {
     if (typeof refreshUserCurriculumSection === 'function') {
       refreshUserCurriculumSection();
     }
+    if (typeof updateApiBanner === 'function') updateApiBanner();
   }
   if (name === 'subjects') renderAllSubjects();
 
@@ -13071,6 +13090,10 @@ function initDashboard() {
   renderSubjectCards('quick-subjects', 6);
   renderProgressChart();
   updateStats();
+  if (typeof refreshUserCurriculumSection === 'function') {
+    refreshUserCurriculumSection();
+  }
+  if (typeof updateApiBanner === 'function') updateApiBanner();
 }
 
 function updateStats() {
@@ -17717,7 +17740,7 @@ function saveApiKey() {
   var key = inp.value.trim();
   if (!key || !key.startsWith('gsk_') || key.length > 20) {
     inp.style.borderColor = '#EF5350';
-    inp.placeholder = 'المفتاح يجب أن يبدأ بـ sk-';
+    inp.placeholder = 'المفتاح يجب أن يبدأ بـ gsk_';
     return;
   }
   setApiKey(key);
@@ -18126,6 +18149,33 @@ function updateApiKeyStatusDisplay() {
     el.style.borderColor = 'rgba(239,83,80,0.25)';
     el.style.color = '#EF5350';
     el.innerHTML = '❌ غير مضبوط — أدخل المفتاح أدناه';
+  }
+}
+
+function showApiKeyFromDashboard() {
+  showApiKeyPrompt();
+  // After save, update banner
+  var origSave = window.saveApiKey;
+  window.saveApiKey = function() {
+    origSave && origSave();
+    updateApiBanner();
+    window.saveApiKey = origSave;
+  };
+}
+
+function updateApiBanner() {
+  var el = document.getElementById('api-banner-status');
+  var banner = document.getElementById('api-key-banner');
+  if (!el) return;
+  var key = getApiKey ? getApiKey() : '';
+  if (key) {
+    el.textContent = 'مفعّل: ' + key.slice(0,14) + '... — الذكاء الاصطناعي جاهز';
+    el.style.color = '#66BB6A';
+    if (banner) banner.style.borderColor = 'rgba(102,187,106,0.4)';
+  } else {
+    el.textContent = 'غير مضبوط — أدخل مفتاح Groq المجاني لتفعيل تحليل الملفات';
+    el.style.color = '#FFA726';
+    if (banner) banner.style.borderColor = 'rgba(255,167,38,0.4)';
   }
 }
 </script>

@@ -19524,12 +19524,15 @@ function getTimeAgo(ts) {
 
 // Track current tab for presence
 window._currentTab = 'لوحة التحكم';
-// Track current tab
-var __showSectionBase = window.showSection;
-window.showSection = function(name) {
-  window._currentTab = name;
-  if (__showSectionBase) __showSectionBase(name);
-};
+// Track current tab passively
+document.addEventListener('click', function(e) {
+  var btn = e.target.closest('[onclick]');
+  if (btn) {
+    var onclick = btn.getAttribute('onclick') || '';
+    var m = onclick.match(/showSection\(['"]([^'"]+)['"]/);
+    if (m) window._currentTab = m[1];
+  }
+});
 </script>
 
 

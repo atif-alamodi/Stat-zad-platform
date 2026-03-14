@@ -13375,10 +13375,10 @@ function renderSubjectCards(containerId, limit) {
     const totalLessons = s.chapters ? s.chapters.reduce(function(acc,ch){ return acc+(ch.lessons?ch.lessons.length:0); },0) : 0;
     return `
       <div class="subject-card" data-subject-id="${s.id}" style="position:relative" onclick="showSubject('${s.id}')">
-        ${isCustom ? `<button onclick="event.stopPropagation();deleteSubject('${s.id}')"
-          style="position:absolute;top:8px;left:8px;z-index:2;width:26px;height:26px;border-radius:50%;border:none;
-          background:rgba(255,82,82,0.15);color:#FF5252;font-size:0.75rem;cursor:pointer;display:flex;align-items:center;justify-content:center"
-          title="حذف المادة">🗑️</button>` : ''}
+        <button onclick="event.stopPropagation();deleteSubject('${s.id}')"
+          style="position:absolute;top:8px;left:8px;z-index:2;width:28px;height:28px;border-radius:50%;border:none;
+          background:rgba(255,82,82,0.15);color:#FF5252;font-size:0.8rem;cursor:pointer;display:flex;align-items:center;justify-content:center"
+          title="حذف المادة من حسابي">🗑️</button>
         <div class="subject-icon-wrap" style="background: ${color}22; color: ${color}">
           ${s.icon || '📚'}
         </div>

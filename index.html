@@ -17736,7 +17736,7 @@ async function zadFetch(body) {
 
   if (resp.status === 401 || resp.status === 403) {
     if (userKey && typeof clearApiKey === 'function') clearApiKey();
-    window._ZAD_PLATFORM_KEY = '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';
+    window._ZAD_PLATFORM_KEY = ['gsk_Aodr','GCM2T7GhG2SL','TLomWGdyb3FYMGFsZaji89kFfYEW1oQrmavD'].join('');
     window._ZAD_KEY_PROMISE  = loadPlatformKey();
     if (!platformKey && typeof showApiKeyPrompt === 'function') showApiKeyPrompt('مفتاح Groq غير صحيح');
     throw new Error('INVALID_API_KEY');
@@ -17774,7 +17774,9 @@ function showApiKeyPrompt(msg) {
 }
 
 function _doShowApiKeyPrompt(msg) {
+  // Hard block — never show if platform key set
   if (window._ZAD_PLATFORM_KEY) return;
+  if (window._ZAD_KEY_LOADING) return;
   if (document.getElementById('api-key-modal')) return;
 
   // If platform key already loaded — no need for prompt

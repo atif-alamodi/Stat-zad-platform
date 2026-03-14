@@ -10877,33 +10877,41 @@ function repairAndParseJSON(raw) {
 
 
 function refreshAllTabsWithAILesson(lesson, subjectId) {
-  // Show result card
-  var out = document.getElementById('ai-gen-output');
-  if (out) {
-    out.innerHTML = buildUploadSuccessCard(lesson, subjectId);
-    out.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
-
   // Hide progress bar
   var bar = document.getElementById('ai-gen-progress');
   if (bar) bar.style.display = 'none';
 
-  showToast('✅ تم إنشاء الدرس! اضغط "عرض في الدروس"', 'success');
+  // Store for navigation
+  window._ZAD_LAST_UPLOAD_SUBJECT = subjectId;
 
-  // Navigate immediately to lessons tab
-  if (subjectId && typeof showSubject === 'function') {
-    showSubject(subjectId, 'lessons');
-    setTimeout(refreshUserCurriculumSection, 300);
+  // Show success card with navigation button
+  var out = document.getElementById('ai-gen-output');
+  if (out) {
+    var div = document.createElement('div');
+    div.style.cssText = 'text-align:center;padding:24px 16px;background:rgba(40,202,65,0.08);border:2px solid rgba(40,202,65,0.3);border-radius:18px;direction:rtl';
+    div.innerHTML = '<div style="font-size:2.5rem;margin-bottom:8px">✅</div>'
+      + '<div style="font-weight:900;font-size:1.1rem;margin-bottom:6px">تم إنشاء الدرس بنجاح!</div>'
+      + '<div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:18px">' + (lesson.lessonTitle||'درس جديد') + '</div>';
+    var btn = document.createElement('button');
+    btn.textContent = '📚 اضغط هنا لعرض الدرس';
+    btn.style.cssText = 'width:100%;padding:14px;border-radius:12px;border:none;cursor:pointer;background:linear-gradient(135deg,#28CA41,#1ea832);color:white;font-family:var(--font);font-weight:900;font-size:1rem;';
+    btn.onclick = function() {
+      var sid = window._ZAD_LAST_UPLOAD_SUBJECT || 'statistics';
+      showSubject(sid, 'lessons');
+      refreshUserCurriculumSection();
+    };
+    div.appendChild(btn);
+    out.innerHTML = '';
+    out.appendChild(div);
+    out.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
-  // Clear output after 3 seconds
+  // Auto-navigate after 2 seconds
   setTimeout(function() {
-    var out2 = document.getElementById('ai-gen-output');
-    var bar2 = document.getElementById('ai-gen-progress');
-    if (out2) { out2.style.transition='opacity 0.5s'; out2.style.opacity='0';
-      setTimeout(function(){ if(out2){out2.innerHTML='';out2.style.opacity='1';out2.style.transition='';} if(bar2)bar2.style.display='none'; }, 500);
-    }
-  }, 3000);
+    var sid = window._ZAD_LAST_UPLOAD_SUBJECT || subjectId || 'statistics';
+    showSubject(sid, 'lessons');
+    refreshUserCurriculumSection();
+  }, 2000);
 }
 
 function buildUploadSuccessCard(lesson, subjectId) {

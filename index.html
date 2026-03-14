@@ -9275,7 +9275,7 @@ function saveAILessonForUser(lesson, subjectId, uploadId, originalFileName) {
   ZAD_UPLOADS.save(bundle);
 
   showToast('✅ تم حفظ الملف في حسابك — ابحث عنه في تبويب الدروس', 'success');
-  setTimeout(() => showSubject(subjectId, 'lessons'), 1500);
+  // Navigation handled by refreshAllTabsWithAILesson
 }
 
 function restoreUserUploads() {
@@ -10796,10 +10796,9 @@ async function analyzeAndGenerate(text, subjectId, fileName) {
     }
     window._ZAD_AI_LESSON = { lesson, subjectId: detectedSubject, uploadId, fileName };
 
-    upd('تم! الدرس جاهز', 'انتقل للدروس', 100);
-    if (out) out.innerHTML = renderAILesson(lesson);
-    showUploadStatus('success', 'تم إنشاء الدرس بنجاح!');
-    setTimeout(function() { refreshAllTabsWithAILesson(lesson, detectedSubject); }, 500);
+    upd('✅ تم! الدرس جاهز', 'جاري الانتقال للدروس...', 100);
+    showUploadStatus('success', '✅ تم إنشاء الدرس! يمكنك الآن الانتقال للتبويبات');
+    refreshAllTabsWithAILesson(lesson, detectedSubject);
 
   } catch(err) {
     if (err.message === 'NO_API_KEY' || err.message === 'INVALID_API_KEY') return;
@@ -10875,25 +10874,35 @@ function repairAndParseJSON(raw) {
 
 
 function refreshAllTabsWithAILesson(lesson, subjectId) {
-  // Show lesson result card inside upload tab
+  // Show result card
   var out = document.getElementById('ai-gen-output');
   if (out) {
     out.innerHTML = buildUploadSuccessCard(lesson, subjectId);
+    out.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
-  showToast('✅ تم إنشاء الدرس التفاعلي بنجاح!', 'success');
-  // Auto-clear success card after 9 seconds
+
+  // Hide progress bar
+  var bar = document.getElementById('ai-gen-progress');
+  if (bar) bar.style.display = 'none';
+
+  showToast('✅ تم إنشاء الدرس! اضغط "عرض في الدروس"', 'success');
+
+  // Auto-navigate to lessons tab after 4 seconds
+  setTimeout(function() {
+    if (subjectId && typeof showSubject === 'function') {
+      showSubject(subjectId, 'lessons');
+    }
+  }, 4000);
+
+  // Auto-clear output after 5 seconds
   setTimeout(function() {
     var out2 = document.getElementById('ai-gen-output');
-    var bar2 = document.getElementById('ai-gen-progress');
     if (out2) {
-      out2.style.transition = 'opacity 0.8s ease';
+      out2.style.transition = 'opacity 0.5s';
       out2.style.opacity = '0';
-      setTimeout(function() {
-        if (out2) { out2.innerHTML = ''; out2.style.opacity = '1'; }
-        if (bar2) bar2.style.display = 'none';
-      }, 800);
+      setTimeout(function(){ if(out2){out2.innerHTML='';out2.style.opacity='1';out2.style.transition='';} }, 500);
     }
-  }, 9000);
+  }, 5000);
 }
 
 function buildUploadSuccessCard(lesson, subjectId) {
@@ -13518,11 +13527,17 @@ function buildLessonsTab(subject, subjectId) {
           else if (comp.status==='partial') badge = `<span style="font-size:0.72rem;background:rgba(255,214,0,0.1);color:#FFD600;padding:2px 8px;border-radius:20px;margin-right:auto;white-space:nowrap">⚠️ ${comp.label||'غير مكتمل'}</span>`;
           else badge = `<span style="font-size:0.72rem;background:rgba(255,82,82,0.1);color:#FF5252;padding:2px 8px;border-radius:20px;margin-right:auto;white-space:nowrap">❌ ${comp.label||'لم يُتم'}</span>`;
         }
-        return `<div class="lesson-item" onclick="openLesson('${subjectId}','${l.id}')">
+        const delBtn = l.aiGenerated
+          ? `<button onclick="event.stopPropagation();confirmDeleteUpload('${l.sourceUploadId||l.id}','${subjectId}')"
+              style="padding:3px 8px;border-radius:6px;border:none;background:rgba(255,82,82,0.12);
+              color:#FF5252;cursor:pointer;font-size:0.72rem;flex-shrink:0;font-family:var(--font)">🗑️ حذف</button>`
+          : '';
+        return `<div class="lesson-item" style="display:flex;align-items:center;gap:8px" onclick="openLesson('${subjectId}','${l.id}')">
           <span class="lesson-icon">${getLessonTypeIcon(l.type)}</span>
           <span class="lesson-name" style="flex:1">${l.title}</span>
           ${badge}
           <span class="lesson-type type-${l.type||'concept'}">${getLessonTypeLabel(l.type)}</span>
+          ${delBtn}
         </div>`;
       }).join('')}
       </div>

@@ -5697,91 +5697,78 @@ function readFileAsBase64(file) {
 
 function buildEnhancedMindMap(mm, lessonTitle) {
   if (!mm || !mm.branches) return '';
-  var branches = mm.branches.slice(0, 6); // max 6 branches to prevent overlap
-  var center = (mm.center || lessonTitle || '').replace(/[<>"]/g,'');
+  var branches = mm.branches.slice(0, 6);
+  var center = String(mm.center || lessonTitle || '').replace(/[<>"&]/g, '');
   var n = branches.length;
+  if (!n) return '';
   var PALETTE = ['#6C63FF','#00BFA5','#FF7043','#FFD600','#E91E63','#00B0FF'];
 
-  // Canvas big enough so nothing gets clipped
-  var W = 1400, H = 900, cx = 700, cy = 450;
-  var R  = 240;  // center to branch
-  var RC = 460;  // center to child
+  // Use viewBox with responsive width - no fixed pixel width
+  var W = 800, H = 800, cx = 400, cy = 400;
+  var R = 160, RC = 300;
 
-  var svgLines = '', svgNodes = '';
+  function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
-  function esc(s) { return String(s||'').replace(/[<>"&]/g, function(c){return {'<':'&lt;','>':'&gt;','"':'&quot;','&':'&amp;'}[c]||c;}); }
-
-  // Wrap text into lines of ≤maxW chars
-  function wrap(text, maxW) {
-    text = esc(text).trim();
-    if (text.length <= maxW) return [text];
-    var out = [], cur = '', words = text.split(/\s+/);
-    for (var i = 0; i < words.length; i++) {
-      if ((cur ? cur+' '+words[i] : words[i]).length <= maxW) {
-        cur = cur ? cur+' '+words[i] : words[i];
-      } else {
-        if (cur) out.push(cur);
-        cur = words[i].slice(0, maxW);
-      }
-    }
-    if (cur) out.push(cur);
-    return out.length ? out : [text.slice(0,maxW)];
+  // Truncate to max chars cleanly
+  function trunc(s, max) {
+    s = esc(s).trim();
+    return s.length > max ? s.slice(0,max-1)+'…' : s;
   }
 
-  // Render wrapped text at (x,y)
-  function txt(x, y, lines, col, fs, fw) {
-    var lh = fs + 3;
-    var top = y - (lines.length - 1) * lh / 2;
-    var s = '<text text-anchor="middle" font-family="Cairo,Arial,sans-serif" font-size="'+fs+'" fill="'+col+'" font-weight="'+(fw||700)+'">';
-    for (var i = 0; i < lines.length; i++)
-      s += '<tspan x="'+x+'" y="'+(top + i*lh)+'">'+lines[i]+'</tspan>';
-    return s + '</text>';
-  }
+  var svgLines = '', svgBranches = '', svgChildren = '';
 
   for (var i = 0; i < n; i++) {
     var b   = branches[i];
     var col = b.color || PALETTE[i % PALETTE.length];
     var ang = (2*Math.PI*i/n) - Math.PI/2;
-    var bx  = Math.round(cx + R * Math.cos(ang));
-    var by  = Math.round(cy + R * Math.sin(ang));
+    var bx  = Math.round(cx + R*Math.cos(ang));
+    var by  = Math.round(cy + R*Math.sin(ang));
+    var lbl = trunc(b.label||'', 15);
+    var bw  = Math.min(100, Math.max(52, lbl.length*7+16));
 
-    var bLines = wrap(b.label||'', 13);
-    var brx    = Math.min(120, Math.max(60, Math.max.apply(null,bLines.map(function(l){return l.length;}))*6.5+16));
-    var bry    = bLines.length*9+14;
+    // Line from center to branch
+    svgLines += '<line x1="'+cx+'" y1="'+cy+'" x2="'+bx+'" y2="'+by
+      +'" stroke="'+col+'" stroke-width="2" stroke-opacity="0.5" stroke-dasharray="6,3"/>';
+    // Branch ellipse
+    svgBranches += '<ellipse cx="'+bx+'" cy="'+by+'" rx="'+bw+'" ry="20" fill="'+col+'22" stroke="'+col+'" stroke-width="2"/>';
+    svgBranches += '<text x="'+bx+'" y="'+(by+1)+'" text-anchor="middle" dominant-baseline="middle"'
+      +' font-family="Cairo,Arial,sans-serif" font-size="11" fill="'+col+'" font-weight="800">'+lbl+'</text>';
 
-    svgLines += '<line x1="'+cx+'" y1="'+cy+'" x2="'+bx+'" y2="'+by+'" stroke="'+col+'" stroke-width="2.5" stroke-opacity="0.45" stroke-dasharray="7,4"/>';
-    svgNodes += '<ellipse cx="'+bx+'" cy="'+by+'" rx="'+brx+'" ry="'+bry+'" fill="'+col+'25" stroke="'+col+'" stroke-width="2"/>';
-    svgNodes += txt(bx, by, bLines, col, 12, 800);
-
-    var kids = (b.children||[]).slice(0,4); // max 4 children
-    var nk   = kids.length;
-    var step = Math.min(0.42, 0.9/Math.max(nk,1));
+    var kids = (b.children||[]).slice(0,4);
+    var nk = kids.length;
+    var step = Math.min(0.44, 0.9/Math.max(nk,1));
 
     for (var j = 0; j < nk; j++) {
       var ca  = ang + (j-(nk-1)/2)*step;
-      var chx = Math.round(cx + RC * Math.cos(ca));
-      var chy = Math.round(cy + RC * Math.sin(ca));
-      var cLines = wrap(kids[j]||'', 11);
-      var crx    = Math.min(105, Math.max(44, Math.max.apply(null,cLines.map(function(l){return l.length;}))*5.8+12));
-      var cry    = cLines.length*8+12;
+      var chx = Math.round(cx + RC*Math.cos(ca));
+      var chy = Math.round(cy + RC*Math.sin(ca));
+      var cs  = trunc(kids[j]||'', 12);
+      var cw  = Math.min(88, Math.max(38, cs.length*6.5+12));
 
-      svgLines += '<line x1="'+bx+'" y1="'+by+'" x2="'+chx+'" y2="'+chy+'" stroke="'+col+'" stroke-width="1.4" stroke-opacity="0.35"/>';
-      svgNodes += '<rect x="'+(chx-crx)+'" y="'+(chy-cry)+'" width="'+(crx*2)+'" height="'+(cry*2)+'" rx="'+cry+'" fill="'+col+'15" stroke="'+col+'" stroke-width="1.4"/>';
-      svgNodes += txt(chx, chy, cLines, col, 10, 600);
+      svgLines += '<line x1="'+bx+'" y1="'+by+'" x2="'+chx+'" y2="'+chy
+        +'" stroke="'+col+'" stroke-width="1.2" stroke-opacity="0.35"/>';
+      svgChildren += '<rect x="'+(chx-cw)+'" y="'+(chy-13)+'" width="'+(cw*2)+'" height="26" rx="13"'
+        +' fill="'+col+'18" stroke="'+col+'" stroke-width="1.3"/>';
+      svgChildren += '<text x="'+chx+'" y="'+(chy+1)+'" text-anchor="middle" dominant-baseline="middle"'
+        +' font-family="Cairo,Arial,sans-serif" font-size="10" fill="'+col+'" font-weight="600">'+cs+'</text>';
     }
   }
 
   // Center node
-  var cnLines = wrap(center, 14);
-  var cnrx = Math.min(155, Math.max(85, Math.max.apply(null,cnLines.map(function(l){return l.length;}))*7+20));
-  var cnry = cnLines.length*10+16;
-  svgNodes += '<ellipse cx="'+cx+'" cy="'+cy+'" rx="'+cnrx+'" ry="'+cnry+'" fill="rgba(108,99,255,0.2)" stroke="#6C63FF" stroke-width="3"/>';
-  svgNodes += txt(cx, cy, cnLines, '#fff', 13, 900);
+  var cl = trunc(center, 16);
+  var cr = Math.min(130, Math.max(70, cl.length*7+18));
+  svgBranches += '<ellipse cx="'+cx+'" cy="'+cy+'" rx="'+cr+'" ry="32" fill="rgba(108,99,255,0.2)" stroke="#6C63FF" stroke-width="3"/>';
+  svgBranches += '<text x="'+cx+'" y="'+(cy+1)+'" text-anchor="middle" dominant-baseline="middle"'
+    +' font-family="Cairo,Arial,sans-serif" font-size="13" fill="#fff" font-weight="900">'+cl+'</text>';
 
-  return '<div style="overflow:auto;-webkit-overflow-scrolling:touch;border-radius:16px;background:rgba(10,11,30,0.7)">'
-    + '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+W+' '+H+'" style="display:block;width:'+W+'px;max-width:none;height:auto">'
-    + '<rect width="'+W+'" height="'+H+'" fill="rgba(10,11,30,0.85)" rx="16"/>'
-    + svgLines + svgNodes
+  // Render: lines behind, then children, then branches on top
+  var svgContent = svgLines + svgChildren + svgBranches;
+
+  return '<div style="width:100%;overflow:auto;-webkit-overflow-scrolling:touch;border-radius:14px">'
+    + '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+W+' '+H+'"'
+    + ' style="width:100%;min-width:320px;height:auto;display:block;border-radius:14px">'
+    + '<rect width="'+W+'" height="'+H+'" fill="rgba(10,11,30,0.85)" rx="14"/>'
+    + svgContent
     + '</svg></div>';
 }
 

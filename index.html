@@ -13509,9 +13509,10 @@ function showSubject(subjectId, activeTab) {
 }
 
 function buildLessonsTab(subject, subjectId) {
-  // ── My uploaded lessons (always from localStorage, not CURRICULUM) ──
+  // ── My uploaded lessons ──────────────────────────────────────
   var myUploads = ZAD_UPLOADS.getAll().filter(function(u) {
-    return u.subjectId === subjectId && u.lesson;
+    return u.subjectId === subjectId && u.lesson
+      && !isLessonHidden(subjectId, u.lessonId||('ai-'+u.id));
   });
 
   var myLessonsHTML = '';
@@ -13521,67 +13522,84 @@ function buildLessonsTab(subject, subjectId) {
       + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">'
       + '<span style="font-size:1.1rem">✨</span>'
       + '<span style="font-weight:800;font-size:0.88rem">دروسي المرفوعة</span>'
-      + '<span style="margin-right:auto;font-size:0.72rem;padding:2px 8px;background:rgba(108,99,255,0.2);color:var(--primary);border-radius:10px">'+myUploads.length+' درس</span>'
+      + '<span style="margin-right:auto;font-size:0.72rem;padding:2px 8px;background:rgba(108,99,255,0.2);color:var(--primary);border-radius:10px">'
+      + myUploads.length+' درس</span>'
+      + '<span style="font-size:0.68rem;color:var(--text-muted)">اضغط مطولاً للحذف</span>'
       + '</div>'
       + myUploads.map(function(u) {
-        var title = (u.lesson && u.lesson.title) || u.title || u.fileName || '—';
-        var def   = (u.lesson && u.lesson.content && u.lesson.content.definition || '').slice(0,80);
+        var title     = (u.lesson && u.lesson.title) || u.title || u.fileName || '—';
+        var def       = ((u.lesson&&u.lesson.content&&u.lesson.content.definition)||'').slice(0,80);
         var uploadRef = u.id;
         var lessonId  = u.lessonId || ('ai-'+u.id);
+        var safeTitle = title.replace(/'/g,"&#39;").replace(/"/g,"&quot;");
         return '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;'
           + 'background:rgba(255,255,255,0.04);border-radius:12px;margin-bottom:6px;cursor:pointer;'
-          + 'border-right:3px solid var(--primary)"'
+          + 'border-right:3px solid var(--primary);user-select:none"'
           + ' onclick="openLesson(\''+subjectId+'\',\''+lessonId+'\')"'
-          + ' oncontextmenu="event.preventDefault();deleteAILesson(\''+lessonId+'\',\''+uploadRef+'\',\''+subjectId+'\');return false;"'
-          + ' ontouchstart="startLongPress(event,\''+lessonId+'\',\''+uploadRef+'\',\''+subjectId+'\')"'
+          + ' oncontextmenu="event.preventDefault();showDeleteLessonConfirm(\''+subjectId+'\',\''+lessonId+'\',\''+safeTitle+'\',\''+uploadRef+'\');return false;"'
+          + ' ontouchstart="startLongPress(event,\''+lessonId+'\',\''+uploadRef+'\',\''+subjectId+'\',\''+safeTitle+'\')"'
           + ' ontouchend="clearLongPress()" ontouchmove="clearLongPress()">'
-          + '<span style="font-size:1.3rem">📄</span>'
+          + '<span style="font-size:1.2rem">📄</span>'
           + '<div style="flex:1;min-width:0">'
-          + '<div style="font-weight:700;font-size:0.85rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+title+'</div>'
-          + (def ? '<div style="font-size:0.72rem;color:var(--text-muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+def+'...</div>' : '')
+            + '<div style="font-weight:700;font-size:0.85rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+title+'</div>'
+            + (def ? '<div style="font-size:0.71rem;color:var(--text-muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+def+'...</div>' : '')
           + '</div>'
-          + '<span style="font-size:0.65rem;color:var(--text-muted);flex-shrink:0;text-align:center">اضغط مطولاً<br>للحذف</span>'
           + '</div>';
       }).join('')
       + '</div>';
   }
 
-  return myLessonsHTML + `<div class="chapter-list">${subject.chapters.map((ch,i)=>{
-    const chDone = ch.lessons.filter(l=>{ const d=getLessonCompletion(subjectId,l.id); return d && d.status==='completed';}).length;
-    const chTotal = ch.lessons.length;
-    const chPct = chTotal ? Math.round(chDone/chTotal*100) : 0;
-    const chBadge = chDone===chTotal && chTotal>0
-      ? '<span style="font-size:0.75rem;background:rgba(40,202,65,0.15);color:#28CA41;padding:2px 8px;border-radius:20px;border:1px solid rgba(40,202,65,0.3)">✅ مكتمل</span>'
+  // ── Curriculum chapters ──────────────────────────────────────
+  var chaptersHTML = subject.chapters.map(function(ch, i) {
+    // Filter hidden lessons
+    var visibleLessons = ch.lessons.filter(function(l) {
+      return !l.aiGenerated && !isLessonHidden(subjectId, l.id);
+    });
+    if (!visibleLessons.length && i > 0) return '';
+
+    var chDone  = visibleLessons.filter(function(l){ var d=getLessonCompletion(subjectId,l.id); return d&&d.status==='completed'; }).length;
+    var chTotal = visibleLessons.length;
+    var chBadge = chDone===chTotal && chTotal>0
+      ? '<span style="font-size:0.75rem;background:rgba(40,202,65,0.15);color:#28CA41;padding:2px 8px;border-radius:20px">✅ مكتمل</span>'
       : chDone>0
-        ? `<span style="font-size:0.75rem;background:rgba(255,214,0,0.12);color:#FFD600;padding:2px 8px;border-radius:20px;border:1px solid rgba(255,214,0,0.25)">${chDone}/${chTotal}</span>`
-        : '';
-    return `<div class="chapter-item${i===0?' open':''}" id="ch-${ch.id}">
-      <div class="chapter-header" onclick="toggleChapter('${ch.id}')">
-        <div class="chapter-num">${i+1}</div>
-        <div class="chapter-info">
-          <div class="chapter-title" style="display:flex;align-items:center;gap:8px">${ch.icon||'📘'} ${ch.title} ${chBadge}</div>
-          <div class="chapter-pages">📄 ${ch.pages}</div>
-        </div>
-        <i class="fas fa-chevron-left chapter-chevron"></i>
-      </div>
-      <div class="lesson-list">${ch.lessons.filter(l=>!l.aiGenerated).map(l=>{
-        const comp = getLessonCompletion(subjectId, l.id);
-        let badge = '';
-        if (comp) {
-          if (comp.status==='completed') badge = `<span style="font-size:0.72rem;background:rgba(40,202,65,0.12);color:#28CA41;padding:2px 8px;border-radius:20px;margin-right:auto;white-space:nowrap">✅ ${comp.label||'مكتمل'}</span>`;
-          else if (comp.status==='partial') badge = `<span style="font-size:0.72rem;background:rgba(255,214,0,0.1);color:#FFD600;padding:2px 8px;border-radius:20px;margin-right:auto;white-space:nowrap">⚠️ ${comp.label||'غير مكتمل'}</span>`;
-          else badge = `<span style="font-size:0.72rem;background:rgba(255,82,82,0.1);color:#FF5252;padding:2px 8px;border-radius:20px;margin-right:auto;white-space:nowrap">❌ ${comp.label||'لم يُتم'}</span>`;
-        }
-        return `<div class="lesson-item" onclick="openLesson('${subjectId}','${l.id}')">
-          <span class="lesson-icon">${getLessonTypeIcon(l.type)}</span>
-          <span class="lesson-name" style="flex:1">${l.title}</span>
-          ${badge}
-          <span class="lesson-type type-${l.type||'concept'}">${getLessonTypeLabel(l.type)}</span>
-        </div>`;
-      }).join('')}
-      </div>
-    </div>`;
-  }).join('')}</div>`;
+      ? '<span style="font-size:0.75rem;background:rgba(255,214,0,0.12);color:#FFD600;padding:2px 8px;border-radius:20px">'+chDone+'/'+chTotal+'</span>'
+      : '';
+
+    var lessonsHTML = visibleLessons.map(function(l) {
+      var comp  = getLessonCompletion(subjectId, l.id);
+      var badge = '';
+      if (comp) {
+        if      (comp.status==='completed') badge = '<span style="font-size:0.72rem;background:rgba(40,202,65,0.12);color:#28CA41;padding:2px 8px;border-radius:20px;margin-right:auto;white-space:nowrap">✅ '+(comp.label||'مكتمل')+'</span>';
+        else if (comp.status==='partial')   badge = '<span style="font-size:0.72rem;background:rgba(255,214,0,0.1);color:#FFD600;padding:2px 8px;border-radius:20px;margin-right:auto;white-space:nowrap">⚠️ '+(comp.label||'جزئي')+'</span>';
+        else                                badge = '<span style="font-size:0.72rem;background:rgba(255,82,82,0.1);color:#FF5252;padding:2px 8px;border-radius:20px;margin-right:auto;white-space:nowrap">❌ '+(comp.label||'لم يُتم')+'</span>';
+      }
+      var safeTitle = l.title.replace(/'/g,"&#39;").replace(/"/g,"&quot;");
+      return '<div class="lesson-item" style="user-select:none"'
+        + ' onclick="openLesson(\''+subjectId+'\',\''+l.id+'\')"'
+        + ' oncontextmenu="event.preventDefault();showDeleteLessonConfirm(\''+subjectId+'\',\''+l.id+'\',\''+safeTitle+'\',\'\');return false;"'
+        + ' ontouchstart="startLongPress(event,\''+l.id+'\',\'\',\''+subjectId+'\',\''+safeTitle+'\')"'
+        + ' ontouchend="clearLongPress()" ontouchmove="clearLongPress()">'
+        + '<span class="lesson-icon">'+getLessonTypeIcon(l.type)+'</span>'
+        + '<span class="lesson-name" style="flex:1">'+l.title+'</span>'
+        + badge
+        + '<span class="lesson-type type-'+(l.type||'concept')+'">'+getLessonTypeLabel(l.type)+'</span>'
+        + '</div>';
+    }).join('');
+
+    return '<div class="chapter-item'+(i===0?' open':'')+'" id="ch-'+ch.id+'">'
+      + '<div class="chapter-header" onclick="toggleChapter(\''+ch.id+'\')">'
+        + '<div class="chapter-num">'+(i+1)+'</div>'
+        + '<div class="chapter-info">'
+          + '<div class="chapter-title" style="display:flex;align-items:center;gap:8px">'+(ch.icon||'📘')+' '+ch.title+' '+chBadge+'</div>'
+          + '<div class="chapter-pages">📄 '+ch.pages+'</div>'
+        + '</div>'
+        + '<i class="fas fa-chevron-left chapter-chevron"></i>'
+      + '</div>'
+      + '<div class="lesson-list">'+lessonsHTML+'</div>'
+      + '</div>';
+  }).join('');
+
+  return myLessonsHTML + '<div class="chapter-list">' + chaptersHTML + '</div>';
 }
 
 function buildMindMap(mm) {
@@ -19777,6 +19795,86 @@ function startLongPress(e, lessonId, uploadRef, subjectId) {
   }, 600);
 }
 
+function clearLongPress() {
+  if (_lpTimer) { clearTimeout(_lpTimer); _lpTimer = null; }
+}
+
+// ══════════════════════════════════════════════════════════════
+// PER-STUDENT LESSON HIDING SYSTEM
+// Students can hide/delete any lesson — only affects their account
+// ══════════════════════════════════════════════════════════════
+
+function _hiddenKey() {
+  var email = (APP.student.email||'guest').replace(/[^a-z0-9]/gi,'_');
+  return 'zad_hidden_lessons_' + email;
+}
+
+function getHiddenLessons() {
+  try { return JSON.parse(localStorage.getItem(_hiddenKey()) || '[]'); }
+  catch(e) { return []; }
+}
+
+function hideLessonForStudent(subjectId, lessonId) {
+  var hidden = getHiddenLessons();
+  var key = subjectId + '__' + lessonId;
+  if (!hidden.includes(key)) hidden.push(key);
+  localStorage.setItem(_hiddenKey(), JSON.stringify(hidden));
+}
+
+function isLessonHidden(subjectId, lessonId) {
+  return getHiddenLessons().includes(subjectId + '__' + lessonId);
+}
+
+function showDeleteLessonConfirm(subjectId, lessonId, lessonTitle, uploadId) {
+  var existing = document.getElementById('zad-del-lesson-overlay');
+  if (existing) existing.remove();
+
+  var overlay = document.createElement('div');
+  overlay.id = 'zad-del-lesson-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;padding:20px;direction:rtl';
+
+  var isAI = !!uploadId;
+  overlay.innerHTML = '<div style="background:#1C1917;border:1.5px solid rgba(255,82,82,0.4);border-radius:20px;padding:24px;max-width:360px;width:100%;text-align:center">'
+    + '<div style="font-size:2rem;margin-bottom:10px">🗑️</div>'
+    + '<div style="font-weight:900;font-size:0.95rem;margin-bottom:8px">إخفاء الدرس؟</div>'
+    + '<div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:6px;font-weight:700;overflow:hidden;text-overflow:ellipsis">' + (lessonTitle||'الدرس') + '</div>'
+    + '<div style="font-size:0.78rem;color:#aaa;margin-bottom:20px;line-height:1.6">'
+    + 'سيُخفى من قائمتك فقط ولن يؤثر على حسابات الطلاب الآخرين<br>'
+    + '<span style="color:var(--primary);font-size:0.72rem">يمكنك إعادة إظهاره من الإعدادات</span>'
+    + '</div>'
+    + '<div style="display:flex;gap:10px;justify-content:center">'
+    + '<button id="del-l-cancel" style="padding:10px 22px;border-radius:10px;border:1px solid #555;background:transparent;color:#aaa;font-family:var(--font);cursor:pointer">إلغاء</button>'
+    + '<button id="del-l-ok" style="padding:10px 22px;border-radius:10px;border:none;background:linear-gradient(135deg,#FF5252,#C62828);color:white;font-family:var(--font);font-weight:700;cursor:pointer">🗑️ إخفاء من حسابي</button>'
+    + '</div></div>';
+
+  document.body.appendChild(overlay);
+
+  document.getElementById('del-l-cancel').onclick = function() { overlay.remove(); };
+  document.getElementById('del-l-ok').onclick = function() {
+    overlay.remove();
+    // 1. Hide for this student
+    hideLessonForStudent(subjectId, lessonId);
+    // 2. If AI lesson, also remove from uploads
+    if (isAI && uploadId) {
+      var uploads = ZAD_UPLOADS.getAll().filter(function(u){ return u.id !== uploadId && u.lessonId !== lessonId; });
+      localStorage.setItem(ZAD_UPLOADS._key(), JSON.stringify(uploads));
+    }
+    showToast('🗑️ تم إخفاء الدرس من حسابك', 'success');
+    // Refresh current subject view
+    if (APP.currentSubject) showSubject(APP.currentSubject, 'lessons');
+  };
+}
+
+// Updated long-press for ALL lessons
+var _lpTimer = null;
+function startLongPress(e, lessonId, uploadRef, subjectId, lessonTitle) {
+  clearLongPress();
+  _lpTimer = setTimeout(function() {
+    _lpTimer = null;
+    if (navigator.vibrate) navigator.vibrate(60);
+    showDeleteLessonConfirm(subjectId, lessonId, lessonTitle, uploadRef);
+  }, 600);
+}
 function clearLongPress() {
   if (_lpTimer) { clearTimeout(_lpTimer); _lpTimer = null; }
 }

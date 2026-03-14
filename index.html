@@ -8725,6 +8725,13 @@ function makeTypeCardClickable(html, types, colors) {
 /* [dup removed: buildInfoCards] */
 
 function toggleInfoCard(uid) {
+  // Track card viewed
+  var parts = uid.split('_');
+  var subjectId = parts[0] || APP.currentSubject;
+  var lessonId  = parts.slice(0,-1).join('_');
+  if (typeof trackCardsViewed === 'function' && subjectId && lessonId) {
+    trackCardsViewed(subjectId, lessonId);
+  }
   const inner = document.getElementById('card-inner-'+uid);
   if (!inner) return;
   inner.classList.toggle('flipped');
@@ -13168,6 +13175,8 @@ function showSection(name) {
       refreshUserCurriculumSection();
     }
     if (typeof updateApiBanner === 'function') updateApiBanner();
+  // Refresh progress bars with real data
+  if (typeof refreshProgressBars === 'function') setTimeout(refreshProgressBars, 300);
   }
   if (name === 'subjects') renderAllSubjects();
 
@@ -13260,7 +13269,7 @@ function renderSubjectCards(containerId, limit) {
 
   const subjects = Object.values(CURRICULUM).slice(0, limit || 99);
   container.innerHTML = subjects.map(s => {
-    const prog      = APP.progress.subjectProgress[s.id] || 0;
+    const prog      = (typeof calcSubjectProgress === 'function') ? calcSubjectProgress(s.id) : (APP.progress.subjectProgress[s.id] || 0);
     const chapters  = s.chapters ? s.chapters.length : 0;
     const isCustom  = s.id && s.id.startsWith('custom_');
     const color     = s.color || '#6C63FF';
@@ -13653,6 +13662,10 @@ function toggleChapter(id) {
 
 function openLesson(subjectId, lessonId) {
   if (typeof trackUserActivity === 'function') trackUserActivity('درس: '+lessonId);
+  // Track lesson opened for progress
+  if (subjectId && lessonId && typeof trackLessonOpened === 'function') {
+    trackLessonOpened(subjectId, lessonId);
+  }
 
   // 1. Check ZAD_UPLOADS first
   var uploads = ZAD_UPLOADS.getAll();
@@ -14676,6 +14689,17 @@ function showQuizResults() {
   saveProgress();
   updateStats();
   updateLevel();
+  // Track quiz completion per lesson
+  if (typeof trackQuizCompleted === 'function') {
+    var _qSubject = APP.quiz.subject || APP.currentSubject;
+    var _qLessonId = (APP.quiz.questions && APP.quiz.questions[0] && APP.quiz.questions[0].lessonId) || null;
+    if (_qSubject && _qLessonId) trackQuizCompleted(_qSubject, _qLessonId, score);
+    // If no specific lesson, track at subject level
+    else if (_qSubject) {
+      var _qMerged = getSubjectWithUploads(_qSubject);
+      if (_qMerged) _qMerged.chapters.forEach(function(ch){ (ch.lessons||[]).forEach(function(l){ if(!getLessonActivity(_qSubject,l.id)||getLessonActivity(_qSubject,l.id).quizTaken){}else trackQuizCompleted(_qSubject,l.id,score);});});
+    }
+  }
   setTimeout(function(){ showQuizCelebration(score); }, 800);
   addActivity(`اختبار: ${score}% ✅`);
   
@@ -20363,6 +20387,118 @@ async function labAskQuestion(subjectId) {
     if (loadEl2) loadEl2.outerHTML = '<div style="color:#FF5252;font-size:0.8rem;padding:8px">❌ '+err.message+'</div>';
   }
 }
+
+// ══════════════════════════════════════════════════════════════
+// REALISTIC PROGRESS TRACKING SYSTEM
+// Mathematical algorithm based on actual study activity
+// ══════════════════════════════════════════════════════════════
+
+// Progress weights per lesson (total = 100%)
+var ZAD_PROGRESS_WEIGHTS = {
+  opened:     20,  // opened the lesson
+  cardsViewed: 20, // flipped info cards
+  quizTaken:  35,  // completed a quiz for this lesson
+  quizScore:  25   // scored ≥70% on quiz
+};
+
+// Get raw activity data for a lesson
+function getLessonActivity(subjectId, lessonId) {
+  var key = 'zad_lesson_' + subjectId + '_' + lessonId;
+  try { return JSON.parse(localStorage.getItem(key) || 'null'); } catch(e) { return null; }
+}
+
+function saveLessonActivity(subjectId, lessonId, data) {
+  var key = 'zad_lesson_' + subjectId + '_' + lessonId;
+  var existing = getLessonActivity(subjectId, lessonId) || {};
+  var merged = Object.assign({}, existing, data, { updatedAt: Date.now() });
+  localStorage.setItem(key, JSON.stringify(merged));
+}
+
+// Calculate progress % for one lesson (0-100)
+function calcLessonProgress(subjectId, lessonId) {
+  var a = getLessonActivity(subjectId, lessonId);
+  if (!a) return 0;
+  var score = 0;
+  if (a.opened)     score += ZAD_PROGRESS_WEIGHTS.opened;
+  if (a.cardsViewed) score += ZAD_PROGRESS_WEIGHTS.cardsViewed;
+  if (a.quizTaken)  score += ZAD_PROGRESS_WEIGHTS.quizTaken;
+  if (a.quizScore >= 70) score += ZAD_PROGRESS_WEIGHTS.quizScore;
+  else if (a.quizScore >= 50) score += Math.round(ZAD_PROGRESS_WEIGHTS.quizScore * 0.5);
+  return Math.min(100, score);
+}
+
+// Calculate progress % for a subject (0-100)
+function calcSubjectProgress(subjectId) {
+  var merged = getSubjectWithUploads(subjectId);
+  if (!merged || !merged.chapters) return 0;
+
+  var allLessons = [];
+  merged.chapters.forEach(function(ch) {
+    (ch.lessons || []).forEach(function(l) { allLessons.push(l.id); });
+  });
+
+  if (!allLessons.length) return 0;
+
+  var total = allLessons.reduce(function(sum, lid) {
+    return sum + calcLessonProgress(subjectId, lid);
+  }, 0);
+
+  return Math.round(total / allLessons.length);
+}
+
+// Track: lesson opened
+function trackLessonOpened(subjectId, lessonId) {
+  saveLessonActivity(subjectId, lessonId, { opened: true, openedAt: Date.now() });
+  refreshProgressBars();
+}
+
+// Track: info cards viewed (at least 3 cards flipped)
+function trackCardsViewed(subjectId, lessonId) {
+  saveLessonActivity(subjectId, lessonId, { cardsViewed: true });
+  refreshProgressBars();
+}
+
+// Track: quiz completed with score
+function trackQuizCompleted(subjectId, lessonId, scorePct) {
+  var existing = getLessonActivity(subjectId, lessonId) || {};
+  var best = Math.max(existing.quizScore || 0, scorePct || 0);
+  saveLessonActivity(subjectId, lessonId, {
+    quizTaken: true,
+    quizScore: best,
+    quizCompletedAt: Date.now()
+  });
+  refreshProgressBars();
+}
+
+// Refresh all progress bars on screen
+function refreshProgressBars() {
+  // Update subject cards
+  document.querySelectorAll('[data-subject-id]').forEach(function(card) {
+    var sid = card.getAttribute('data-subject-id');
+    if (!sid) return;
+    var pct = calcSubjectProgress(sid);
+    var fill = card.querySelector('.progress-fill');
+    var label = card.querySelector('.progress-label span:last-child');
+    if (fill) fill.style.width = pct + '%';
+    if (label) label.textContent = pct + '%';
+  });
+
+  // Update APP.progress.subjectProgress for legacy compatibility
+  Object.keys(CURRICULUM).forEach(function(sid) {
+    APP.progress.subjectProgress[sid] = calcSubjectProgress(sid);
+  });
+}
+
+// ── Override getLessonCompletion to use new system ─────────────
+var _origGetLessonCompletion = getLessonCompletion;
+getLessonCompletion = function(subjectId, lessonId) {
+  var a = getLessonActivity(subjectId, lessonId);
+  if (!a) return null;
+  var pct = calcLessonProgress(subjectId, lessonId);
+  if (pct >= 80) return { status: 'completed', label: 'مكتمل', pct: pct };
+  if (pct >= 20) return { status: 'partial',   label: Math.round(pct)+'%', pct: pct };
+  return { status: 'started', label: 'بدأ', pct: pct };
+};
 </script>
 
 

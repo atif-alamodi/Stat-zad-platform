@@ -5703,72 +5703,82 @@ function buildEnhancedMindMap(mm, lessonTitle) {
   if (!n) return '';
   var PALETTE = ['#6C63FF','#00BFA5','#FF7043','#FFD600','#E91E63','#00B0FF'];
 
-  // Use viewBox with responsive width - no fixed pixel width
-  var W = 800, H = 800, cx = 400, cy = 400;
-  var R = 160, RC = 300;
+  var W = 1000, H = 1000, cx = 500, cy = 500;
+  var R = 185, RC = 360;
 
   function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
-  // Truncate to max chars cleanly
-  function trunc(s, max) {
+  // Split text into lines of max maxW chars at word boundaries
+  function splitLines(s, maxW) {
     s = esc(s).trim();
-    return s.length > max ? s.slice(0,max-1)+'…' : s;
+    if (!s) return [''];
+    var words = s.split(/\s+/), lines = [], cur = '';
+    for (var i = 0; i < words.length; i++) {
+      var test = cur ? cur + ' ' + words[i] : words[i];
+      if (test.length <= maxW) { cur = test; }
+      else { if (cur) lines.push(cur); cur = words[i]; }
+    }
+    if (cur) lines.push(cur);
+    return lines.length ? lines : [s];
   }
 
-  var svgLines = '', svgBranches = '', svgChildren = '';
+  // Render multi-line text, white always for readability
+  function mlTxt(x, y, lines, fs, fw) {
+    var lh = fs + 4;
+    var top = y - ((lines.length - 1) * lh) / 2;
+    var o = '<text text-anchor="middle" font-family="Cairo,Arial,sans-serif" font-size="' + fs + '" fill="#FFFFFF" font-weight="' + (fw||700) + '">';
+    for (var i = 0; i < lines.length; i++)
+      o += '<tspan x="' + x + '" y="' + (top + i * lh) + '">' + lines[i] + '</tspan>';
+    return o + '</text>';
+  }
+
+  var svgLines = '', svgShapes = '', svgTexts = '';
 
   for (var i = 0; i < n; i++) {
     var b   = branches[i];
     var col = b.color || PALETTE[i % PALETTE.length];
-    var ang = (2*Math.PI*i/n) - Math.PI/2;
-    var bx  = Math.round(cx + R*Math.cos(ang));
-    var by  = Math.round(cy + R*Math.sin(ang));
-    var lbl = trunc(b.label||'', 15);
-    var bw  = Math.min(100, Math.max(52, lbl.length*7+16));
+    var ang = (2 * Math.PI * i / n) - Math.PI / 2;
+    var bx  = Math.round(cx + R * Math.cos(ang));
+    var by  = Math.round(cy + R * Math.sin(ang));
+    var bLines = splitLines(b.label || '', 13);
+    var bw  = Math.min(115, Math.max(58, Math.max.apply(null, bLines.map(function(l){return l.length;})) * 6.5 + 18));
+    var bh  = bLines.length * 10 + 14;
 
-    // Line from center to branch
-    svgLines += '<line x1="'+cx+'" y1="'+cy+'" x2="'+bx+'" y2="'+by
-      +'" stroke="'+col+'" stroke-width="2" stroke-opacity="0.5" stroke-dasharray="6,3"/>';
-    // Branch ellipse
-    svgBranches += '<ellipse cx="'+bx+'" cy="'+by+'" rx="'+bw+'" ry="20" fill="'+col+'22" stroke="'+col+'" stroke-width="2"/>';
-    svgBranches += '<text x="'+bx+'" y="'+(by+1)+'" text-anchor="middle" dominant-baseline="middle"'
-      +' font-family="Cairo,Arial,sans-serif" font-size="11" fill="'+col+'" font-weight="800">'+lbl+'</text>';
+    svgLines  += '<line x1="'+cx+'" y1="'+cy+'" x2="'+bx+'" y2="'+by+'" stroke="'+col+'" stroke-width="2" stroke-opacity="0.5" stroke-dasharray="6,3"/>';
+    svgShapes += '<ellipse cx="'+bx+'" cy="'+by+'" rx="'+bw+'" ry="'+bh+'" fill="'+col+'30" stroke="'+col+'" stroke-width="2"/>';
+    svgTexts  += mlTxt(bx, by, bLines, 11, 800);
 
-    var kids = (b.children||[]).slice(0,4);
+    var kids = (b.children || []).slice(0, 4);
     var nk = kids.length;
-    var step = Math.min(0.44, 0.9/Math.max(nk,1));
+    var step = Math.min(0.42, 0.85 / Math.max(nk, 1));
 
     for (var j = 0; j < nk; j++) {
-      var ca  = ang + (j-(nk-1)/2)*step;
-      var chx = Math.round(cx + RC*Math.cos(ca));
-      var chy = Math.round(cy + RC*Math.sin(ca));
-      var cs  = trunc(kids[j]||'', 12);
-      var cw  = Math.min(88, Math.max(38, cs.length*6.5+12));
+      var ca   = ang + (j - (nk - 1) / 2) * step;
+      var chx  = Math.round(cx + RC * Math.cos(ca));
+      var chy  = Math.round(cy + RC * Math.sin(ca));
+      var cLines = splitLines(kids[j] || '', 11);
+      var cw   = Math.min(100, Math.max(40, Math.max.apply(null, cLines.map(function(l){return l.length;})) * 6 + 14));
+      var ch   = cLines.length * 9 + 12;
 
-      svgLines += '<line x1="'+bx+'" y1="'+by+'" x2="'+chx+'" y2="'+chy
-        +'" stroke="'+col+'" stroke-width="1.2" stroke-opacity="0.35"/>';
-      svgChildren += '<rect x="'+(chx-cw)+'" y="'+(chy-13)+'" width="'+(cw*2)+'" height="26" rx="13"'
-        +' fill="'+col+'18" stroke="'+col+'" stroke-width="1.3"/>';
-      svgChildren += '<text x="'+chx+'" y="'+(chy+1)+'" text-anchor="middle" dominant-baseline="middle"'
-        +' font-family="Cairo,Arial,sans-serif" font-size="10" fill="'+col+'" font-weight="600">'+cs+'</text>';
+      svgLines  += '<line x1="'+bx+'" y1="'+by+'" x2="'+chx+'" y2="'+chy+'" stroke="'+col+'" stroke-width="1.2" stroke-opacity="0.35"/>';
+      svgShapes += '<rect x="'+(chx-cw)+'" y="'+(chy-ch)+'" width="'+(cw*2)+'" height="'+(ch*2)+'" rx="'+ch+'" fill="'+col+'18" stroke="'+col+'" stroke-width="1.3"/>';
+      svgTexts  += mlTxt(chx, chy, cLines, 10, 600);
     }
   }
 
-  // Center node
-  var cl = trunc(center, 16);
-  var cr = Math.min(130, Math.max(70, cl.length*7+18));
-  svgBranches += '<ellipse cx="'+cx+'" cy="'+cy+'" rx="'+cr+'" ry="32" fill="rgba(108,99,255,0.2)" stroke="#6C63FF" stroke-width="3"/>';
-  svgBranches += '<text x="'+cx+'" y="'+(cy+1)+'" text-anchor="middle" dominant-baseline="middle"'
-    +' font-family="Cairo,Arial,sans-serif" font-size="13" fill="#fff" font-weight="900">'+cl+'</text>';
-
-  // Render: lines behind, then children, then branches on top
-  var svgContent = svgLines + svgChildren + svgBranches;
+  // Center
+  var cnLines = splitLines(center, 14);
+  var cnrx = Math.min(145, Math.max(80, Math.max.apply(null, cnLines.map(function(l){return l.length;})) * 7 + 20));
+  var cnry = cnLines.length * 10 + 16;
+  svgShapes += '<ellipse cx="'+cx+'" cy="'+cy+'" rx="'+cnrx+'" ry="'+cnry+'" fill="rgba(108,99,255,0.25)" stroke="#6C63FF" stroke-width="3"/>';
+  svgTexts  += mlTxt(cx, cy, cnLines, 13, 900);
 
   return '<div style="width:100%;overflow:auto;-webkit-overflow-scrolling:touch;border-radius:14px">'
     + '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+W+' '+H+'"'
-    + ' style="width:100%;min-width:320px;height:auto;display:block;border-radius:14px">'
-    + '<rect width="'+W+'" height="'+H+'" fill="rgba(10,11,30,0.85)" rx="14"/>'
-    + svgContent
+    + ' preserveAspectRatio="xMidYMid meet"'
+    + ' style="width:100%;height:auto;display:block;border-radius:14px">'
+    + '<rect width="'+W+'" height="'+H+'" fill="rgba(10,11,30,0.9)" rx="14"/>'
+    + svgLines + svgShapes + svgTexts
     + '</svg></div>';
 }
 
@@ -10572,9 +10582,15 @@ async function analyzeAndGenerate(text, subjectId, fileName) {
       upd('📡', `تحليل الجزء ${ci+1} من ${totalChunks}...`, pct);
 
       const isFirst = ci === 0;
+      const isEnglish = subjectId === 'english';
+      const langNote = isEnglish
+        ? 'IMPORTANT: You MUST respond ENTIRELY in ENGLISH. Every field (lessonTitle, definition, keyTerms, examples, steps, mindMapBranches, quiz, summary) must be in English.'
+        : 'مهم: يجب أن تكون جميع الحقول باللغة العربية.';
       const prompt = isFirst
-        ? `أنت مساعد تعليمي. حلل هذا النص من مادة "${subTitle}" وأنتج محتوى تعليمياً شاملاً باللغة العربية.
-النص (الجزء ${ci+1}/${totalChunks}):
+        ? `${langNote}
+
+${isEnglish ? 'Analyze this text from subject "'+subTitle+'" and produce a comprehensive educational lesson in ENGLISH.' : 'أنت مساعد تعليمي. حلل هذا النص من مادة "'+subTitle+'" وأنتج محتوى تعليمياً شاملاً.'}
+${isEnglish ? 'Text (Part '+String(ci+1)+'/'+String(totalChunks)+'):' : 'النص (الجزء '+(ci+1)+'/'+(totalChunks)+'):'}
 ${chunks[ci]}
 
 أجب بـ JSON صالح فقط:

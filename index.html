@@ -10502,12 +10502,12 @@ async function analyzeAndGenerate(text, subjectId, fileName) {
     const cleanText = text.replace(/[\u0000-\u001F]/g, ' ').trim();
 
     // ── Split into chunks for full coverage ──────────────────
-    const CHUNK = 8000;
+    const CHUNK = 12000;
     const chunks = [];
     for (let i = 0; i < cleanText.length; i += CHUNK) {
       chunks.push(cleanText.slice(i, i + CHUNK));
     }
-    const totalChunks = Math.min(chunks.length, 4); // max 4 chunks = 32000 chars
+    const totalChunks = Math.min(chunks.length, 8); // max 8 chunks = 96000 chars
 
     upd('📖', `قراءة الملف كاملاً (${cleanText.length} حرف في ${totalChunks} أجزاء)...`, 10);
 
@@ -10565,7 +10565,7 @@ ${chunks[ci]}
 
       const resp = await zadFetch({
         model: 'llama-3.3-70b-versatile',
-        max_tokens: 6000,
+        max_tokens: 8000,
         system: 'أنت مساعد تعليمي. أجب بـ JSON صالح فقط بدون أي نص خارجه.',
         messages: [{ role: 'user', content: prompt }]
       });

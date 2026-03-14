@@ -17675,36 +17675,31 @@ function clearApiKey() {
 }
 
 async function zadFetch(body) {
-  // Avoid infinite recursion from retry
-  var isRetry = body._retry || false;
-
-  // Step 1: Get user key
-  var userKey = (typeof getApiKey === 'function') ? getApiKey() : '';
-
-  // Step 2: If no user key, wait for platform key to finish loading
-  if (!userKey && !window._ZAD_PLATFORM_KEY) {
-    if (window._ZAD_KEY_LOADING) {
-      // Wait up to 5 seconds for platform key
-      for (var t = 0; t < 10; t++) {
-        await new Promise(function(r){ setTimeout(r, 500); });
-        if (window._ZAD_PLATFORM_KEY || !window._ZAD_KEY_LOADING) break;
-      }
-    }
-    // Try one more fresh fetch if still empty
-    if (!window._ZAD_PLATFORM_KEY && !isRetry) {
-      await loadPlatformKey();
-    }
+  // Wait for initial platform key load to complete (max 6s)
+  if (window._ZAD_KEY_PROMISE) {
+    try { await Promise.race([
+      window._ZAD_KEY_PROMISE,
+      new Promise(function(r){ setTimeout(r, 6000); })
+    ]); } catch(e) {}
   }
 
+  var userKey     = (typeof getApiKey === 'function') ? getApiKey() : '';
   var platformKey = window._ZAD_PLATFORM_KEY || '';
   var key = userKey || platformKey;
+
+  // If still no key, try fetching once more
+  if (!key) {
+    try { await loadPlatformKey(); } catch(e) {}
+    platformKey = window._ZAD_PLATFORM_KEY || '';
+    key = userKey || platformKey;
+  }
 
   if (!key) {
     if (typeof showApiKeyPrompt === 'function') showApiKeyPrompt();
     throw new Error('NO_API_KEY');
   }
 
-  // Build messages in OpenAI format
+  // Build messages
   var messages = [];
   if (body.system) messages.push({ role: 'system', content: body.system });
 
@@ -17730,31 +17725,16 @@ async function zadFetch(body) {
   var model = hasImage ? 'meta-llama/llama-4-scout-17b-16e-instruct' : 'llama-3.3-70b-versatile';
 
   var resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer ' + key
-    },
-    body: JSON.stringify({
-      model: model,
-      messages: messages,
-      max_tokens: body.max_tokens || 4000,
-      temperature: 0.3
-    })
+    method : 'POST',
+    headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+key },
+    body   : JSON.stringify({ model:model, messages:messages, max_tokens:body.max_tokens||4000, temperature:0.3 })
   });
 
   if (resp.status === 401 || resp.status === 403) {
     if (userKey && typeof clearApiKey === 'function') clearApiKey();
-    // If platform key failed, try reloading it once
-    if (platformKey && !isRetry) {
-      window._ZAD_PLATFORM_KEY = '';
-      await loadPlatformKey();
-      if (window._ZAD_PLATFORM_KEY) {
-        body._retry = true;
-        return zadFetch(body);
-      }
-    }
-    if (!window._ZAD_PLATFORM_KEY && typeof showApiKeyPrompt === 'function') showApiKeyPrompt('مفتاح Groq غير صحيح');
+    window._ZAD_PLATFORM_KEY = '';
+    window._ZAD_KEY_PROMISE  = loadPlatformKey();
+    if (!platformKey && typeof showApiKeyPrompt === 'function') showApiKeyPrompt('مفتاح Groq غير صحيح');
     throw new Error('INVALID_API_KEY');
   }
 
@@ -18385,7 +18365,7 @@ async function loadPlatformKey() {
   } catch(e) { /* silent */ }
   window._ZAD_KEY_LOADING = false;
 }
-loadPlatformKey();
+window._ZAD_KEY_PROMISE = loadPlatformKey();
 setInterval(loadPlatformKey, 600000); // refresh every 10 min
 
 // ── Admin: save Groq key to GitHub → all users get it ─────────

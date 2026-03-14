@@ -12465,7 +12465,7 @@ body {
       </div>
 
       <!-- API Key Banner -->
-      <div id="api-key-banner" style="background:linear-gradient(135deg,rgba(108,99,255,0.12),rgba(167,139,250,0.08));
+      <div id="api-key-banner" style="display:none" style="background:linear-gradient(135deg,rgba(108,99,255,0.12),rgba(167,139,250,0.08));
         border:1.5px solid rgba(108,99,255,0.3);border-radius:18px;padding:14px 16px;margin-bottom:16px;
         display:flex;align-items:center;gap:12px;flex-wrap:wrap">
         <div style="font-size:1.5rem">🔑</div>
@@ -17669,7 +17669,8 @@ function refreshUserCurriculumSection() {
 const ZAD_API_KEY = 'zad_groq_key_v1';
 
 function getApiKey() {
-  return localStorage.getItem(ZAD_API_KEY) || '';
+  // API key lives on the backend — not in localStorage
+  return '';
 }
 function setApiKey(k) {
   localStorage.setItem(ZAD_API_KEY, k.trim());
@@ -17679,31 +17680,17 @@ function clearApiKey() {
 }
 
 async function zadFetch(body) {
-  // Wait for initial platform key load to complete (max 6s)
-  if (window._ZAD_KEY_PROMISE) {
-    try { await Promise.race([
-      window._ZAD_KEY_PROMISE,
-      new Promise(function(r){ setTimeout(r, 6000); })
-    ]); } catch(e) {}
+  // ── Backend proxy URL (Cloudflare Worker) ──────────────────
+  // Change this to your Worker URL after deployment
+  var BACKEND_URL = window._ZAD_BACKEND_URL || 'https://zad-proxy.YOUR_NAME.workers.dev';
+
+  // If no backend configured, show clear message (not API key prompt)
+  if (!BACKEND_URL || BACKEND_URL.includes('YOUR_NAME')) {
+    showToast('⚠️ لم يتم إعداد الخادم بعد — تواصل مع المشرف', 'warning');
+    throw new Error('BACKEND_NOT_CONFIGURED');
   }
 
-  var userKey     = (typeof getApiKey === 'function') ? getApiKey() : '';
-  var platformKey = window._ZAD_PLATFORM_KEY || '';
-  var key = userKey || platformKey;
-
-  // If still no key, try fetching once more
-  if (!key) {
-    try { await loadPlatformKey(); } catch(e) {}
-    platformKey = window._ZAD_PLATFORM_KEY || '';
-    key = userKey || platformKey;
-  }
-
-  if (!key) {
-    if (typeof showApiKeyPrompt === 'function') showApiKeyPrompt();
-    throw new Error('NO_API_KEY');
-  }
-
-  // Build messages
+  // Build OpenAI-format messages
   var messages = [];
   if (body.system) messages.push({ role: 'system', content: body.system });
 
@@ -17728,39 +17715,27 @@ async function zadFetch(body) {
   var hasImage = Array.isArray(userContent) && userContent.some(function(p){ return p.type==='image'; });
   var model = hasImage ? 'meta-llama/llama-4-scout-17b-16e-instruct' : 'llama-3.3-70b-versatile';
 
-  var resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+  // Send to backend worker — API key is on the server, not here
+  var resp = await fetch(BACKEND_URL, {
     method : 'POST',
-    headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+key },
-    body   : JSON.stringify({ model:model, messages:messages, max_tokens:body.max_tokens||4000, temperature:0.3 })
+    headers: { 'Content-Type': 'application/json' },
+    body   : JSON.stringify({
+      model     : model,
+      messages  : messages,
+      max_tokens: body.max_tokens || 4000,
+      temperature: 0.3
+    })
   });
 
-  if (resp.status === 401 || resp.status === 403) {
-    if (userKey && typeof clearApiKey === 'function') clearApiKey();
-    window._ZAD_PLATFORM_KEY = ['gsk_Aodr','GCM2T7GhG2SL','TLomWGdyb3FYMGFsZaji89kFfYEW1oQrmavD'].join('');
-
-// ── PLATFORM KEY OVERRIDE ─────────────────────────────────────
-// When platform key is set, NEVER show the API key prompt
-(function() {
-  function _blockIfPlatformKey(fn) {
-    return function() {
-      if (window._ZAD_PLATFORM_KEY) return;
-      return fn.apply(this, arguments);
-    };
-  }
-  // Override immediately and also after DOM ready
-  function applyOverrides() {
-    if (typeof showApiKeyPrompt    === 'function') window.showApiKeyPrompt    = _blockIfPlatformKey(showApiKeyPrompt);
-    if (typeof _doShowApiKeyPrompt === 'function') window._doShowApiKeyPrompt = _blockIfPlatformKey(_doShowApiKeyPrompt);
-  }
-  applyOverrides();
-  document.addEventListener('DOMContentLoaded', applyOverrides);
-  setTimeout(applyOverrides, 100);
-  setTimeout(applyOverrides, 500);
-  setTimeout(applyOverrides, 1000);
-})();
-    window._ZAD_KEY_PROMISE  = loadPlatformKey();
-    if (!platformKey && typeof showApiKeyPrompt === 'function') showApiKeyPrompt('مفتاح Groq غير صحيح');
-    throw new Error('INVALID_API_KEY');
+  if (!resp.ok) {
+    var errData = await resp.json().catch(function(){ return {}; });
+    var errMsg  = errData?.error?.message || 'خطأ في الخادم';
+    if (resp.status === 401 || resp.status === 403) {
+      showToast('❌ مشكلة في إعداد الخادم — تواصل مع المشرف', 'error');
+    } else {
+      showToast('❌ ' + errMsg, 'error');
+    }
+    throw new Error(errMsg);
   }
 
   var groqData = await resp.json();
@@ -17774,25 +17749,11 @@ async function zadFetch(body) {
 }
 
 function showApiKeyPrompt(msg) {
-  // Block if platform key is already loaded
-  if (window._ZAD_PLATFORM_KEY) return;
-
-  // If platform key is still loading, wait for it
-  var p = window._ZAD_KEY_PROMISE;
-  if (p && typeof p.then === 'function') {
-    p.then(function() {
-      if (!window._ZAD_PLATFORM_KEY) _doShowApiKeyPrompt(msg);
-    });
-    return;
-  }
-
-  // Try one more fetch before giving up
-  loadPlatformKey().then(function() {
-    if (!window._ZAD_PLATFORM_KEY) _doShowApiKeyPrompt(msg);
-  }).catch(function() {
-    _doShowApiKeyPrompt(msg);
-  });
+  // No-op: API key is handled server-side via Cloudflare Worker
+  // Students are never asked for an API key
+  console.log('[ZAD] API key prompt suppressed — using backend proxy');
 }
+
 
 function _doShowApiKeyPrompt(msg) {
   // Hard block — never show if platform key set
@@ -18526,7 +18487,13 @@ function buildAdminPlatformKeySection() {
 
     // Groq Key input
     + '<div style="margin-bottom:10px">'
-    + '<label style="font-size:0.78rem;color:var(--text-muted);display:block;margin-bottom:5px">🤖 مفتاح Groq API الجديد</label>'
+    + '<label style="font-size:0.78rem;color:var(--text-muted);display:block;margin-bottom:5px">🌐 رابط Cloudflare Worker (للجهاز الحالي فقط)</label>'
+    + '<input id="admin-worker-url-inp" type="text" placeholder="https://zad-proxy.YOUR_NAME.workers.dev" value="'+(window._ZAD_BACKEND_URL||'')+'"'
+    + ' style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:10px;border:1.5px solid rgba(255,107,53,0.3);background:rgba(255,107,53,0.05);color:var(--text);font-family:monospace;font-size:0.82rem;outline:none;direction:ltr;margin-bottom:6px">'
+    + '<div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:12px">⬆️ أنشئ Worker على cloudflare.com (مجاني 100k طلب/يوم)</div>'
+    + '<button onclick="adminSaveWorkerURL()" style="width:100%;padding:9px;border-radius:10px;border:none;cursor:pointer;background:rgba(255,107,53,0.2);color:#FF6B35;font-family:var(--font);font-size:0.82rem;font-weight:700;margin-bottom:12px">💾 حفظ رابط الخادم</button>'
+    + '<div style="height:1px;background:rgba(255,255,255,0.08);margin-bottom:12px"></div>'
+    + '<label style="font-size:0.78rem;color:var(--text-muted);display:block;margin-bottom:5px">🤖 مفتاح Groq (يوضع في Worker settings — ليس هنا)</label>'
     + '<input id="admin-groq-key-inp" type="password" placeholder="gsk_xxxxxxxxxxxxxxxxx" value="'+ current +'"'
     + ' style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:10px;border:1.5px solid rgba(255,107,53,0.3);background:rgba(255,107,53,0.05);color:var(--text);font-family:monospace;font-size:0.82rem;outline:none;direction:ltr">'
     + '</div>'
@@ -18576,6 +18543,28 @@ function setupAdminTopbarBtn() {
 }
 
 
+
+// ── Admin Worker URL Management ────────────────────────────────
+var ZAD_WORKER_URL_KEY = 'zad_worker_url';
+
+// Load worker URL on startup
+(function() {
+  var saved = localStorage.getItem(ZAD_WORKER_URL_KEY);
+  if (saved) window._ZAD_BACKEND_URL = saved;
+})();
+
+function adminSaveWorkerURL() {
+  var inp = document.getElementById('admin-worker-url-inp');
+  if (!inp) return;
+  var url = inp.value.trim();
+  if (!url || !url.startsWith('https://')) {
+    showToast('أدخل رابطاً صحيحاً يبدأ بـ https://', 'error'); return;
+  }
+  localStorage.setItem(ZAD_WORKER_URL_KEY, url);
+  window._ZAD_BACKEND_URL = url;
+  showToast('✅ تم حفظ رابط الخادم — يعمل الآن لهذا الجهاز', 'success');
+  setAdminPKStatus('success', '✅ رابط الخادم محفوظ: ' + url.slice(0,40) + '...');
+}
 </script>
 
 

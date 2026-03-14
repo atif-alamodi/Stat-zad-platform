@@ -7710,12 +7710,17 @@ async function analyzeImageFile(file, subjectId) {
       }]
     });
 
+    if (!resp.ok) {
+      const errData = await resp.json().catch(() => ({}));
+      throw new Error(errData.error?.message || `خطأ من الخادم (${resp.status})`);
+    }
+
     const data = await resp.json();
     let raw = (data.content?.[0]?.text || '').replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
     let lesson;
     try { lesson = JSON.parse(raw); }
     catch(e) {
-      const m = raw.match(/\{[\s\S]+\}/);
+      const m = raw.match(/\{[\s\S]*\}/);
       if (m) lesson = JSON.parse(m[0]);
       else throw new Error('فشل تحليل الصورة');
     }
@@ -7800,7 +7805,8 @@ async function generateLessonWithAI(text, subjectId, title, subject) {
       });
 
     if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
+      const errData = await response.json().catch(() => ({}));
+      throw new Error(errData.error?.message || `خطأ من الخادم (${response.status})`);
     }
 
     updateStep('📊', 'معالجة الاستجابة...', 70);
@@ -10728,6 +10734,12 @@ ${text.slice(0, 9000)}
 
     updateStep('⚙️', 'معالجة الاستجابة...', 65);
 
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({}));
+      const errMsg = errData.error?.message || `خطأ من الخادم (${response.status})`;
+      throw new Error(errMsg);
+    }
+
     const data = await response.json();
     let rawText = (data.content?.[0]?.text || '').trim();
     rawText = rawText.replace(/^```json\s*/,'').replace(/^```\s*/,'').replace(/\s*```$/,'').trim();
@@ -10736,12 +10748,12 @@ ${text.slice(0, 9000)}
     try {
       lesson = JSON.parse(rawText);
     } catch(e1) {
-      const jsonMatch = rawText.match(/\{[\s\S]+\}/);
+      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         try { lesson = JSON.parse(jsonMatch[0]); }
-        catch(e2) { throw new Error('فشل في تحليل JSON: ' + rawText.slice(0,100)); }
+        catch(e2) { throw new Error('فشل في تحليل JSON: ' + rawText.slice(0,200)); }
       } else {
-        throw new Error('لم يرجع الذكاء الاصطناعي JSON صحيحاً');
+        throw new Error('لم يرجع الذكاء الاصطناعي JSON صحيحاً — الاستجابة: ' + rawText.slice(0,200));
       }
     }
 

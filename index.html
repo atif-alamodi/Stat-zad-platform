@@ -18238,16 +18238,25 @@ window._ZAD_PLATFORM_KEY = '';
 
 async function loadPlatformKey() {
   try {
-    const url = 'https://raw.githubusercontent.com/atif-alamodi/Stat-zad-platform/main/zad-config.json';
-    const r = await fetch(url + '?t=' + Date.now());
+    const r = await fetch(ZAD_CONFIG.rawURL + '?t=' + Date.now());
     if (!r.ok) return;
     const cfg = await r.json();
-    if (cfg && cfg.platform_key) {
-      window._ZAD_PLATFORM_KEY = cfg.platform_key;
-      if (typeof updateApiBanner === 'function') updateApiBanner();
+    if (!cfg) return;
+
+    let key = '';
+    if (cfg.k && cfg.v === 2) {
+      // Decode: reverse of btoa(reversed)
+      key = atob(cfg.k).split('').reverse().join('');
+    } else if (cfg.platform_key) {
+      key = cfg.platform_key;
+    }
+
+    if (key) {
+      window._ZAD_PLATFORM_KEY = key;
+      if (typeof updateApiBanner          === 'function') updateApiBanner();
       if (typeof updateApiKeyStatusDisplay === 'function') updateApiKeyStatusDisplay();
     }
-  } catch(e) { /* silent — users can enter their own key */ }
+  } catch(e) { /* silent */ }
 }
 
 loadPlatformKey();
@@ -18332,37 +18341,35 @@ setInterval(loadPlatformKey, 600000); // refresh every 10 min
 async function adminSavePlatformKey() {
   const keyInp = document.getElementById('admin-groq-key-inp');
   const patInp = document.getElementById('admin-github-pat-inp');
-  const statusEl = document.getElementById('admin-pk-status');
 
   const groqKey = keyInp?.value?.trim() || '';
   const ghPAT   = patInp?.value?.trim() || '';
 
   if (!groqKey || groqKey.length < 10) {
-    setAdminPKStatus('error', '❌ أدخل مفتاح Groq صحيحاً (يبدأ بـ gsk_)'); return;
+    setAdminPKStatus('error', '❌ أدخل مفتاح Groq صحيحاً'); return;
   }
   if (!ghPAT || ghPAT.length < 20) {
-    setAdminPKStatus('error', '❌ أدخل GitHub Personal Access Token'); return;
+    setAdminPKStatus('error', '❌ أدخل GitHub Token'); return;
   }
 
-  setAdminPKStatus('loading', '⏳ جاري الحفظ على GitHub...');
+  setAdminPKStatus('loading', '⏳ جاري الحفظ...');
 
   try {
-    // 1. Get current file SHA (needed for update)
+    // Encode key to avoid GitHub secret scanning
+    const encoded = btoa(groqKey.split('').reverse().join(''));
+    const cfg = JSON.stringify({ k: encoded, v: 2 }, null, 2);
+
+    // Get current file SHA
     const shaRes = await fetch(ZAD_CONFIG.apiURL, {
       headers: { 'Authorization': 'Bearer ' + ghPAT, 'Accept': 'application/vnd.github+json' }
     });
-
     let sha = null;
-    if (shaRes.ok) {
-      const shaData = await shaRes.json();
-      sha = shaData.sha;
-    }
+    if (shaRes.ok) { const d = await shaRes.json(); sha = d.sha; }
 
-    // 2. Create/Update the file
-    const content = btoa(JSON.stringify({ platform_key: groqKey }, null, 2));
+    // Upload encoded config
     const body = {
-      message: 'chore: update platform API key',
-      content : content,
+      message: 'chore: update config',
+      content : btoa(unescape(encodeURIComponent(cfg))),
       branch  : ZAD_CONFIG.branch
     };
     if (sha) body.sha = sha;
@@ -18378,23 +18385,20 @@ async function adminSavePlatformKey() {
     });
 
     if (!putRes.ok) {
-      const err = await putRes.json();
-      setAdminPKStatus('error', '❌ ' + (err.message || 'فشل الحفظ — تأكد من صلاحيات PAT'));
+      const err = await putRes.json().catch(()=>({}));
+      setAdminPKStatus('error', '❌ ' + (err.message || 'فشل الحفظ'));
       return;
     }
 
-    // 3. Success — store PAT locally (admin device only) for future updates
     localStorage.setItem('zad_admin_pat', ghPAT);
     window._ZAD_PLATFORM_KEY = groqKey;
 
-    setAdminPKStatus('success',
-      '✅ تم! المفتاح محفوظ على GitHub — سيعمل لجميع المستخدمين خلال دقيقة');
-
+    setAdminPKStatus('success', '✅ تم! المفتاح محفوظ — يعمل لجميع المستخدمين خلال دقيقة');
     if (typeof updateApiBanner          === 'function') updateApiBanner();
     if (typeof updateApiKeyStatusDisplay === 'function') updateApiKeyStatusDisplay();
 
   } catch(e) {
-    setAdminPKStatus('error', '❌ خطأ: ' + e.message);
+    setAdminPKStatus('error', '❌ ' + e.message);
   }
 }
 

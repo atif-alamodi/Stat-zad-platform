@@ -10670,7 +10670,7 @@ async function analyzeAndGenerate(text, subjectId, fileName) {
       system: 'You are an educational assistant. Return ONLY valid JSON, no markdown, no explanation.',
       messages: [{
         role: 'user',
-        content: 'Create an educational lesson in Arabic from this text about "' + subTitle + '".\n\nText:\n' + safeText + '\n\nReturn ONLY this JSON structure (all values in Arabic, use simple text no special chars):\n{"lessonTitle":"title","definition":"definition text","whyLearn":["reason1","reason2","reason3"],"keyTerms":[{"term":"term1","def":"def1"},{"term":"term2","def":"def2"}],"examples":[{"icon":"example","title":"title1","content":"content1"}],"steps":["step1","step2","step3"],"mindMapBranches":[{"label":"branch1","color":"#6C63FF","children":["item1","item2","item3"]},{"label":"branch2","color":"#FF6584","children":["item1","item2","item3"]}],"quiz":[{"q":"question1","options":["correct","wrong1","wrong2","wrong3"],"answer":0,"explanation":"why"},{"q":"question2","options":["correct","wrong1","wrong2","wrong3"],"answer":0,"explanation":"why"},{"q":"question3","options":["correct","wrong1","wrong2","wrong3"],"answer":0,"explanation":"why"}],"summary":"summary text","properties":["prop1","prop2","prop3"]}'
+        content: 'Read this text about ' + subTitle + ' and create a JSON lesson. Text: ' + safeText.slice(0,3000) + ' --- Respond with ONLY valid JSON like this template (fill in Arabic values, NO extra text outside JSON): {"lessonTitle":"...","definition":"...","whyLearn":["...","...","..."],"keyTerms":[{"term":"...","def":"..."},{"term":"...","def":"..."}],"examples":[{"icon":"example","title":"...","content":"..."}],"steps":["...","...","..."],"mindMapBranches":[{"label":"...","color":"#6C63FF","children":["...","...","..."]},{"label":"...","color":"#FF6584","children":["...","...","..."]}],"quiz":[{"q":"...","options":["correct answer","wrong1","wrong2","wrong3"],"answer":0,"explanation":"..."},{"q":"...","options":["correct answer","wrong1","wrong2","wrong3"],"answer":0,"explanation":"..."}],"summary":"...","properties":["...","...","..."]}'
       }]
     });
 
@@ -10720,55 +10720,70 @@ async function analyzeAndGenerate(text, subjectId, fileName) {
 }
 
 function repairAndParseJSON(raw) {
-  // Step 1: strip markdown fences
-  raw = raw.replace(/^```[a-z]*\n?/im, '').replace(/\n?```$/m, '').trim();
+  if (!raw) return null;
 
-  // Step 2: extract content between first { and last }
+  // Strip markdown
+  raw = raw.replace(/^```[a-z]*\n?/im,'').replace(/\n?```$/m,'').trim();
+
+  // Find JSON boundaries
   var first = raw.indexOf('{');
   var last  = raw.lastIndexOf('}');
-  if (first < 0 || last < 0 || last <= first) return null;
+  if (first < 0 || last <= first) return null;
   raw = raw.slice(first, last + 1);
 
-  // Step 3: try direct parse
-  try { return JSON.parse(raw); } catch(e) {}
+  // Try 1: direct
+  try { return JSON.parse(raw); } catch(e1) {}
 
-  // Step 4: aggressive repair
-  var fixed = raw
-    // Remove control characters
-    .replace(/[\u0000-\u001F\u007F]/g, ' ')
-    // Fix trailing commas before ] or }
-    .replace(/,(\s*[}\]])/g, '$1')
-    // Fix missing quotes on keys
-    .replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)(\s*:)/g, '$1"$2"$3')
-    // Fix single quotes to double quotes (only outside values)
-    .replace(/'/g, '"');
+  // Try 2: clean Arabic/special quotes and control chars
+  var c2 = raw
+    .replace(/[\u0000-\u001F\u007F]/g, ' ')   // control chars
+    .replace(/\u201C|\u201D|\u201E|\u201F/g, '"') // smart double quotes
+    .replace(/\u2018|\u2019|\u201A|\u201B/g, "'") // smart single quotes
+    .replace(/\u060C/g, ',')                   // Arabic comma
+    .replace(/\u061B/g, ';')                   // Arabic semicolon
+    .replace(/,(\s*[}\]])/g, '$1')             // trailing commas
+    .replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)(\s*:)/g, '$1"$2"$3'); // unquoted keys
+  try { return JSON.parse(c2); } catch(e2) {}
 
-  try { return JSON.parse(fixed); } catch(e) {}
+  // Try 3: replace all single quotes → double quotes carefully
+  var c3 = c2.replace(/'/g, '"');
+  try { return JSON.parse(c3); } catch(e3) {}
 
-  // Step 5: try to truncate at last complete object
-  var truncated = fixed.replace(/,?\s*"[^"]*"\s*:\s*[^,}\]]*$/, '');
-  // Close any open arrays/objects
-  var opens = (truncated.match(/\{/g)||[]).length - (truncated.match(/\}/g)||[]).length;
-  var arrOpens = (truncated.match(/\[/g)||[]).length - (truncated.match(/\]/g)||[]).length;
-  for (var i=0; i<arrOpens; i++) truncated += ']';
-  for (var j=0; j<opens; j++)    truncated += '}';
+  // Try 4: extract field by field manually
+  var lesson = {};
+  var titleM = raw.match(/"lessonTitle"\s*:\s*"([^"]+)"/);
+  var defM   = raw.match(/"definition"\s*:\s*"([^"]+)"/);
+  var sumM   = raw.match(/"summary"\s*:\s*"([^"]+)"/);
+  if (titleM) lesson.lessonTitle = titleM[1];
+  if (defM)   lesson.definition  = defM[1];
+  if (sumM)   lesson.summary     = sumM[1];
 
-  try { return JSON.parse(truncated); } catch(e) {}
-
-  // Step 6: build minimal lesson from what we can extract
-  var title = raw.match(/"lessonTitle"\s*:\s*"([^"]+)"/);
-  var def   = raw.match(/"definition"\s*:\s*"([^"]+)"/);
-  if (title || def) {
-    return {
-      lessonTitle: title ? title[1] : 'درس من الملف',
-      definition:  def   ? def[1]   : raw.slice(0, 200),
-      quiz: [], keyTerms: [], mindMapBranches: [], whyLearn: [],
-      examples: [], steps: [], properties: [], summary: ''
-    };
+  // Extract arrays safely
+  function extractArr(key) {
+    var m = raw.match(new RegExp('"'+key+'"\\s*:\\s*\\[([\\s\\S]*?)\\]'));
+    if (!m) return [];
+    try { return JSON.parse('['+m[1]+']'); } catch(e) {
+      // Extract quoted strings only
+      var items = [];
+      var sm = m[1].match(/"([^"]+)"/g);
+      if (sm) sm.forEach(function(s){ items.push(s.slice(1,-1)); });
+      return items;
+    }
   }
 
+  lesson.whyLearn        = extractArr('whyLearn');
+  lesson.steps           = extractArr('steps');
+  lesson.properties      = extractArr('properties');
+  lesson.keyTerms        = lesson.keyTerms || [];
+  lesson.examples        = lesson.examples || [];
+  lesson.mindMapBranches = lesson.mindMapBranches || [];
+  lesson.quiz            = lesson.quiz || [];
+  lesson.types           = [];
+
+  if (lesson.lessonTitle || lesson.definition) return lesson;
   return null;
 }
+
 
 function refreshAllTabsWithAILesson(lesson, subjectId) {
 

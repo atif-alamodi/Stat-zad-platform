@@ -7583,11 +7583,7 @@ function handleUploadPaste(subjectId) {
 }
 
 async function processUploadedFile(file, subjectId) {
-  const maxSize = 100 * 1024 * 1024; // 100MB
-  if (file.size > maxSize) {
-    showUploadStatus('error', 'حجم الملف أكبر من 100MB');
-    return;
-  }
+  // No file size limit
 
   const ext = file.name.split('.').pop().toLowerCase();
   const imgExts = ['jpg','jpeg','png','gif','webp','bmp','tiff','tif','heic','heif','avif','svg'];

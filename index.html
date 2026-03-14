@@ -7626,7 +7626,7 @@ async function processUploadedFile(file, subjectId) {
       return;
     }
 
-    showUploadStatus('loading', `✅ قُرئ ${text.length} حرف — الذكاء الاصطناعي يحلّل المحتوى...`);
+    showUploadStatus('info', `✅ قُرئ ${text.length} حرف — الذكاء الاصطناعي يحلّل المحتوى...`);
     await analyzeAndGenerate(text.slice(0, 14000), subjectId, file.name);
   } catch(e) {
         if (e.message === 'NO_API_KEY' || e.message === 'INVALID_API_KEY') return;
@@ -8095,8 +8095,8 @@ function renderAutoSummary(text, subjectId) {
 function showUploadStatus(type, msg) {
   const out = document.getElementById('upload-result');
   if (!out) return;
-  const colors = { loading: '#FFD600', error: '#FF5252', warning: '#FF9800', success: '#28CA41' };
-  const icons  = { loading: '⏳', error: '❌', warning: '⚠️', success: '✅' };
+  const colors = { loading: '#FFD600', error: '#FF5252', warning: '#FF9800', success: '#28CA41', info: '#2196F3' };
+  const icons  = { loading: '⏳', error: '❌', warning: '⚠️', success: '✅', info: 'ℹ️' };
   out.innerHTML = `
     <div style="padding:14px 16px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);
       border-radius:12px;margin-top:8px;display:flex;align-items:center;gap:10px">
@@ -8104,17 +8104,16 @@ function showUploadStatus(type, msg) {
       <span style="font-size:0.85rem;color:${colors[type]||'var(--text)'}">${msg}</span>
       ${type==='loading'?'<div style="margin-right:auto;width:20px;height:20px;border:2px solid rgba(255,255,255,0.1);border-top-color:var(--primary);border-radius:50%;animation:spin 0.8s linear infinite"></div>':''}
     </div>`;
-  // Auto-dismiss non-loading messages after 9 seconds
-  if (type !== 'loading') {
-    clearTimeout(window._uploadStatusTimer);
-    window._uploadStatusTimer = setTimeout(function() {
-      if (out) {
-        out.style.transition = 'opacity 0.6s ease';
-        out.style.opacity = '0';
-        setTimeout(function() { out.innerHTML = ''; out.style.opacity = '1'; }, 600);
-      }
-    }, 9000);
-  }
+  // Auto-dismiss all messages (loading after 30s, others after 9s)
+  clearTimeout(window._uploadStatusTimer);
+  var delay = (type === 'loading') ? 30000 : 9000;
+  window._uploadStatusTimer = setTimeout(function() {
+    if (out) {
+      out.style.transition = 'opacity 0.6s ease';
+      out.style.opacity = '0';
+      setTimeout(function() { out.innerHTML = ''; out.style.opacity = '1'; }, 600);
+    }
+  }, delay);
 }
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
@@ -12474,7 +12473,7 @@ body {
           <div style="font-weight:800;font-size:0.88rem;margin-bottom:2px">مفتاح Groq API</div>
           <div id="api-banner-status" style="font-size:0.75rem;color:var(--text-muted)">جارٍ التحقق...</div>
         </div>
-        <button onclick="showApiKeyFromDashboard()"
+        <button onclick="if(window._ZAD_PLATFORM_KEY){showToast('مفتاح المنصة نشط ✅','success');}else{showApiKeyFromDashboard();}"
           style="padding:8px 16px;border-radius:10px;border:none;cursor:pointer;
           background:linear-gradient(135deg,var(--primary),#a78bfa);color:white;
           font-family:var(--font);font-size:0.8rem;font-weight:700;white-space:nowrap">
@@ -13145,6 +13144,11 @@ function toggleSidebar() {
 }
 
 function initDashboard() {
+  // Hide API key banner if platform key is active
+  if (window._ZAD_PLATFORM_KEY) {
+    var b = document.getElementById('api-key-banner');
+    if (b) b.style.display = 'none';
+  }
   renderSubjectCards('quick-subjects', 6);
   renderProgressChart();
   updateStats();
@@ -17732,7 +17736,7 @@ async function zadFetch(body) {
 
   if (resp.status === 401 || resp.status === 403) {
     if (userKey && typeof clearApiKey === 'function') clearApiKey();
-    window._ZAD_PLATFORM_KEY = '';
+    window._ZAD_PLATFORM_KEY = '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';
     window._ZAD_KEY_PROMISE  = loadPlatformKey();
     if (!platformKey && typeof showApiKeyPrompt === 'function') showApiKeyPrompt('مفتاح Groq غير صحيح');
     throw new Error('INVALID_API_KEY');
@@ -17749,6 +17753,30 @@ async function zadFetch(body) {
 }
 
 function showApiKeyPrompt(msg) {
+  // Block if platform key is already loaded
+  if (window._ZAD_PLATFORM_KEY) return;
+
+  // If platform key is still loading, wait for it
+  var p = window._ZAD_KEY_PROMISE;
+  if (p && typeof p.then === 'function') {
+    p.then(function() {
+      if (!window._ZAD_PLATFORM_KEY) _doShowApiKeyPrompt(msg);
+    });
+    return;
+  }
+
+  // Try one more fetch before giving up
+  loadPlatformKey().then(function() {
+    if (!window._ZAD_PLATFORM_KEY) _doShowApiKeyPrompt(msg);
+  }).catch(function() {
+    _doShowApiKeyPrompt(msg);
+  });
+}
+
+function _doShowApiKeyPrompt(msg) {
+  if (window._ZAD_PLATFORM_KEY) return;
+  if (document.getElementById('api-key-modal')) return;
+
   // If platform key already loaded — no need for prompt
   if (window._ZAD_PLATFORM_KEY) return;
 
@@ -17813,6 +17841,7 @@ function showApiKeyPrompt(msg) {
     var inp = document.getElementById('api-key-input');
     if(inp) inp.focus(); 
   }, 100);
+
 }
 
 function saveApiKey() {
@@ -18236,7 +18265,8 @@ function updateApiKeyStatusDisplay() {
 }
 
 function showApiKeyFromDashboard() {
-  showApiKeyPrompt();
+  if (window._ZAD_PLATFORM_KEY) { showToast('مفتاح المنصة نشط بالفعل ✅', 'success'); return; }
+  _doShowApiKeyPrompt();
   // After save, update banner
   var origSave = window.saveApiKey;
   window.saveApiKey = function() {
@@ -18247,18 +18277,24 @@ function showApiKeyFromDashboard() {
 }
 
 function updateApiBanner() {
-  var el = document.getElementById('api-banner-status');
+  var el     = document.getElementById('api-banner-status');
   var banner = document.getElementById('api-key-banner');
   if (!el) return;
-  var key = getApiKey ? getApiKey() : '';
+  var key = (typeof getApiKey==='function' ? getApiKey() : '') || window._ZAD_PLATFORM_KEY || '';
   if (key) {
-    el.textContent = 'مفعّل: ' + key.slice(0,14) + '... — الذكاء الاصطناعي جاهز';
+    var src = window._ZAD_PLATFORM_KEY && !getApiKey() ? 'مفتاح المنصة' : 'مفتاحك الشخصي';
+    el.textContent = '✅ ' + src + ' — الذكاء الاصطناعي جاهز';
     el.style.color = '#66BB6A';
-    if (banner) banner.style.borderColor = 'rgba(102,187,106,0.4)';
+    if (banner) {
+      banner.style.borderColor = 'rgba(102,187,106,0.4)';
+      // Hide the "إدخال المفتاح" button when platform key active
+      var btn = banner.querySelector('button');
+      if (btn && window._ZAD_PLATFORM_KEY) btn.style.display = 'none';
+    }
   } else {
-    el.textContent = 'غير مضبوط — أدخل مفتاح Groq المجاني لتفعيل تحليل الملفات';
-    el.style.color = '#FFA726';
-    if (banner) banner.style.borderColor = 'rgba(255,167,38,0.4)';
+    el.textContent = '⚠️ لا يوجد مفتاح — اضغط لإدخاله';
+    el.style.color = '#FFD600';
+    if (banner) banner.style.borderColor = 'rgba(255,214,0,0.4)';
   }
 }
 

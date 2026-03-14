@@ -7554,8 +7554,19 @@ function buildUploadTab(subjectId) {
       </button>
     </div>
 
+    <!-- شريط التقدم -->
+    <div id="ai-gen-progress" style="display:none;margin-bottom:14px">
+      <div style="background:rgba(255,255,255,0.06);border-radius:10px;height:6px;overflow:hidden">
+        <div id="ai-gen-bar" style="height:100%;width:0%;background:linear-gradient(90deg,var(--primary),var(--secondary));border-radius:10px;transition:width 0.4s ease"></div>
+      </div>
+    </div>
+    <div id="ai-gen-steps"></div>
+
     <!-- نتيجة التحليل -->
     <div id="upload-result"></div>
+
+    <!-- مخرجات الدرس المُولَّد -->
+    <div id="ai-gen-output"></div>
   </div>`;
 }
 

@@ -5702,72 +5702,96 @@ function buildEnhancedMindMap(mm, lessonTitle) {
   var n = branches.length;
   var PALETTE = ['#6C63FF','#00BFA5','#FF7043','#FFD600','#E91E63','#00B0FF','#8BC34A','#FF5722'];
 
-  var W = 900, H = 560, cx = 450, cy = 280;
-  var R = 155, RC = 290;
+  // Larger canvas for more space
+  var W = 1100, H = 700, cx = 550, cy = 350;
+  var R  = 200;  // branch distance from center
+  var RC = 380;  // child distance from center
+
   var svgLines = '', svgNodes = '';
 
+  // Helper: wrap text into max 2 lines of maxChars each
+  function wrapLabel(text, maxChars) {
+    if (!text) return [''];
+    text = String(text);
+    if (text.length <= maxChars) return [text];
+    // Try to split at a space
+    var mid = Math.floor(text.length / 2);
+    var split = text.lastIndexOf(' ', mid);
+    if (split < 1) split = mid;
+    var line1 = text.slice(0, split).trim();
+    var line2 = text.slice(split).trim();
+    // Truncate if still too long
+    if (line2.length > maxChars) line2 = line2.slice(0, maxChars - 1) + '…';
+    if (line1.length > maxChars) line1 = line1.slice(0, maxChars - 1) + '…';
+    return [line1, line2];
+  }
+
+  // Helper: render text (1 or 2 lines) centered at (x, y)
+  function renderText(x, y, lines, col, fontSize, fontWeight) {
+    if (lines.length === 1) {
+      return '<text x="'+x+'" y="'+(y+4)+'" text-anchor="middle" dominant-baseline="middle" '
+        + 'font-family="Cairo,sans-serif" font-size="'+fontSize+'" fill="'+col+'" font-weight="'+(fontWeight||'700')+'">'+lines[0]+'</text>';
+    }
+    // 2 lines
+    return '<text text-anchor="middle" font-family="Cairo,sans-serif" font-size="'+fontSize+'" fill="'+col+'" font-weight="'+(fontWeight||'700')+'">'
+      + '<tspan x="'+x+'" dy="'+(y - fontSize/2)+'" dominant-baseline="middle">'+lines[0]+'</tspan>'
+      + '<tspan x="'+x+'" dy="'+(fontSize+2)+'" dominant-baseline="middle">'+lines[1]+'</tspan>'
+      + '</text>';
+  }
+
   for (var i = 0; i < branches.length; i++) {
-    var b = branches[i];
+    var b   = branches[i];
     var col = b.color || PALETTE[i % PALETTE.length];
     var ang = (2 * Math.PI * i / n) - Math.PI / 2;
-    var bx = Math.round(cx + R * Math.cos(ang));
-    var by = Math.round(cy + R * Math.sin(ang));
+    var bx  = Math.round(cx + R * Math.cos(ang));
+    var by  = Math.round(cy + R * Math.sin(ang));
     var lbl = (b.label || '').replace(/</g,'&lt;');
-    var brx = Math.min(Math.max(lbl.length * 6 + 18, 52), 110);
 
-    svgLines += '<line x1="' + cx + '" y1="' + cy + '" x2="' + bx + '" y2="' + by + '" stroke="' + col + '" stroke-width="2.5" stroke-opacity="0.5" stroke-dasharray="8,4"/>';
-    svgNodes += '<ellipse cx="' + bx + '" cy="' + by + '" rx="' + brx + '" ry="22" fill="' + col + '28" stroke="' + col + '" stroke-width="2.2"/>';
-    svgNodes += '<text x="' + bx + '" y="' + (by + 5) + '" text-anchor="middle" dominant-baseline="middle" font-family="Cairo,sans-serif" font-size="12" fill="' + col + '" font-weight="900">' + lbl + '</text>';
+    // Wrap branch label
+    var lblLines = wrapLabel(lbl, 10);
+    var isTwo    = lblLines.length > 1;
+    var brx      = Math.min(Math.max(Math.max(lblLines[0].length, isTwo ? lblLines[1].length : 0) * 7 + 16, 55), 120);
+    var bry      = isTwo ? 28 : 20;
+
+    svgLines += '<line x1="'+cx+'" y1="'+cy+'" x2="'+bx+'" y2="'+by+'" stroke="'+col+'" stroke-width="2.5" stroke-opacity="0.5" stroke-dasharray="8,4"/>';
+    svgNodes += '<ellipse cx="'+bx+'" cy="'+by+'" rx="'+brx+'" ry="'+bry+'" fill="'+col+'28" stroke="'+col+'" stroke-width="2.2"/>';
+    svgNodes += renderText(bx, by, lblLines, col, 12, '900');
 
     var children = b.children || [];
-    var nch = children.length;
-    var spreadStep = Math.min(0.45, 1.0 / Math.max(nch, 1));
+    var nch  = children.length;
+    var spreadStep = Math.min(0.5, 1.1 / Math.max(nch, 1));
 
     for (var j = 0; j < nch; j++) {
-      var cs = String(children[j]).replace(/</g,'&lt;');
-      var ca = ang + (j - (nch - 1) / 2) * spreadStep;
+      var cs  = String(children[j] || '').replace(/</g,'&lt;');
+      var ca  = ang + (j - (nch - 1) / 2) * spreadStep;
       var chx = Math.round(cx + RC * Math.cos(ca));
       var chy = Math.round(cy + RC * Math.sin(ca));
-      var crx = Math.min(Math.max(cs.length * 5.5 + 14, 42), 100);
 
-      svgLines += '<line x1="' + bx + '" y1="' + by + '" x2="' + chx + '" y2="' + chy + '" stroke="' + col + '" stroke-width="1.4" stroke-opacity="0.4"/>';
-      svgNodes += '<rect x="' + (chx - crx) + '" y="' + (chy - 13) + '" width="' + (crx * 2) + '" height="26" rx="13" fill="' + col + '1a" stroke="' + col + '60" stroke-width="1.2"/>';
-      svgNodes += '<text x="' + chx + '" y="' + (chy + 4) + '" text-anchor="middle" dominant-baseline="middle" font-family="Cairo,sans-serif" font-size="11" fill="' + col + '">' + cs + '</text>';
+      // Wrap child label
+      var csLines = wrapLabel(cs, 9);
+      var csTwo   = csLines.length > 1;
+      var crx     = Math.min(Math.max(Math.max(csLines[0].length, csTwo ? csLines[1].length : 0) * 6.5 + 12, 44), 110);
+      var cry     = csTwo ? 22 : 15;
+
+      svgLines += '<line x1="'+bx+'" y1="'+by+'" x2="'+chx+'" y2="'+chy+'" stroke="'+col+'" stroke-width="1.4" stroke-opacity="0.4"/>';
+      svgNodes += '<rect x="'+(chx-crx)+'" y="'+(chy-cry)+'" width="'+(crx*2)+'" height="'+(cry*2)+'" rx="'+cry+'" fill="'+col+'1A" stroke="'+col+'" stroke-width="1.5"/>';
+      svgNodes += renderText(chx, chy, csLines, col, 11, '600');
     }
   }
 
-  var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;overflow:visible">';
-  svg += '<defs><radialGradient id="mmGlow2" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#6C63FF" stop-opacity="0.08"/><stop offset="100%" stop-color="#6C63FF" stop-opacity="0"/></radialGradient></defs>';
-  svg += '<ellipse cx="' + cx + '" cy="' + cy + '" rx="' + (W/2-10) + '" ry="' + (H/2-10) + '" fill="url(#mmGlow2)"/>';
-  svg += svgLines + svgNodes;
-  svg += '<ellipse cx="' + cx + '" cy="' + cy + '" rx="72" ry="30" fill="#6C63FF" opacity="0.95"/>';
-  svg += '<text x="' + cx + '" y="' + (cy+5) + '" text-anchor="middle" dominant-baseline="middle" font-family="Cairo,sans-serif" font-size="13.5" fill="white" font-weight="900">' + center + '</text>';
-  svg += '</svg>';
+  // Center node
+  var centerLines = wrapLabel(center, 12);
+  var cnrx = Math.min(Math.max(Math.max(centerLines[0].length, centerLines.length>1?centerLines[1].length:0) * 8 + 20, 80), 150);
+  var cnry = centerLines.length > 1 ? 35 : 28;
 
-  var cards = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:8px;margin-top:14px;direction:rtl">';
-  for (var i = 0; i < branches.length; i++) {
-    var b = branches[i];
-    var col = b.color || PALETTE[i % PALETTE.length];
-    var children = b.children || [];
-    cards += '<div style="background:' + col + '10;border:1.5px solid ' + col + '35;border-radius:13px;padding:11px 10px;direction:rtl;text-align:right">';
-    cards += '<div style="font-weight:800;font-size:0.8rem;color:' + col + ';margin-bottom:7px;padding-bottom:6px;border-bottom:1px solid ' + col + '28;word-break:break-word;white-space:normal">' + (b.label || '') + '</div>';
-    cards += '<div style="display:flex;flex-direction:column;gap:4px">';
-    for (var j = 0; j < children.length; j++) {
-      cards += '<div style="font-size:0.76rem;line-height:1.6;color:var(--text);padding:4px 8px;background:' + col + '14;border-radius:7px;border-right:2px solid ' + col + '60;word-break:break-word;white-space:normal;direction:rtl">' + String(children[j]) + '</div>';
-    }
-    cards += '</div></div>';
-  }
-  cards += '</div>';
+  svgNodes += '<ellipse cx="'+cx+'" cy="'+cy+'" rx="'+cnrx+'" ry="'+cnry+'" fill="rgba(108,99,255,0.18)" stroke="#6C63FF" stroke-width="3"/>';
+  svgNodes += renderText(cx, cy, centerLines, '#fff', 14, '900');
 
-  return '<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(108,99,255,0.2);border-radius:18px;padding:14px;margin-top:8px;direction:rtl">'
-    + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;direction:rtl">'
-    + '<span style="font-size:1.2rem">🧠</span>'
-    + '<span style="font-weight:800;font-size:0.9rem">' + (mm.center || lessonTitle || '') + '</span>'
-    + '<span style="font-size:0.7rem;color:var(--text-muted);margin-right:auto">' + n + ' فروع | ' + branches.reduce(function(s,b){return s+(b.children||[]).length;},0) + ' عنصراً</span>'
-    + '</div>'
-    + '<div style="background:rgba(0,0,0,0.2);border-radius:12px;padding:8px;overflow:visible">' + svg + '</div>'
-    + cards
-    + '</div>';
+  return '<div style="overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;border-radius:16px">'
+    + '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;min-width:340px;max-width:'+W+'px;height:auto;display:block">'
+    + '<rect width="'+W+'" height="'+H+'" fill="rgba(10,11,30,0.7)" rx="16"/>'
+    + svgLines + svgNodes
+    + '</svg></div>';
 }
 
 // [removed duplicate] //

@@ -1349,7 +1349,6 @@ print(f"الأعلى : {df['الدرجة'].max()}")`,
       },
     ],
   },
-
 };
 
 CURRICULUM['english'] = {
@@ -12504,6 +12503,19 @@ body {
       <span class="nav-badge" style="background:rgba(33,150,243,0.2);color:#2196F3;border:1px solid rgba(33,150,243,0.4)">ELG</span>
     </div>
     
+    <div class="nav-section-title">الأدوات</div>
+    <div class="nav-item" onclick="showSearchSection()">
+      <span class="nav-icon">🔍</span> البحث الشامل
+    </div>
+    <div class="nav-item" onclick="showSection('planner');closeNav ? closeNav() : closeSidebar()">
+      <span class="nav-icon">📅</span> مخطط الدراسة
+    </div>
+    <div class="nav-item" onclick="showSection('notes');closeNav ? closeNav() : closeSidebar()">
+      <span class="nav-icon">📝</span> ملاحظاتي
+    </div>
+    <div class="nav-item" onclick="showSection('bookmarks');closeNav ? closeNav() : closeSidebar()">
+      <span class="nav-icon">🔖</span> إشاراتي
+    </div>
     <div class="nav-section-title">الاختبارات</div>
     <div class="nav-item" onclick="startQuiz()">
       <span class="nav-icon">⚡</span> اختبار سريع
@@ -12544,6 +12556,7 @@ body {
         مرحباً، <span id="topbar-name">الطالب</span>! 👋
       </div>
       <div class="topbar-actions">
+        <div class="icon-btn" onclick="showSearchSection()" title="بحث">🔍</div>
         <div class="streak-badge">
           🔥 <span id="streak-count">1</span> يوم متواصل
         </div>
@@ -12651,6 +12664,24 @@ body {
     <div id="section-subjects" style="display:none">
       <div class="section-title">📚 المواد الدراسية</div>
       <div class="subjects-grid" id="all-subjects-grid"></div>
+    </div>
+
+    <!-- ====== PLANNER SECTION ====== -->
+    <div id="section-planner" style="display:none">
+      <div class="section-title">📅 مخطط الدراسة</div>
+      <div id="planner-content"></div>
+    </div>
+
+    <!-- ====== NOTES SECTION ====== -->
+    <div id="section-notes" style="display:none">
+      <div class="section-title">📝 ملاحظاتي</div>
+      <div id="notes-content"></div>
+    </div>
+
+    <!-- ====== BOOKMARKS SECTION ====== -->
+    <div id="section-bookmarks" style="display:none">
+      <div class="section-title">🔖 إشاراتي</div>
+      <div id="bookmarks-content"></div>
     </div>
 
     <!-- ====== PROGRESS SECTION ====== -->
@@ -12889,6 +12920,7 @@ body {
             <option value="python">🐍 Python</option>
             <option value="os">💻 أنظمة التشغيل</option>
             <option value="communication">🗣️ مهارات التواصل</option>
+            <option value="english">🇬🇧 الإنجليزية التطبيقية</option>
           </select>
         </div>
       </div>
@@ -13114,7 +13146,7 @@ function enterApp() {
   document.body.setAttribute('data-gender', APP.student.gender || 'male');
   updateStudentUI();
   showPage('page-app');
-  setupAdminUI(); setTimeout(setupAdminTopbarBtn, 800);
+  setupAdminUI(); setTimeout(setupAdminTopbarBtn, 800); if (typeof startPresencePing==='function') startPresencePing();
 
   // Pyodide: on-demand only
 
@@ -13139,6 +13171,7 @@ function enterApp() {
 }
 
 function logoutStudent() {
+  if (typeof stopPresencePing==='function') stopPresencePing();
   closeSidebar();
   saveCurrentStudent();
   clearLocation();
@@ -13233,6 +13266,19 @@ function showSection(name) {
   if (name === 'subjects') renderAllSubjects();
 
   if (window.innerWidth <= 768) closeSidebar();
+
+  if (name === 'planner') {
+    var pc = document.getElementById('planner-content');
+    if (pc && typeof buildPlannerPanel === 'function') pc.innerHTML = buildPlannerPanel();
+  }
+  if (name === 'notes') {
+    var nc = document.getElementById('notes-content');
+    if (nc && typeof buildNotesPanel === 'function') nc.innerHTML = buildNotesPanel();
+  }
+  if (name === 'bookmarks') {
+    var bc = document.getElementById('bookmarks-content');
+    if (bc && typeof buildBookmarksPanel === 'function') bc.innerHTML = buildBookmarksPanel();
+  }
 }
 
 function openSidebar() {
@@ -13256,6 +13302,9 @@ function toggleSidebar() {
 }
 
 function initDashboard() {
+  // Restore uploaded lessons into CURRICULUM first
+  if (typeof restoreCustomSubjects === 'function') restoreCustomSubjects();
+  if (typeof restoreUserLessons === 'function') restoreUserLessons();
   // Hide API key banner if platform key is active
   if (window._ZAD_PLATFORM_KEY) {
     var b = document.getElementById('api-key-banner');
@@ -13268,6 +13317,20 @@ function initDashboard() {
     refreshUserCurriculumSection();
   }
   if (typeof updateApiBanner === 'function') updateApiBanner();
+  // Daily challenge widget
+  var dc = document.getElementById('daily-challenge-widget');
+  if (dc && typeof buildDailyChallenge === 'function') dc.innerHTML = buildDailyChallenge();
+  // Planner widget preview
+  var pw = document.getElementById('planner-widget');
+  if (pw && typeof buildPlannerPanel === 'function') {
+    var tasks = getPlannerTasks ? getPlannerTasks() : [];
+    var doneCnt = tasks.filter(function(t){return t.done;}).length;
+    pw.innerHTML = '<div style="background:rgba(108,99,255,0.06);border:1.5px solid rgba(108,99,255,0.22);border-radius:16px;padding:14px 16px;cursor:pointer" onclick="showSection(\'planner\')">'
+      + '<div style="display:flex;align-items:center;gap:8px"><span style="font-size:1.1rem">📅</span>'
+      + '<span style="font-weight:800;font-size:0.88rem">مخطط الدراسة</span>'
+      + '<span style="margin-right:auto;font-size:0.78rem;color:var(--text-muted)">' + doneCnt + '/' + tasks.length + ' مهمة مكتملة</span>'
+      + '<span style="color:var(--primary);font-size:0.8rem">←</span></div></div>';
+  }
 }
 
 function updateStats() {
@@ -13288,30 +13351,37 @@ function updateStats() {
 function renderSubjectCards(containerId, limit) {
   const container = document.getElementById(containerId);
   if (!container) return;
-  
-  const subjects = Object.values(CURRICULUM).slice(0, limit);
+
+  const subjects = Object.values(CURRICULUM).slice(0, limit || 99);
   container.innerHTML = subjects.map(s => {
-    const prog = APP.progress.subjectProgress[s.id] || 0;
-    const chapters = s.chapters ? s.chapters.length : 0;
+    const prog      = APP.progress.subjectProgress[s.id] || 0;
+    const chapters  = s.chapters ? s.chapters.length : 0;
+    const isCustom  = s.id && s.id.startsWith('custom_');
+    const color     = s.color || '#6C63FF';
+    const totalLessons = s.chapters ? s.chapters.reduce(function(acc,ch){ return acc+(ch.lessons?ch.lessons.length:0); },0) : 0;
     return `
-      <div class="subject-card" onclick="showSubject('${s.id}')">
-        <div class="subject-icon-wrap" style="background: ${s.color}22; color: ${s.color}">
-          ${s.icon}
+      <div class="subject-card" data-subject-id="${s.id}" style="position:relative" onclick="showSubject('${s.id}')">
+        ${isCustom ? `<button onclick="event.stopPropagation();deleteSubject('${s.id}')"
+          style="position:absolute;top:8px;left:8px;z-index:2;width:26px;height:26px;border-radius:50%;border:none;
+          background:rgba(255,82,82,0.15);color:#FF5252;font-size:0.75rem;cursor:pointer;display:flex;align-items:center;justify-content:center"
+          title="حذف المادة">🗑️</button>` : ''}
+        <div class="subject-icon-wrap" style="background: ${color}22; color: ${color}">
+          ${s.icon || '📚'}
         </div>
         <div class="subject-title">${s.title}</div>
-        <div class="subject-desc">${s.description}</div>
+        <div class="subject-desc">${s.description || ''}</div>
         <div class="progress-bar-wrap">
           <div class="progress-label">
             <span>التقدم</span>
             <span>${prog}%</span>
           </div>
           <div class="progress-bar">
-            <div class="progress-fill" style="width: ${prog}%; background: linear-gradient(to right, ${s.color}, ${s.color}88)"></div>
+            <div class="progress-fill" style="width: ${prog}%; background: linear-gradient(to right, ${color}, ${color}88)"></div>
           </div>
         </div>
         <div class="subject-meta">
-          <span class="subject-chapters">${chapters} فصول • ${chapters * 2} دروس</span>
-          <button class="subject-start-btn" style="background: linear-gradient(135deg, ${s.color}, ${s.color}88)">
+          <span class="subject-chapters">${chapters} فصول • ${totalLessons} درس</span>
+          <button class="subject-start-btn" style="background: linear-gradient(135deg, ${color}, ${color}88)">
             ابدأ →
           </button>
         </div>
@@ -14845,6 +14915,7 @@ function showExamGenerator() {
             <option value="python">🐍 برمجة Python</option>
             <option value="os">💻 أنظمة التشغيل</option>
             <option value="communication">🗣️ مهارات التواصل</option>
+            <option value="english">🇬🇧 الإنجليزية التطبيقية</option>
             <option value="mixed">🌐 مزيج من جميع المواد</option>
           </select>
         </div>
@@ -16984,6 +17055,7 @@ function fileIcon(name) {
 
 function trackUserActivity(tabName) {
   if (!APP.student.email) return;
+  window._currentTab = tabName;
   var act = getAct();
   act[APP.student.email] = {
     lastSeen: Date.now(), tab: tabName,
@@ -16991,6 +17063,8 @@ function trackUserActivity(tabName) {
     level: APP.student.level||'beginner'
   };
   saveAct(act);
+  // Also ping remote worker
+  if (typeof pingWorker === 'function') pingWorker(tabName);
 }
 
 function setupAdminUI() {
@@ -17008,7 +17082,11 @@ function refreshAdminBadge() {
 function showAdminPanel() {
   if (!isAdmin()) return showToast('🚫 غير مصرح','error');
   var ov = document.getElementById('admin-panel-overlay');
-  if (ov) { ov.classList.add('show'); adminTab('overview'); }
+  if (ov) {
+    ov.classList.add('show');
+    // Load real data async
+    setTimeout(buildAdminOverviewAsync, 100);
+  }
 }
 function closeAdminPanel() {
   var ov = document.getElementById('admin-panel-overlay');
@@ -17087,6 +17165,7 @@ function buildAdminOverview() {
   }).join('');
 
   return (typeof buildAdminPlatformKeySection==='function'?buildAdminPlatformKeySection():'')
+    +(typeof buildAdminSubjectsSection==='function'?buildAdminSubjectsSection():'')
     +'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-bottom:18px">'+
     statHTML+'</div>'+
     '<div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.1);border-radius:14px;padding:14px">'+
@@ -17734,26 +17813,55 @@ async function handleCurriculumUpload(input) {
   var file = input.files[0];
   input.value = '';
 
-  var subjectMap = {
-    '1':'statistics','2':'python','3':'os','4':'communication','5':'english'
-  };
-  var choice = prompt(
-    'اختر رقم المادة:\n1-الإحصاء  2-Python  3-أنظمة التشغيل  4-التواصل  5-الإنجليزية',
-    '1'
-  );
-  if (!choice) return;
-  var subjectId = subjectMap[choice] || 'statistics';
+  // Show subject picker modal
+  var subjectId = await pickSubjectModal();
+  if (!subjectId) return;
 
-  // Show loading immediately — no error before processing
   showUploadStatus('loading', '⏳ جاري رفع ومعالجة "' + file.name + '"...');
-
   try {
     await processUploadedFile(file, subjectId);
     setTimeout(refreshUserCurriculumSection, 2000);
   } catch(err) {
-    if (err && (err.message==='NO_API_KEY'||err.message==='INVALID_API_KEY')) return;
+    if (err && (err.message==='NO_API_KEY'||err.message==='BACKEND_NOT_CONFIGURED')) return;
     showUploadStatus('error', 'خطأ: ' + (err?err.message:''));
   }
+}
+
+function pickSubjectModal() {
+  return new Promise(function(resolve) {
+    var existing = document.getElementById('zad-subject-picker');
+    if (existing) existing.remove();
+
+    var active = typeof getActiveSubjects==='function' ? getActiveSubjects() : Object.keys(CURRICULUM);
+    var subjects = active.map(function(id) {
+      var s = CURRICULUM[id];
+      return s ? { id:id, title:s.title, icon:s.icon||'📚' } : null;
+    }).filter(Boolean);
+
+    var overlay = document.createElement('div');
+    overlay.id = 'zad-subject-picker';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;padding:20px;direction:rtl';
+
+    var items = subjects.map(function(s) {
+      return '<button onclick="document.getElementById(\'zad-subject-picker\')._resolve(\''+s.id+'\')" '
+        + 'style="width:100%;padding:12px 16px;margin-bottom:8px;border-radius:12px;border:1px solid var(--border);'
+        + 'background:rgba(255,255,255,0.04);color:var(--text);font-family:var(--font);font-size:0.9rem;'
+        + 'cursor:pointer;text-align:right;display:flex;align-items:center;gap:10px">'
+        + '<span style="font-size:1.3rem">' + s.icon + '</span>'
+        + '<span style="font-weight:700">' + s.title + '</span></button>';
+    }).join('');
+
+    overlay.innerHTML = '<div style="background:#1C1917;border:1.5px solid var(--border);border-radius:20px;padding:24px;max-width:380px;width:100%">'
+      + '<div style="font-weight:900;font-size:1rem;margin-bottom:16px;display:flex;align-items:center;gap:8px">'
+      + '📚 اختر المادة الدراسية</div>'
+      + items
+      + '<button onclick="document.getElementById(\'zad-subject-picker\')._resolve(null)" '
+      + 'style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text-muted);font-family:var(--font);cursor:pointer;margin-top:4px">إلغاء</button>'
+      + '</div>';
+
+    overlay._resolve = function(val) { overlay.remove(); resolve(val); };
+    document.body.appendChild(overlay);
+  });
 }
 function handleCurriculumDrop(event) {
   event.preventDefault();
@@ -18693,6 +18801,735 @@ function adminSaveWorkerURL() {
   showToast('✅ تم حفظ رابط الخادم — يعمل الآن لهذا الجهاز', 'success');
   setAdminPKStatus('success', '✅ رابط الخادم محفوظ: ' + url.slice(0,40) + '...');
 }
+
+// ══════════════════════════════════════════════════════════════
+// DYNAMIC SUBJECTS MANAGEMENT
+// ══════════════════════════════════════════════════════════════
+
+var ZAD_SUBJECTS_KEY = 'zad_custom_subjects_v1';
+
+function getActiveSubjects() {
+  try {
+    var saved = localStorage.getItem(ZAD_SUBJECTS_KEY);
+    if (saved) return JSON.parse(saved);
+  } catch(e) {}
+  // Default: all built-in subjects
+  return Object.keys(CURRICULUM);
+}
+
+function setActiveSubjects(list) {
+  localStorage.setItem(ZAD_SUBJECTS_KEY, JSON.stringify(list));
+}
+
+function getSubjectList() {
+  // All available subjects (built-in + custom)
+  return Object.keys(CURRICULUM).map(function(id) {
+    return { id: id, title: CURRICULUM[id].title, icon: CURRICULUM[id].icon || '📚' };
+  });
+}
+
+function buildAdminSubjectsSection() {
+  var active = getActiveSubjects();
+  var all    = getSubjectList();
+
+  var rows = all.map(function(s) {
+    var isActive = active.indexOf(s.id) >= 0;
+    return '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;'
+      + 'background:rgba(255,255,255,0.04);border-radius:10px;margin-bottom:6px">'
+      + '<span style="font-size:1.3rem">' + (s.icon||'📚') + '</span>'
+      + '<span style="flex:1;font-size:0.85rem;font-weight:700">' + s.title + '</span>'
+      + '<label style="display:flex;align-items:center;gap:6px;cursor:pointer">'
+      + '<input type="checkbox" id="subj-toggle-'+s.id+'" '
+      + (isActive ? 'checked' : '') + ' onchange="toggleSubjectActive(\''+s.id+'\')"'
+      + ' style="width:16px;height:16px;cursor:pointer">'
+      + '<span style="font-size:0.75rem;color:var(--text-muted)">'+(isActive?'مفعّل':'معطّل')+'</span>'
+      + '</label>'
+      + '</div>';
+  }).join('');
+
+  return '<div style="background:rgba(108,99,255,0.06);border:1.5px solid rgba(108,99,255,0.28);border-radius:18px;padding:18px;margin-bottom:18px">'
+    + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">'
+    + '<div style="width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,var(--primary),var(--secondary));display:flex;align-items:center;justify-content:center;font-size:1.2rem">📚</div>'
+    + '<div><div style="font-weight:900;font-size:0.92rem">إدارة المواد الدراسية</div>'
+    + '<div style="font-size:0.74rem;color:var(--text-muted)">فعّل أو عطّل المواد حسب الترم</div></div>'
+    + '</div>'
+    + rows
+    + '<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);font-size:0.75rem;color:var(--text-muted)">'
+    + '💡 المواد المعطّلة لن تظهر للطلاب في القوائم والاختبارات</div>'
+    + '</div>';
+}
+
+function toggleSubjectActive(subjectId) {
+  var active = getActiveSubjects();
+  var idx = active.indexOf(subjectId);
+  if (idx >= 0) {
+    active.splice(idx, 1);
+  } else {
+    active.push(subjectId);
+  }
+  setActiveSubjects(active);
+  showToast('✅ تم تحديث المواد', 'success');
+  // Refresh subjects grid if visible
+  if (typeof renderSubjectCards === 'function') {
+    renderSubjectCards('quick-subjects', 6);
+    var grid = document.getElementById('all-subjects-grid');
+    if (grid) renderSubjectCards('all-subjects-grid', 99);
+  }
+  // Refresh admin panel
+  var overviewEl = document.getElementById('admin-panel-content');
+  if (overviewEl && typeof buildAdminOverview === 'function') {
+    overviewEl.innerHTML = buildAdminOverview();
+  }
+}
+
+// Override renderSubjectCards to filter by active subjects
+var _origRenderSubjectCards = null;
+(function() {
+  var _orig = typeof renderSubjectCards === 'function' ? renderSubjectCards : null;
+  if (_orig) {
+    _origRenderSubjectCards = _orig;
+    window.renderSubjectCards = function(containerId, maxCount) {
+      var active = getActiveSubjects();
+      // Temporarily filter CURRICULUM
+      var origKeys = Object.keys(CURRICULUM);
+      var filtered = origKeys.filter(function(k){ return active.indexOf(k)>=0; });
+      // We can't easily filter CURRICULUM, so just call original
+      // The filtering happens in the UI
+      _orig(containerId, maxCount);
+      // After render, hide inactive subjects
+      setTimeout(function() {
+        var container = document.getElementById(containerId);
+        if (!container) return;
+        container.querySelectorAll('[data-subject-id]').forEach(function(el) {
+          var sid = el.getAttribute('data-subject-id');
+          if (sid && active.indexOf(sid) < 0) el.style.display = 'none';
+        });
+      }, 50);
+    };
+  }
+})();
+
+// ── Restore user-uploaded lessons into CURRICULUM on every load ──
+function restoreUserLessons() {
+  try {
+    var uploads = ZAD_UPLOADS.getAll();
+    uploads.forEach(function(bundle) {
+      if (bundle.lesson && bundle.subjectId && bundle.lessonId) {
+        _injectLessonToCurriculum(bundle.lesson, bundle.subjectId);
+      }
+    });
+  } catch(e) { console.warn('restoreUserLessons error:', e); }
+}
+
+// ══════════════════════════════════════════════════════════════
+// STUDENT SUBJECT & LESSON MANAGEMENT
+// ══════════════════════════════════════════════════════════════
+
+var ZAD_CUSTOM_SUBJECTS_KEY = 'zad_student_subjects_v1';
+
+// Get all subjects (built-in + custom added by student)
+function getAllSubjectsForStudent() {
+  var builtin = Object.keys(CURRICULUM).map(function(id) {
+    var s = CURRICULUM[id];
+    return { id:id, title:s.title, icon:s.icon||'📚', builtin:true };
+  });
+  try {
+    var email = APP.student.email || 'guest';
+    var key = ZAD_CUSTOM_SUBJECTS_KEY + '_' + email.replace(/[^a-z0-9]/gi,'_');
+    var custom = JSON.parse(localStorage.getItem(key) || '[]');
+    return builtin.concat(custom);
+  } catch(e) { return builtin; }
+}
+
+function saveCustomSubjects(list) {
+  var email = APP.student.email || 'guest';
+  var key = ZAD_CUSTOM_SUBJECTS_KEY + '_' + email.replace(/[^a-z0-9]/gi,'_');
+  localStorage.setItem(key, JSON.stringify(list));
+}
+
+function getCustomSubjects() {
+  var email = APP.student.email || 'guest';
+  var key = ZAD_CUSTOM_SUBJECTS_KEY + '_' + email.replace(/[^a-z0-9]/gi,'_');
+  try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch(e) { return []; }
+}
+
+// Show "Add Subject" modal
+function showAddSubjectModal() {
+  var existing = document.getElementById('zad-add-subject-modal');
+  if (existing) existing.remove();
+
+  var icons = ['📚','📖','🔬','💻','🧮','🎨','🌍','⚗️','📐','🏛️','🎯','💡','🧬','📝','🔭'];
+
+  var overlay = document.createElement('div');
+  overlay.id = 'zad-add-subject-modal';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;padding:20px;direction:rtl';
+
+  overlay.innerHTML = '<div style="background:#1C1917;border:1.5px solid rgba(108,99,255,0.4);border-radius:20px;padding:24px;max-width:420px;width:100%;max-height:90vh;overflow-y:auto">'
+    + '<div style="font-weight:900;font-size:1.05rem;margin-bottom:18px">➕ إضافة مادة جديدة</div>'
+    + '<div style="margin-bottom:12px">'
+    + '<label style="font-size:0.78rem;color:var(--text-muted);display:block;margin-bottom:5px">اسم المادة</label>'
+    + '<input id="new-subject-title" type="text" placeholder="مثال: الفيزياء، الكيمياء..." maxlength="40"'
+    + ' style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text);font-family:var(--font);font-size:0.9rem;outline:none;direction:rtl">'
+    + '</div>'
+    + '<div style="margin-bottom:16px">'
+    + '<label style="font-size:0.78rem;color:var(--text-muted);display:block;margin-bottom:8px">اختر أيقونة</label>'
+    + '<div style="display:flex;flex-wrap:wrap;gap:6px">'
+    + icons.map(function(ic) {
+        return '<button onclick="selectSubjectIcon(\'' + ic + '\')" id="icon-btn-' + ic + '"'
+          + ' style="width:38px;height:38px;border-radius:8px;border:1.5px solid var(--border);background:rgba(255,255,255,0.04);font-size:1.2rem;cursor:pointer">' + ic + '</button>';
+      }).join('')
+    + '</div>'
+    + '<div id="selected-icon-display" style="margin-top:8px;font-size:0.78rem;color:var(--text-muted)">الأيقونة المختارة: <span id="chosen-icon">📚</span></div>'
+    + '</div>'
+    + '<div style="display:flex;gap:10px">'
+    + '<button onclick="document.getElementById(\'zad-add-subject-modal\').remove()" style="flex:1;padding:11px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text-muted);font-family:var(--font);cursor:pointer">إلغاء</button>'
+    + '<button onclick="confirmAddSubject()" style="flex:2;padding:11px;border-radius:10px;border:none;background:linear-gradient(135deg,var(--primary),var(--secondary));color:white;font-family:var(--font);font-weight:800;cursor:pointer">✅ إضافة المادة</button>'
+    + '</div>'
+    + '</div>';
+
+  overlay._selectedIcon = '📚';
+  document.body.appendChild(overlay);
+}
+
+function selectSubjectIcon(icon) {
+  var overlay = document.getElementById('zad-add-subject-modal');
+  if (overlay) overlay._selectedIcon = icon;
+  var display = document.getElementById('chosen-icon');
+  if (display) display.textContent = icon;
+  // Highlight selected
+  document.querySelectorAll('[id^="icon-btn-"]').forEach(function(btn) {
+    btn.style.borderColor = 'var(--border)';
+    btn.style.background = 'rgba(255,255,255,0.04)';
+  });
+  var sel = document.getElementById('icon-btn-' + icon);
+  if (sel) { sel.style.borderColor = 'var(--primary)'; sel.style.background = 'rgba(108,99,255,0.2)'; }
+}
+
+function confirmAddSubject() {
+  var titleInp = document.getElementById('new-subject-title');
+  var overlay  = document.getElementById('zad-add-subject-modal');
+  if (!titleInp || !overlay) return;
+
+  var title = titleInp.value.trim();
+  if (!title) { titleInp.style.borderColor = '#FF5252'; return; }
+
+  var icon = overlay._selectedIcon || '📚';
+  var id   = 'custom_' + Date.now();
+
+  // Add to CURRICULUM
+  CURRICULUM[id] = {
+    id: id, title: title, icon: icon, description: title,
+    chapters: [{ id:'ch1', title: title, lessons:[] }]
+  };
+
+  // Save to localStorage
+  var custom = getCustomSubjects();
+  custom.push({ id:id, title:title, icon:icon, description:title,
+    chapters:[{id:'ch1',title:title,lessons:[]}] });
+  saveCustomSubjects(custom);
+
+  overlay.remove();
+  showToast('✅ تمت إضافة "' + title + '"', 'success');
+
+  // Refresh UI
+  renderSubjectCards('quick-subjects', 6);
+  var grid = document.getElementById('all-subjects-grid');
+  if (grid) renderSubjectCards('all-subjects-grid', 99);
+  if (typeof refreshUserCurriculumSection === 'function') refreshUserCurriculumSection();
+}
+
+// Delete a subject (custom only)
+function deleteSubject(subjectId) {
+  var isCustom = subjectId.startsWith('custom_');
+  if (!isCustom) {
+    showToast('لا يمكن حذف المواد الأساسية — فقط المواد المضافة', 'error');
+    return;
+  }
+  var s = CURRICULUM[subjectId];
+  var title = s ? s.title : subjectId;
+
+  var overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;padding:20px;direction:rtl';
+  overlay.innerHTML = '<div style="background:#1C1917;border:1.5px solid rgba(255,82,82,0.4);border-radius:20px;padding:28px;max-width:360px;width:100%;text-align:center">'
+    + '<div style="font-size:2rem;margin-bottom:12px">🗑️</div>'
+    + '<div style="font-weight:900;margin-bottom:8px">حذف "' + title + '"؟</div>'
+    + '<div style="font-size:0.82rem;color:#aaa;margin-bottom:20px">سيتم حذف المادة وجميع دروسها المرفوعة من حسابك</div>'
+    + '<div style="display:flex;gap:10px;justify-content:center">'
+    + '<button id="del-sub-cancel" style="padding:10px 22px;border-radius:10px;border:1px solid #555;background:transparent;color:#aaa;font-family:var(--font);cursor:pointer">إلغاء</button>'
+    + '<button id="del-sub-ok" style="padding:10px 22px;border-radius:10px;border:none;background:linear-gradient(135deg,#FF5252,#C62828);color:white;font-family:var(--font);font-weight:700;cursor:pointer">حذف نهائياً</button>'
+    + '</div></div>';
+
+  document.body.appendChild(overlay);
+  document.getElementById('del-sub-cancel').onclick = function() { overlay.remove(); };
+  document.getElementById('del-sub-ok').onclick = function() {
+    overlay.remove();
+    // Remove from CURRICULUM
+    delete CURRICULUM[subjectId];
+    // Remove from custom subjects
+    var custom = getCustomSubjects().filter(function(s){ return s.id !== subjectId; });
+    saveCustomSubjects(custom);
+    // Remove all uploads for this subject
+    var uploads = ZAD_UPLOADS.getAll().filter(function(u){ return u.subjectId !== subjectId; });
+    var email = APP.student.email || 'guest';
+    localStorage.setItem(ZAD_UPLOADS._key(), JSON.stringify(uploads));
+
+    showToast('🗑️ تم حذف "' + title + '"', 'success');
+    renderSubjectCards('quick-subjects', 6);
+    var grid = document.getElementById('all-subjects-grid');
+    if (grid) renderSubjectCards('all-subjects-grid', 99);
+    if (typeof refreshUserCurriculumSection === 'function') refreshUserCurriculumSection();
+    showSection('dashboard');
+  };
+}
+
+// Restore custom subjects on login
+function restoreCustomSubjects() {
+  var custom = getCustomSubjects();
+  custom.forEach(function(s) {
+    if (!CURRICULUM[s.id]) {
+      CURRICULUM[s.id] = s;
+    }
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+// COMPLETE PRODUCT FEATURES
+// ══════════════════════════════════════════════════════════════
+
+// ── 1. GLOBAL SEARCH ──────────────────────────────────────────
+function buildSearchPanel() {
+  return '<div style="direction:rtl">'
+    + '<div style="position:relative;margin-bottom:16px">'
+    + '<input id="global-search-inp" type="text" placeholder="🔍 ابحث في الدروس، المصطلحات..." oninput="doGlobalSearch(this.value)"'
+    + ' style="width:100%;box-sizing:border-box;padding:12px 16px;border-radius:14px;border:1.5px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text);font-family:var(--font);font-size:0.9rem;outline:none;direction:rtl">'
+    + '</div>'
+    + '<div id="search-results" style="min-height:100px"></div>'
+    + '</div>';
+}
+
+function doGlobalSearch(query) {
+  var out = document.getElementById('search-results');
+  if (!out) return;
+  query = (query||'').trim().toLowerCase();
+  if (!query || query.length < 2) { out.innerHTML = '<div style="color:var(--text-muted);text-align:center;padding:20px">اكتب للبحث...</div>'; return; }
+
+  var results = [];
+  Object.keys(CURRICULUM).forEach(function(sid) {
+    var subj = CURRICULUM[sid];
+    (subj.chapters||[]).forEach(function(ch) {
+      (ch.lessons||[]).forEach(function(l) {
+        var cnt = l.content || {};
+        var text = [l.title, cnt.definition||'', (cnt.keyTerms||[]).map(function(k){return k.term+' '+k.def;}).join(' ')].join(' ').toLowerCase();
+        if (text.indexOf(query) >= 0) {
+          results.push({ subjectId:sid, subjectTitle:subj.title, lessonId:l.id, title:l.title, def:(cnt.definition||'').slice(0,80) });
+        }
+      });
+    });
+  });
+
+  if (!results.length) { out.innerHTML = '<div style="color:var(--text-muted);text-align:center;padding:20px">لا توجد نتائج لـ "'+query+'"</div>'; return; }
+
+  out.innerHTML = '<div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:10px">'+results.length+' نتيجة</div>'
+    + results.slice(0,20).map(function(r) {
+      return '<div onclick="openLesson(\''+r.subjectId+'\',\''+r.lessonId+'\')" style="padding:12px;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:12px;margin-bottom:8px;cursor:pointer">'
+        + '<div style="font-size:0.7rem;color:var(--primary);margin-bottom:3px">'+r.subjectTitle+'</div>'
+        + '<div style="font-weight:700;font-size:0.88rem;margin-bottom:3px">'+r.title+'</div>'
+        + (r.def ? '<div style="font-size:0.78rem;color:var(--text-muted)">'+r.def+'...</div>' : '')
+        + '</div>';
+    }).join('');
+}
+
+// ── 2. NOTES SYSTEM ───────────────────────────────────────────
+var ZAD_NOTES_KEY = 'zad_notes_v1';
+
+function getNotes() {
+  var email = APP.student.email || 'guest';
+  var key = ZAD_NOTES_KEY + '_' + email.replace(/[^a-z0-9]/gi,'_');
+  try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch(e) { return []; }
+}
+
+function saveNote(lessonId, text) {
+  var email = APP.student.email || 'guest';
+  var key = ZAD_NOTES_KEY + '_' + email.replace(/[^a-z0-9]/gi,'_');
+  var notes = getNotes();
+  var existing = notes.findIndex(function(n){ return n.lessonId === lessonId; });
+  if (existing >= 0) notes[existing] = { lessonId:lessonId, text:text, date:Date.now() };
+  else notes.push({ lessonId:lessonId, text:text, date:Date.now() });
+  notes = notes.filter(function(n){ return n.text.trim(); });
+  localStorage.setItem(key, JSON.stringify(notes));
+}
+
+function buildNotesPanel() {
+  var notes = getNotes();
+  var notesHTML = notes.length ? notes.map(function(n) {
+    return '<div style="padding:12px;background:rgba(255,214,0,0.06);border:1px solid rgba(255,214,0,0.2);border-radius:12px;margin-bottom:8px">'
+      + '<div style="font-size:0.7rem;color:#E8A020;margin-bottom:4px">' + new Date(n.date).toLocaleDateString('ar') + '</div>'
+      + '<div style="font-size:0.83rem;line-height:1.6">' + (n.text||'').replace(/\n/g,'<br>') + '</div>'
+      + '</div>';
+  }).join('') : '<div style="color:var(--text-muted);text-align:center;padding:20px">لا توجد ملاحظات بعد<br><small>أضف ملاحظات من داخل كل درس</small></div>';
+
+  return '<div style="direction:rtl">'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">'
+    + '<div style="font-weight:800">📝 ملاحظاتي (' + notes.length + ')</div>'
+    + '</div>'
+    + notesHTML + '</div>';
+}
+
+// ── 3. BOOKMARKS ──────────────────────────────────────────────
+var ZAD_BOOKMARKS_KEY = 'zad_bookmarks_v1';
+
+function getBookmarks() {
+  var email = APP.student.email || 'guest';
+  var key = ZAD_BOOKMARKS_KEY + '_' + email.replace(/[^a-z0-9]/gi,'_');
+  try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch(e) { return []; }
+}
+
+function toggleBookmark(subjectId, lessonId, title) {
+  var email = APP.student.email || 'guest';
+  var key = ZAD_BOOKMARKS_KEY + '_' + email.replace(/[^a-z0-9]/gi,'_');
+  var bookmarks = getBookmarks();
+  var id = subjectId + '__' + lessonId;
+  var idx = bookmarks.findIndex(function(b){ return b.id === id; });
+  if (idx >= 0) {
+    bookmarks.splice(idx, 1);
+    showToast('تم إزالة الإشارة المرجعية', 'success');
+  } else {
+    bookmarks.push({ id:id, subjectId:subjectId, lessonId:lessonId, title:title, date:Date.now() });
+    showToast('✅ تمت الإضافة للإشارات المرجعية', 'success');
+  }
+  localStorage.setItem(key, JSON.stringify(bookmarks));
+  return idx < 0; // returns true if added
+}
+
+function buildBookmarksPanel() {
+  var bookmarks = getBookmarks();
+  var html = bookmarks.length ? bookmarks.map(function(b) {
+    return '<div style="display:flex;align-items:center;gap:10px;padding:12px;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:12px;margin-bottom:8px;cursor:pointer" onclick="openLesson(\''+b.subjectId+'\',\''+b.lessonId+'\')">'
+      + '<span style="font-size:1.3rem">🔖</span>'
+      + '<div style="flex:1"><div style="font-weight:700;font-size:0.88rem">'+b.title+'</div>'
+      + '<div style="font-size:0.7rem;color:var(--text-muted)">'+new Date(b.date).toLocaleDateString('ar')+'</div></div>'
+      + '<button onclick="event.stopPropagation();toggleBookmark(\''+b.subjectId+'\',\''+b.lessonId+'\',\''+b.title+'\');buildBookmarksPanel && showSection(\'bookmarks\')" style="padding:4px 8px;border-radius:6px;border:none;background:rgba(255,82,82,0.1);color:#FF5252;cursor:pointer;font-size:0.7rem">إزالة</button>'
+      + '</div>';
+  }).join('') : '<div style="color:var(--text-muted);text-align:center;padding:20px">لا توجد إشارات مرجعية</div>';
+
+  return '<div style="direction:rtl"><div style="font-weight:800;margin-bottom:16px">🔖 إشاراتي المرجعية (' + bookmarks.length + ')</div>' + html + '</div>';
+}
+
+// ── 4. STUDY PLANNER ──────────────────────────────────────────
+var ZAD_PLANNER_KEY = 'zad_planner_v1';
+
+function getPlannerTasks() {
+  var email = APP.student.email || 'guest';
+  var key = ZAD_PLANNER_KEY + '_' + email.replace(/[^a-z0-9]/gi,'_');
+  try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch(e) { return []; }
+}
+
+function savePlannerTasks(tasks) {
+  var email = APP.student.email || 'guest';
+  var key = ZAD_PLANNER_KEY + '_' + email.replace(/[^a-z0-9]/gi,'_');
+  localStorage.setItem(key, JSON.stringify(tasks));
+}
+
+function buildPlannerPanel() {
+  var tasks = getPlannerTasks();
+  var doneCnt = tasks.filter(function(t){ return t.done; }).length;
+
+  return '<div style="direction:rtl">'
+    + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">'
+    + '<div style="font-weight:800;flex:1">📅 مخطط الدراسة (' + doneCnt + '/' + tasks.length + ')</div>'
+    + '</div>'
+    + '<div style="display:flex;gap:8px;margin-bottom:14px">'
+    + '<input id="planner-task-inp" placeholder="أضف مهمة دراسية..." style="flex:1;padding:9px 12px;border-radius:10px;border:1.5px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text);font-family:var(--font);font-size:0.85rem;outline:none;direction:rtl">'
+    + '<button onclick="addPlannerTask()" style="padding:9px 14px;border-radius:10px;border:none;background:var(--primary);color:white;font-family:var(--font);font-weight:700;cursor:pointer">+ إضافة</button>'
+    + '</div>'
+    + '<div id="planner-tasks-list">' + renderPlannerTasks(tasks) + '</div>'
+    + '</div>';
+}
+
+function renderPlannerTasks(tasks) {
+  if (!tasks.length) return '<div style="color:var(--text-muted);text-align:center;padding:16px">لا توجد مهام — أضف مهمة للبدء</div>';
+  return tasks.map(function(t,i) {
+    return '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:10px;margin-bottom:6px">'
+      + '<input type="checkbox" ' + (t.done?'checked':'') + ' onchange="togglePlannerTask(' + i + ')" style="width:16px;height:16px;cursor:pointer">'
+      + '<span style="flex:1;font-size:0.85rem;' + (t.done?'text-decoration:line-through;color:var(--text-muted)':'') + '">' + t.text + '</span>'
+      + '<button onclick="deletePlannerTask(' + i + ')" style="padding:3px 7px;border-radius:6px;border:none;background:rgba(255,82,82,0.1);color:#FF5252;cursor:pointer;font-size:0.7rem">✕</button>'
+      + '</div>';
+  }).join('');
+}
+
+function addPlannerTask() {
+  var inp = document.getElementById('planner-task-inp');
+  if (!inp || !inp.value.trim()) return;
+  var tasks = getPlannerTasks();
+  tasks.unshift({ text: inp.value.trim(), done: false, date: Date.now() });
+  savePlannerTasks(tasks);
+  inp.value = '';
+  var list = document.getElementById('planner-tasks-list');
+  if (list) list.innerHTML = renderPlannerTasks(tasks);
+}
+
+function togglePlannerTask(idx) {
+  var tasks = getPlannerTasks();
+  if (tasks[idx]) tasks[idx].done = !tasks[idx].done;
+  savePlannerTasks(tasks);
+  var list = document.getElementById('planner-tasks-list');
+  if (list) list.innerHTML = renderPlannerTasks(tasks);
+}
+
+function deletePlannerTask(idx) {
+  var tasks = getPlannerTasks();
+  tasks.splice(idx, 1);
+  savePlannerTasks(tasks);
+  var list = document.getElementById('planner-tasks-list');
+  if (list) list.innerHTML = renderPlannerTasks(tasks);
+}
+
+// ── 5. CERTIFICATE GENERATOR ──────────────────────────────────
+function buildCertificate(subjectId) {
+  var subj = CURRICULUM[subjectId];
+  if (!subj) return '';
+  var name = APP.student.name || 'الطالب';
+  var date = new Date().toLocaleDateString('ar-SA', {year:'numeric',month:'long',day:'numeric'});
+
+  return '<div style="direction:rtl;text-align:center;padding:30px 20px;background:linear-gradient(135deg,#1C1917,#2a2420);border:2px solid #E8A020;border-radius:24px;position:relative;overflow:hidden">'
+    + '<div style="position:absolute;top:0;left:0;right:0;bottom:0;background:radial-gradient(circle at 30% 30%,rgba(232,160,32,0.05),transparent);pointer-events:none"></div>'
+    + '<div style="font-size:2.5rem;margin-bottom:8px">🏆</div>'
+    + '<div style="font-size:0.7rem;letter-spacing:3px;color:#E8A020;margin-bottom:8px">شهادة إتمام</div>'
+    + '<div style="font-size:1.5rem;font-weight:900;margin-bottom:6px">' + name + '</div>'
+    + '<div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:16px">أتم دراسة مادة</div>'
+    + '<div style="font-size:1.2rem;font-weight:900;color:#E8A020;margin-bottom:20px">' + (subj.icon||'📚') + ' ' + subj.title + '</div>'
+    + '<div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:20px">' + date + '</div>'
+    + '<div style="display:flex;gap:8px;justify-content:center">'
+    + '<button onclick="printCertificate()" style="padding:10px 20px;border-radius:10px;border:none;background:#E8A020;color:#1C1917;font-weight:800;font-family:var(--font);cursor:pointer">🖨️ طباعة</button>'
+    + '</div></div>';
+}
+
+function printCertificate() {
+  var cert = document.querySelector('[data-cert]');
+  if (!cert) return;
+  var w = window.open('','_blank');
+  w.document.write('<html dir="rtl"><head><meta charset="utf-8"><title>شهادة زاد</title>'
+    + '<style>body{font-family:Cairo,Arial,sans-serif;background:#1C1917;color:white;display:flex;justify-content:center;padding:40px}</style></head>'
+    + '<body>' + cert.outerHTML + '<script>window.print();<\/script></body></html>');
+  w.document.close();
+}
+
+// ── 6. DAILY CHALLENGE ────────────────────────────────────────
+function buildDailyChallenge() {
+  var today = new Date().toDateString();
+  var key = 'zad_daily_' + (APP.student.email||'guest').replace(/[^a-z0-9]/gi,'_') + '_' + today;
+  var done = localStorage.getItem(key);
+
+  // Pick a random subject for challenge
+  var subjects = Object.keys(CURRICULUM);
+  var todayIdx = new Date().getDate() % subjects.length;
+  var sid = subjects[todayIdx];
+  var subj = CURRICULUM[sid];
+  if (!subj) return '';
+
+  return '<div style="background:linear-gradient(135deg,rgba(255,214,0,0.1),rgba(255,107,53,0.06));border:1.5px solid rgba(255,214,0,0.3);border-radius:16px;padding:16px;margin-bottom:14px">'
+    + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">'
+    + '<div style="width:36px;height:36px;border-radius:10px;background:rgba(255,214,0,0.2);display:flex;align-items:center;justify-content:center;font-size:1.2rem">⚡</div>'
+    + '<div><div style="font-weight:800;font-size:0.88rem">تحدي اليوم</div>'
+    + '<div style="font-size:0.72rem;color:var(--text-muted)">تحدي يومي في ' + (subj.title||'') + '</div></div>'
+    + (done ? '<span style="margin-right:auto;padding:4px 10px;background:rgba(40,202,65,0.15);color:#28CA41;border-radius:20px;font-size:0.72rem;font-weight:700">✅ مكتمل</span>' : '')
+    + '</div>'
+    + (!done ? '<button onclick="startQuizForSubject(\''+sid+'\');localStorage.setItem(\''+key+'\',\'1\')" style="width:100%;padding:10px;border-radius:10px;border:none;background:linear-gradient(135deg,#FFD600,#FF6B35);color:#1C1917;font-family:var(--font);font-weight:800;cursor:pointer">ابدأ التحدي</button>' : '<div style="font-size:0.8rem;color:#28CA41;text-align:center">أحسنت! أنجزت تحدي اليوم 🎉</div>')
+    + '</div>';
+}
+
+// ── 7. Add new sections to navigation ─────────────────────────
+function showSearchSection() {
+  var sec = document.getElementById('section-dashboard');
+  if (!sec) return;
+  // Build search UI inline above dashboard
+  var existing = document.getElementById('zad-search-overlay');
+  if (existing) { existing.remove(); return; }
+  var overlay = document.createElement('div');
+  overlay.id = 'zad-search-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.9);padding:20px;direction:rtl;overflow-y:auto';
+  overlay.innerHTML = '<div style="max-width:600px;margin:0 auto">'
+    + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">'
+    + '<button onclick="document.getElementById(\'zad-search-overlay\').remove()" style="padding:8px;border-radius:8px;border:none;background:rgba(255,255,255,0.1);color:var(--text);cursor:pointer">✕</button>'
+    + '<div style="font-weight:800;font-size:1rem">🔍 البحث الشامل</div></div>'
+    + buildSearchPanel()
+    + '</div>';
+  document.body.appendChild(overlay);
+  setTimeout(function(){ var inp=document.getElementById('global-search-inp'); if(inp) inp.focus(); }, 100);
+}
+
+function showPlannerSection() {
+  showSection('dashboard');
+  setTimeout(function() {
+    var el = document.getElementById('planner-widget');
+    if (el) el.scrollIntoView({behavior:'smooth'});
+  }, 200);
+}
+
+// ══════════════════════════════════════════════════════════════
+// REAL-TIME STUDENT TRACKING via Cloudflare Worker
+// ══════════════════════════════════════════════════════════════
+
+var ZAD_WORKER = 'https://zad-proxy.atif-alamodi.workers.dev';
+var _pingInterval = null;
+
+// Called on login and periodically — sends presence to worker
+function pingWorker(tabName) {
+  if (!APP.student.email || !ZAD_WORKER) return;
+  try {
+    fetch(ZAD_WORKER + '/ping', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        email    : APP.student.email,
+        name     : APP.student.name  || APP.student.email,
+        tab      : tabName || 'لوحة التحكم',
+        joinDate : APP.student.joinDate || '',
+        level    : APP.student.level   || 'beginner'
+      })
+    }).catch(function(){});
+  } catch(e) {}
+}
+
+// Start pinging every 2 minutes
+function startPresencePing() {
+  pingWorker('لوحة التحكم');
+  clearInterval(_pingInterval);
+  _pingInterval = setInterval(function() {
+    pingWorker(window._currentTab || 'لوحة التحكم');
+  }, 2 * 60 * 1000);
+}
+
+// Stop pinging on logout
+function stopPresencePing() {
+  clearInterval(_pingInterval);
+}
+
+// ── Admin: fetch real students from worker ─────────────────────
+async function fetchRealStudents() {
+  try {
+    var r = await fetch(ZAD_WORKER + '/students');
+    if (!r.ok) return null;
+    return await r.json();
+  } catch(e) { return null; }
+}
+
+// ── Rewrite buildAdminOverview with REAL data ──────────────────
+async function buildAdminOverviewAsync() {
+  var el = document.getElementById('admin-panel-content');
+  if (!el) return;
+
+  // Show loading
+  el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted)">⏳ جاري تحميل البيانات الحقيقية...</div>';
+  adminTab('overview');
+
+  // Fetch real data from worker
+  var workerData = await fetchRealStudents();
+  var localDb    = getAllStudents();
+  var localEmails = Object.keys(localDb);
+
+  var allStudents, onlineCount, totalCount;
+
+  if (workerData && workerData.students) {
+    allStudents  = workerData.students;
+    onlineCount  = workerData.online || 0;
+    totalCount   = workerData.total  || 0;
+  } else {
+    // Fallback to localStorage
+    var act = getAct();
+    var now = Date.now();
+    allStudents = localEmails.map(function(e) {
+      var st = (localDb[e].student || {});
+      return {
+        email    : e,
+        name     : st.name || e,
+        lastSeen : (act[e]||{}).lastSeen || 0,
+        tab      : (act[e]||{}).tab || '—',
+        joinDate : st.joinDate || '',
+        level    : st.level || 'beginner',
+        online   : act[e] && (now - act[e].lastSeen) < 5*60*1000
+      };
+    });
+    onlineCount = allStudents.filter(function(s){return s.online;}).length;
+    totalCount  = allStudents.length;
+  }
+
+  var now = Date.now();
+  var bans    = getBans();
+  var weekAgo = now - 7*24*3600*1000;
+  var newWeek = allStudents.filter(function(s){
+    return s.joinDate && new Date(s.joinDate) > new Date(weekAgo);
+  }).length;
+
+  var statsHTML = [
+    {icon:'👥', val:totalCount,   label:'مسجلون',          col:'#42A5F5'},
+    {icon:'🟢', val:onlineCount,  label:'متصلون الآن',      col:'#66BB6A'},
+    {icon:'🔴', val:totalCount - onlineCount, label:'غير متصلين', col:'#EF9A9A'},
+    {icon:'🆕', val:newWeek,      label:'تسجيل هذا الأسبوع',col:'#26C6DA'},
+    {icon:'🚫', val:bans.length,  label:'محظورون',           col:'#EF5350'},
+    {icon:'📊', val:(function(){
+      var t=0,n=0;
+      localEmails.forEach(function(e){((localDb[e].progress||{}).scores||[]).forEach(function(s){t+=s;n++;});});
+      return n>0?Math.round(t/n)+'%':'—';
+    })(),                          label:'متوسط النتائج',    col:'#AB47BC'},
+  ].map(function(s) {
+    return '<div style="background:'+s.col+'15;border:1.5px solid '+s.col+'40;border-radius:14px;padding:14px;text-align:center">'
+      + '<div style="font-size:1.5rem;margin-bottom:4px">'+s.icon+'</div>'
+      + '<div style="font-size:1.5rem;font-weight:900;color:'+s.col+'">'+s.val+'</div>'
+      + '<div style="font-size:0.72rem;color:var(--text-muted);margin-top:2px">'+s.label+'</div>'
+      + '</div>';
+  }).join('');
+
+  // Students list sorted by lastSeen
+  var sorted = allStudents.slice().sort(function(a,b){return (b.lastSeen||0)-(a.lastSeen||0);});
+  var studentsHTML = sorted.slice(0,20).map(function(s) {
+    var timeAgo = s.lastSeen ? getTimeAgo(s.lastSeen) : 'لم يسجل دخول';
+    return '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;'
+      + 'background:rgba(255,255,255,0.03);border-radius:10px;margin-bottom:5px">'
+      + '<div style="width:10px;height:10px;border-radius:50%;flex-shrink:0;background:'+(s.online?'#66BB6A':'#555')+';'
+      + (s.online?'box-shadow:0 0 6px #66BB6A':'')+'"></div>'
+      + '<div style="flex:1;min-width:0">'
+        + '<div style="font-size:0.82rem;font-weight:700">'+(s.name||s.email)+'</div>'
+        + '<div style="font-size:0.68rem;color:var(--text-muted)">'+(s.email||'')+'</div>'
+      + '</div>'
+      + '<div style="font-size:0.7rem;text-align:left;flex-shrink:0">'
+        + '<div style="color:'+(s.online?'#66BB6A':'var(--text-muted)')+'">'+(s.online?'● متصل الآن':timeAgo)+'</div>'
+        + '<div style="color:var(--text-muted);margin-top:2px">'+(s.tab||'—')+'</div>'
+      + '</div>'
+      + '</div>';
+  }).join('');
+
+  var html = (typeof buildAdminPlatformKeySection==='function'?buildAdminPlatformKeySection():'')
+    + (typeof buildAdminSubjectsSection==='function'?buildAdminSubjectsSection():'')
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-bottom:18px">'
+    + statsHTML + '</div>'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
+    + '<div style="font-weight:800;font-size:0.9rem">👥 المستخدمون ('+totalCount+')</div>'
+    + '<button onclick="buildAdminOverviewAsync()" style="padding:5px 12px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-muted);font-size:0.75rem;cursor:pointer">🔄 تحديث</button>'
+    + '</div>'
+    + '<div style="max-height:400px;overflow-y:auto">' + (studentsHTML||'<div style="color:var(--text-muted);padding:20px;text-align:center">لا يوجد مستخدمون مسجلون بعد</div>') + '</div>';
+
+  el.innerHTML = html;
+}
+
+function getTimeAgo(ts) {
+  var diff = Date.now() - ts;
+  var mins = Math.floor(diff/60000);
+  if (mins < 1)  return 'منذ لحظات';
+  if (mins < 60) return 'منذ ' + mins + ' دقيقة';
+  var hrs = Math.floor(mins/60);
+  if (hrs < 24)  return 'منذ ' + hrs + ' ساعة';
+  return 'منذ ' + Math.floor(hrs/24) + ' يوم';
+}
+
+// Track current tab for presence
+window._currentTab = 'لوحة التحكم';
+// Track current tab
+var __showSectionBase = window.showSection;
+window.showSection = function(name) {
+  window._currentTab = name;
+  if (__showSectionBase) __showSectionBase(name);
+};
 </script>
 
 

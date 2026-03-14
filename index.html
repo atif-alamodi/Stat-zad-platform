@@ -11038,6 +11038,7 @@ body {
   padding: 30px 0;
   display: flex;
   flex-direction: column;
+  overflow-y: auto;
   transition: transform 0.3s ease;
 }
 
@@ -12991,7 +12992,7 @@ function enterApp() {
   document.body.setAttribute('data-gender', APP.student.gender || 'male');
   updateStudentUI();
   showPage('page-app');
-  setupAdminUI();
+  setupAdminUI(); setTimeout(setupAdminTopbarBtn, 800);
 
   // Pyodide: on-demand only
 
@@ -16958,7 +16959,8 @@ function buildAdminOverview() {
     '</div>';
   }).join('');
 
-  return '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-bottom:18px">'+
+  return (typeof buildAdminPlatformKeySection==='function'?buildAdminPlatformKeySection():'')
+    +'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-bottom:18px">'+
     statHTML+'</div>'+
     '<div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.1);border-radius:14px;padding:14px">'+
     '<div style="font-weight:800;font-size:0.85rem;margin-bottom:10px">🕐 آخر التسجيلات</div>'+
@@ -17662,26 +17664,30 @@ function clearApiKey() {
 }
 
 async function zadFetch(body) {
-  const key = getApiKey();
-  if (!key) { showApiKeyPrompt(); throw new Error('NO_API_KEY'); }
+  // Get key: personal → platform (from GitHub config)
+  const userKey     = (typeof getApiKey === 'function') ? getApiKey() : '';
+  const platformKey = window._ZAD_PLATFORM_KEY || '';
+  const key = userKey || platformKey;
 
-  // Convert Anthropic format → OpenAI/Groq format
+  if (!key) {
+    showApiKeyPrompt();
+    throw new Error('NO_API_KEY');
+  }
+
   const messages = [];
   if (body.system) messages.push({ role: 'system', content: body.system });
 
   const userContent = body.messages && body.messages[0] ? body.messages[0].content : '';
   if (Array.isArray(userContent)) {
-    // Handle image + text
     const textParts = userContent.filter(function(p){ return p.type==='text'; });
     const imgParts  = userContent.filter(function(p){ return p.type==='image'; });
     if (imgParts.length > 0) {
-      // Groq vision: use llama-4-scout-17b
-      const contentParts = [];
+      const parts = [];
       imgParts.forEach(function(img) {
-        contentParts.push({ type:'image_url', image_url:{ url:'data:'+img.source.media_type+';base64,'+img.source.data } });
+        parts.push({ type:'image_url', image_url:{ url:'data:'+img.source.media_type+';base64,'+img.source.data } });
       });
-      textParts.forEach(function(t){ contentParts.push({ type:'text', text:t.text }); });
-      messages.push({ role:'user', content: contentParts });
+      textParts.forEach(function(t){ parts.push({ type:'text', text:t.text }); });
+      messages.push({ role:'user', content: parts });
     } else {
       messages.push({ role:'user', content: textParts.map(function(t){return t.text;}).join('\n') });
     }
@@ -17707,8 +17713,8 @@ async function zadFetch(body) {
   });
 
   if (resp.status === 401 || resp.status === 403) {
-    clearApiKey();
-    showApiKeyPrompt('❌ مفتاح Groq غير صحيح — أدخله مجدداً');
+    if (userKey && typeof clearApiKey === 'function') clearApiKey();
+    if (!platformKey) showApiKeyPrompt('مفتاح Groq غير صحيح');
     throw new Error('INVALID_API_KEY');
   }
 
@@ -18226,6 +18232,256 @@ function updateApiBanner() {
     if (banner) banner.style.borderColor = 'rgba(255,167,38,0.4)';
   }
 }
+
+// ── Platform Key Loader ─────────────────────────────────────────
+window._ZAD_PLATFORM_KEY = '';
+
+async function loadPlatformKey() {
+  try {
+    const url = 'https://raw.githubusercontent.com/atif-alamodi/Stat-zad-platform/main/zad-config.json';
+    const r = await fetch(url + '?t=' + Date.now());
+    if (!r.ok) return;
+    const cfg = await r.json();
+    if (cfg && cfg.platform_key) {
+      window._ZAD_PLATFORM_KEY = cfg.platform_key;
+      if (typeof updateApiBanner === 'function') updateApiBanner();
+      if (typeof updateApiKeyStatusDisplay === 'function') updateApiKeyStatusDisplay();
+    }
+  } catch(e) { /* silent — users can enter their own key */ }
+}
+
+loadPlatformKey();
+// Reload key every 10 minutes in case admin updates
+setInterval(loadPlatformKey, 600000);
+
+function buildAdminPlatformKeySection() {
+  var current = window._ZAD_PLATFORM_KEY || '';
+  return '<div style="background:rgba(255,107,53,0.06);border:1.5px solid rgba(255,107,53,0.25);border-radius:16px;padding:16px;margin-bottom:14px">'
+    + '<div style="font-weight:800;font-size:0.9rem;color:#FF6B35;margin-bottom:6px">🔑 مفتاح API للمنصة (لجميع المستخدمين)</div>'
+    + '<div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:12px;line-height:1.6">'
+    + 'أدخل المفتاح ثم اضغط <b style="color:#FF6B35">تنزيل zad-config.json</b> ثم ارفع الملف على GitHub — سيعمل تلقائياً لجميع المستخدمين.'
+    + '</div>'
+    + '<div style="display:flex;gap:8px;margin-bottom:10px">'
+    + '<input id="admin-platform-key-inp" type="password" placeholder="gsk_..." value="'+ current +'"'
+    + ' style="flex:1;padding:9px 12px;border-radius:10px;border:1.5px solid rgba(255,107,53,0.35);background:rgba(255,107,53,0.07);color:var(--text);font-family:monospace;font-size:0.78rem;outline:none;direction:ltr">'
+    + '<button onclick="adminDownloadConfig()"'
+    + ' style="padding:9px 14px;border-radius:10px;border:none;cursor:pointer;background:linear-gradient(135deg,#FF6B35,#f54e1b);color:white;font-family:var(--font);font-size:0.8rem;font-weight:700;white-space:nowrap">'
+    + '⬇️ تنزيل Config'
+    + '</button>'
+    + '</div>'
+    + '<div id="admin-platform-key-status" style="font-size:0.78rem;padding:8px 12px;border-radius:8px;background:rgba(255,255,255,0.04);color:var(--text-muted)">'
+    + (current ? '✅ مفتاح محمّل: ' + current.slice(0,16) + '...' : '⚠️ لا يوجد مفتاح منصة — المستخدمون يحتاجون مفتاحهم الشخصي')
+    + '</div>'
+    + '</div>';
+}
+
+function adminDownloadConfig() {
+  var key = document.getElementById('admin-platform-key-inp')?.value?.trim() || '';
+  if (!key || key.length < 10) {
+    showToast('أدخل مفتاحاً صحيحاً أولاً', 'error');
+    return;
+  }
+  var cfg = JSON.stringify({ platform_key: key }, null, 2);
+  var blob = new Blob([cfg], { type: 'application/json' });
+  var url  = URL.createObjectURL(blob);
+  var a    = document.createElement('a');
+  a.href = url; a.download = 'zad-config.json';
+  a.click();
+  URL.revokeObjectURL(url);
+
+  var status = document.getElementById('admin-platform-key-status');
+  if (status) {
+    status.style.background = 'rgba(40,202,65,0.1)';
+    status.style.color = '#28CA41';
+    status.innerHTML = '✅ تم تنزيل zad-config.json — ارفعه الآن على GitHub في نفس مجلد index.html';
+  }
+  showToast('تم تنزيل الملف — ارفعه على GitHub', 'success');
+}
+
+// ══════════════════════════════════════════════════════════════
+// PLATFORM KEY SYSTEM — Admin sets once, all users benefit
+// ══════════════════════════════════════════════════════════════
+const ZAD_CONFIG = {
+  owner  : 'atif-alamodi',
+  repo   : 'Stat-zad-platform',
+  branch : 'main',
+  file   : 'zad-config.json',
+  rawURL : 'https://raw.githubusercontent.com/atif-alamodi/Stat-zad-platform/main/zad-config.json',
+  apiURL : 'https://api.github.com/repos/atif-alamodi/Stat-zad-platform/contents/zad-config.json'
+};
+
+window._ZAD_PLATFORM_KEY = '';
+
+// Called on app load — fetch key silently
+async function loadPlatformKey() {
+  try {
+    const r = await fetch(ZAD_CONFIG.rawURL + '?t=' + Date.now());
+    if (!r.ok) return;
+    const cfg = await r.json();
+    if (cfg && cfg.platform_key) {
+      window._ZAD_PLATFORM_KEY = cfg.platform_key;
+      if (typeof updateApiBanner          === 'function') updateApiBanner();
+      if (typeof updateApiKeyStatusDisplay === 'function') updateApiKeyStatusDisplay();
+    }
+  } catch(e) { /* silent */ }
+}
+loadPlatformKey();
+setInterval(loadPlatformKey, 600000); // refresh every 10 min
+
+// ── Admin: save Groq key to GitHub → all users get it ─────────
+async function adminSavePlatformKey() {
+  const keyInp = document.getElementById('admin-groq-key-inp');
+  const patInp = document.getElementById('admin-github-pat-inp');
+  const statusEl = document.getElementById('admin-pk-status');
+
+  const groqKey = keyInp?.value?.trim() || '';
+  const ghPAT   = patInp?.value?.trim() || '';
+
+  if (!groqKey || groqKey.length < 10) {
+    setAdminPKStatus('error', '❌ أدخل مفتاح Groq صحيحاً (يبدأ بـ gsk_)'); return;
+  }
+  if (!ghPAT || ghPAT.length < 20) {
+    setAdminPKStatus('error', '❌ أدخل GitHub Personal Access Token'); return;
+  }
+
+  setAdminPKStatus('loading', '⏳ جاري الحفظ على GitHub...');
+
+  try {
+    // 1. Get current file SHA (needed for update)
+    const shaRes = await fetch(ZAD_CONFIG.apiURL, {
+      headers: { 'Authorization': 'Bearer ' + ghPAT, 'Accept': 'application/vnd.github+json' }
+    });
+
+    let sha = null;
+    if (shaRes.ok) {
+      const shaData = await shaRes.json();
+      sha = shaData.sha;
+    }
+
+    // 2. Create/Update the file
+    const content = btoa(JSON.stringify({ platform_key: groqKey }, null, 2));
+    const body = {
+      message: 'chore: update platform API key',
+      content : content,
+      branch  : ZAD_CONFIG.branch
+    };
+    if (sha) body.sha = sha;
+
+    const putRes = await fetch(ZAD_CONFIG.apiURL, {
+      method : 'PUT',
+      headers: {
+        'Authorization': 'Bearer ' + ghPAT,
+        'Content-Type' : 'application/json',
+        'Accept'       : 'application/vnd.github+json'
+      },
+      body: JSON.stringify(body)
+    });
+
+    if (!putRes.ok) {
+      const err = await putRes.json();
+      setAdminPKStatus('error', '❌ ' + (err.message || 'فشل الحفظ — تأكد من صلاحيات PAT'));
+      return;
+    }
+
+    // 3. Success — store PAT locally (admin device only) for future updates
+    localStorage.setItem('zad_admin_pat', ghPAT);
+    window._ZAD_PLATFORM_KEY = groqKey;
+
+    setAdminPKStatus('success',
+      '✅ تم! المفتاح محفوظ على GitHub — سيعمل لجميع المستخدمين خلال دقيقة');
+
+    if (typeof updateApiBanner          === 'function') updateApiBanner();
+    if (typeof updateApiKeyStatusDisplay === 'function') updateApiKeyStatusDisplay();
+
+  } catch(e) {
+    setAdminPKStatus('error', '❌ خطأ: ' + e.message);
+  }
+}
+
+function setAdminPKStatus(type, msg) {
+  var el = document.getElementById('admin-pk-status');
+  if (!el) return;
+  var colors = { error:'rgba(255,82,82,0.12)', success:'rgba(40,202,65,0.12)', loading:'rgba(255,214,0,0.08)' };
+  var borders = { error:'rgba(255,82,82,0.35)', success:'rgba(40,202,65,0.35)', loading:'rgba(255,214,0,0.3)' };
+  var textc   = { error:'#FF5252', success:'#28CA41', loading:'#FFD600' };
+  el.style.background = colors[type]  || 'rgba(255,255,255,0.04)';
+  el.style.borderColor= borders[type] || 'var(--border)';
+  el.style.color      = textc[type]   || 'var(--text)';
+  el.innerHTML        = msg;
+}
+
+function buildAdminPlatformKeySection() {
+  var current = window._ZAD_PLATFORM_KEY || '';
+  var savedPAT = localStorage.getItem('zad_admin_pat') || '';
+
+  return '<div style="background:rgba(255,107,53,0.06);border:1.5px solid rgba(255,107,53,0.28);border-radius:18px;padding:18px;margin-bottom:18px">'
+
+    // Header
+    + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">'
+    + '<div style="width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,#FF6B35,#f54e1b);display:flex;align-items:center;justify-content:center;font-size:1.2rem">🔑</div>'
+    + '<div><div style="font-weight:900;font-size:0.92rem">مفتاح AI للمنصة — لجميع المستخدمين</div>'
+    + '<div style="font-size:0.74rem;color:var(--text-muted)">تُدخله مرة واحدة من هنا ويعمل تلقائياً على كل الأجهزة</div></div>'
+    + '</div>'
+
+    // Current status
+    + '<div style="padding:9px 12px;border-radius:10px;background:'
+    + (current ? 'rgba(40,202,65,0.08);border:1px solid rgba(40,202,65,0.25);color:#28CA41' : 'rgba(255,214,0,0.06);border:1px solid rgba(255,214,0,0.25);color:#FFD600')
+    + ';font-size:0.8rem;margin-bottom:14px;font-weight:700">'
+    + (current ? '✅ مفتاح المنصة نشط: ' + current.slice(0,14) + '...' : '⚠️ لا يوجد مفتاح منصة — المستخدمون يدخلون مفتاحهم الشخصي')
+    + '</div>'
+
+    // Groq Key input
+    + '<div style="margin-bottom:10px">'
+    + '<label style="font-size:0.78rem;color:var(--text-muted);display:block;margin-bottom:5px">🤖 مفتاح Groq API الجديد</label>'
+    + '<input id="admin-groq-key-inp" type="password" placeholder="gsk_xxxxxxxxxxxxxxxxx" value="'+ current +'"'
+    + ' style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:10px;border:1.5px solid rgba(255,107,53,0.3);background:rgba(255,107,53,0.05);color:var(--text);font-family:monospace;font-size:0.82rem;outline:none;direction:ltr">'
+    + '</div>'
+
+    // GitHub PAT input
+    + '<div style="margin-bottom:10px">'
+    + '<label style="font-size:0.78rem;color:var(--text-muted);display:block;margin-bottom:5px">'
+    + '🔐 GitHub Personal Access Token '
+    + '<a href="https://github.com/settings/tokens/new?scopes=contents&description=ZadPlatform" target="_blank" style="color:#FF6B35;font-size:0.72rem">(إنشاء توكن جديد ↗)</a>'
+    + '</label>'
+    + '<input id="admin-github-pat-inp" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxx" value="'+ savedPAT +'"'
+    + ' style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:10px;border:1.5px solid rgba(255,107,53,0.3);background:rgba(255,107,53,0.05);color:var(--text);font-family:monospace;font-size:0.82rem;outline:none;direction:ltr">'
+    + '<div style="font-size:0.7rem;color:var(--text-muted);margin-top:4px">يُحفظ على جهازك فقط — لا يُرسل لأحد</div>'
+    + '</div>'
+
+    // Save button
+    + '<button onclick="adminSavePlatformKey()"'
+    + ' style="width:100%;padding:11px;border-radius:11px;border:none;cursor:pointer;'
+    + 'background:linear-gradient(135deg,#FF6B35,#f54e1b);color:white;font-family:var(--font);'
+    + 'font-size:0.88rem;font-weight:800;box-shadow:0 4px 14px rgba(255,107,53,0.4);margin-bottom:10px"'
+    + ' onmouseover="this.style.transform=\'translateY(-2px)\'" onmouseout="this.style.transform=\'none\'">'
+    + '🚀 حفظ وتطبيق على جميع المستخدمين'
+    + '</button>'
+
+    // Status
+    + '<div id="admin-pk-status" style="padding:9px 12px;border-radius:9px;border:1px solid var(--border);'
+    + 'background:rgba(255,255,255,0.03);color:var(--text-muted);font-size:0.8rem;min-height:36px">'
+    + 'اضغط الزر أعلاه لتطبيق المفتاح على جميع الأجهزة فوراً'
+    + '</div>'
+
+    + '</div>';
+}
+
+// Show admin button in topbar for admin users
+function setupAdminTopbarBtn() {
+  if (!isAdmin()) return;
+  var tb = document.querySelector('.topbar-actions');
+  if (!tb || document.getElementById('admin-topbar-btn')) return;
+  var btn = document.createElement('button');
+  btn.id = 'admin-topbar-btn';
+  btn.innerHTML = '🛡️ المشرف';
+  btn.onclick = showAdminPanel;
+  btn.style.cssText = 'padding:6px 14px;border-radius:10px;border:none;cursor:pointer;'
+    +'background:linear-gradient(135deg,#FF6B35,#f54e1b);color:white;font-family:var(--font);'
+    +'font-size:0.8rem;font-weight:800;box-shadow:0 3px 10px rgba(255,107,53,0.4)';
+  tb.insertBefore(btn, tb.firstChild);
+}
+
+
 </script>
 
 
@@ -18897,7 +19153,7 @@ body.light-mode .theme-btn-light {
     <div 
     <!-- ─── مفتاح الذكاء الاصطناعي ─── -->
     <div class="settings-section" style="border-color:rgba(108,99,255,0.3)">
-      <div class="settings-label" style="color:var(--primary)">🔑 مفتاح Groq API</div>
+      <div class="settings-label" style="color:var(--primary)">🔑 مفتاح Groq API (شخصي)</div>
       <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:10px;line-height:1.6">
         مطلوب لتحليل الملفات بالذكاء الاصطناعي — يُحفظ في جهازك فقط
       </div>

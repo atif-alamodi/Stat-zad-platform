@@ -13497,7 +13497,10 @@ function showSubject(subjectId, activeTab) {
     <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px;flex-wrap:wrap">
       <button class="back-btn" onclick="showSection('dashboard')">←</button>
       <div style="flex:1;min-width:0">
-        <div style="font-size:1.7rem;font-weight:900">${subject.icon} ${subject.title}</div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <div style="font-size:1.7rem;font-weight:900">${subject.icon} ${subject.title}</div>
+          <button onclick="showSubjectProfileModal('${subjectId}')" style="padding:4px 10px;border-radius:8px;border:1px solid rgba(108,99,255,0.4);background:rgba(108,99,255,0.1);color:var(--primary);font-size:0.72rem;cursor:pointer">✏️ تعديل</button>
+        </div>
         <div style="color:var(--text-muted);font-size:0.85rem;margin-top:2px">${subject.description}</div>
       </div>
       <button style="padding:10px 20px;background:linear-gradient(135deg,var(--primary),var(--secondary));border:none;border-radius:12px;color:white;font-family:var(--font);font-weight:700;font-size:0.88rem;cursor:pointer;white-space:nowrap" onclick="startQuizForSubject('${subjectId}')">⚡ اختبر نفسك</button>
@@ -20101,6 +20104,195 @@ function showDeleteChapterConfirm(subjectId, chapterId, chapterTitle) {
     showSubject(subjectId, 'lessons');
     if (typeof refreshUserCurriculumSection === 'function') refreshUserCurriculumSection();
   };
+}
+
+// ══════════════════════════════════════════════════════════════
+// STUDENT SUBJECT PROFILE BUILDER
+// Each student creates/edits their own subject profile
+// ══════════════════════════════════════════════════════════════
+
+function showSubjectProfileModal(existingSubjectId) {
+  var existing = document.getElementById('zad-subject-profile-modal');
+  if (existing) existing.remove();
+
+  var subj = existingSubjectId ? CURRICULUM[existingSubjectId] : null;
+  var icons = ['📚','📖','🔬','💻','🧮','🎨','🌍','⚗️','📐','🏛️','🎯','💡','🧬','📝','🔭','🏥','⚖️','🎵','🌱','🤖'];
+
+  var overlay = document.createElement('div');
+  overlay.id = 'zad-subject-profile-modal';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.85);display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto;direction:rtl';
+
+  var selectedIcon = subj ? (subj.icon||'📚') : '📚';
+  var selectedColor = subj ? (subj.color||'#6C63FF') : '#6C63FF';
+
+  var colors = ['#6C63FF','#00BFA5','#FF6B35','#2196F3','#E91E63','#FFD600','#4CAF50','#9C27B0','#FF5252','#00BCD4'];
+
+  overlay.innerHTML = '<div style="background:#1C1917;border:1.5px solid rgba(108,99,255,0.4);border-radius:20px;padding:22px;width:100%;max-width:480px;margin-top:20px">'
+
+    // Header
+    + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">'
+    + '<div style="font-weight:900;font-size:1rem">'+(existingSubjectId?'✏️ تعديل بروفايل المادة':'➕ إنشاء بروفايل مادة جديدة')+'</div>'
+    + '<button onclick="document.getElementById(\'zad-subject-profile-modal\').remove()" style="padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer">✕</button>'
+    + '</div>'
+
+    // Subject name
+    + '<div style="margin-bottom:14px">'
+    + '<label style="font-size:0.78rem;color:var(--text-muted);display:block;margin-bottom:5px">📌 اسم المادة *</label>'
+    + '<input id="sp-title" type="text" placeholder="مثال: الفيزياء العامة، الكيمياء العضوية..." maxlength="50"'
+    + ' value="'+(subj?subj.title:'')+'"'
+    + ' style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text);font-family:var(--font);font-size:0.9rem;outline:none;direction:rtl">'
+    + '</div>'
+
+    // Description
+    + '<div style="margin-bottom:14px">'
+    + '<label style="font-size:0.78rem;color:var(--text-muted);display:block;margin-bottom:5px">📋 وصف المادة</label>'
+    + '<textarea id="sp-desc" rows="2" placeholder="اكتب وصفاً مختصراً للمادة..." maxlength="120"'
+    + ' style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text);font-family:var(--font);font-size:0.85rem;outline:none;resize:none;direction:rtl">'+(subj?subj.description:'')+'</textarea>'
+    + '</div>'
+
+    // Icon selector
+    + '<div style="margin-bottom:14px">'
+    + '<label style="font-size:0.78rem;color:var(--text-muted);display:block;margin-bottom:8px">🎨 الأيقونة — مختارة: <span id="sp-icon-preview">'+selectedIcon+'</span></label>'
+    + '<div style="display:flex;flex-wrap:wrap;gap:6px">'
+    + icons.map(function(ic){
+        return '<button onclick="spSelectIcon(\''+ic+'\')" id="sp-ic-'+ic+'"'
+          + ' style="width:36px;height:36px;border-radius:8px;border:2px solid '+(ic===selectedIcon?'var(--primary)':'var(--border)')+';'
+          + 'background:'+(ic===selectedIcon?'rgba(108,99,255,0.2)':'rgba(255,255,255,0.03)')+';font-size:1.1rem;cursor:pointer">'
+          + ic + '</button>';
+      }).join('')
+    + '</div></div>'
+
+    // Color selector
+    + '<div style="margin-bottom:14px">'
+    + '<label style="font-size:0.78rem;color:var(--text-muted);display:block;margin-bottom:8px">🎨 اللون — مختار: <span id="sp-color-preview" style="display:inline-block;width:16px;height:16px;border-radius:50%;background:'+selectedColor+';vertical-align:middle;margin-right:4px"></span></label>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap">'
+    + colors.map(function(col){
+        return '<button onclick="spSelectColor(\''+col+'\')" id="sp-col-'+col.replace('#','')+'"'
+          + ' style="width:30px;height:30px;border-radius:50%;border:3px solid '+(col===selectedColor?'white':'transparent')+';background:'+col+';cursor:pointer"></button>';
+      }).join('')
+    + '</div></div>'
+
+    // Chapters
+    + '<div style="margin-bottom:16px">'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
+    + '<label style="font-size:0.78rem;color:var(--text-muted)">📂 الفصول / الوحدات</label>'
+    + '<button onclick="spAddChapter()" style="padding:4px 10px;border-radius:8px;border:1px solid var(--primary);background:rgba(108,99,255,0.1);color:var(--primary);font-size:0.75rem;cursor:pointer">+ إضافة فصل</button>'
+    + '</div>'
+    + '<div id="sp-chapters-list">'
+    + (subj ? subj.chapters.map(function(ch,i){
+        return '<div style="display:flex;gap:8px;margin-bottom:6px" id="sp-ch-'+i+'">'
+          + '<input value="'+ch.title+'" placeholder="اسم الفصل..." style="flex:1;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.04);color:var(--text);font-family:var(--font);font-size:0.82rem;outline:none;direction:rtl">'
+          + '<button onclick="document.getElementById(\'sp-ch-'+i+'\').remove()" style="padding:5px 8px;border-radius:8px;border:none;background:rgba(255,82,82,0.1);color:#FF5252;cursor:pointer">✕</button>'
+          + '</div>';
+      }).join('')
+    : '<div style="display:flex;gap:8px;margin-bottom:6px" id="sp-ch-0">'
+      + '<input placeholder="الفصل الأول..." style="flex:1;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.04);color:var(--text);font-family:var(--font);font-size:0.82rem;outline:none;direction:rtl">'
+      + '<button onclick="document.getElementById(\'sp-ch-0\').remove()" style="padding:5px 8px;border-radius:8px;border:none;background:rgba(255,82,82,0.1);color:#FF5252;cursor:pointer">✕</button>'
+      + '</div>')
+    + '</div></div>'
+
+    // Save button
+    + '<button onclick="saveSubjectProfile(\''+( existingSubjectId||'')+'\') " style="width:100%;padding:13px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--primary),var(--secondary));color:white;font-family:var(--font);font-weight:900;font-size:0.92rem;cursor:pointer;box-shadow:0 4px 16px rgba(108,99,255,0.4)">'
+    + (existingSubjectId ? '💾 حفظ التعديلات' : '✅ إنشاء المادة')
+    + '</button>'
+    + '</div>';
+
+  overlay._selectedIcon  = selectedIcon;
+  overlay._selectedColor = selectedColor;
+  document.body.appendChild(overlay);
+}
+
+function spSelectIcon(icon) {
+  var overlay = document.getElementById('zad-subject-profile-modal');
+  if (overlay) overlay._selectedIcon = icon;
+  var preview = document.getElementById('sp-icon-preview');
+  if (preview) preview.textContent = icon;
+  document.querySelectorAll('[id^="sp-ic-"]').forEach(function(b) {
+    b.style.borderColor = 'var(--border)';
+    b.style.background  = 'rgba(255,255,255,0.03)';
+  });
+  var sel = document.getElementById('sp-ic-'+icon);
+  if (sel) { sel.style.borderColor = 'var(--primary)'; sel.style.background = 'rgba(108,99,255,0.2)'; }
+}
+
+function spSelectColor(color) {
+  var overlay = document.getElementById('zad-subject-profile-modal');
+  if (overlay) overlay._selectedColor = color;
+  var preview = document.getElementById('sp-color-preview');
+  if (preview) preview.style.background = color;
+  document.querySelectorAll('[id^="sp-col-"]').forEach(function(b){ b.style.borderColor = 'transparent'; });
+  var sel = document.getElementById('sp-col-'+color.replace('#',''));
+  if (sel) sel.style.borderColor = 'white';
+}
+
+var _spChIdx = 10;
+function spAddChapter() {
+  var list = document.getElementById('sp-chapters-list');
+  if (!list) return;
+  var idx = _spChIdx++;
+  var div = document.createElement('div');
+  div.id = 'sp-ch-'+idx;
+  div.style.cssText = 'display:flex;gap:8px;margin-bottom:6px';
+  div.innerHTML = '<input placeholder="اسم الفصل..." style="flex:1;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.04);color:var(--text);font-family:var(--font);font-size:0.82rem;outline:none;direction:rtl">'
+    + '<button onclick="this.parentElement.remove()" style="padding:5px 8px;border-radius:8px;border:none;background:rgba(255,82,82,0.1);color:#FF5252;cursor:pointer">✕</button>';
+  list.appendChild(div);
+  div.querySelector('input').focus();
+}
+
+function saveSubjectProfile(existingId) {
+  var overlay  = document.getElementById('zad-subject-profile-modal');
+  var titleInp = document.getElementById('sp-title');
+  var descInp  = document.getElementById('sp-desc');
+  var chList   = document.getElementById('sp-chapters-list');
+
+  if (!titleInp || !titleInp.value.trim()) {
+    titleInp.style.borderColor = '#FF5252';
+    showToast('أدخل اسم المادة أولاً', 'error');
+    return;
+  }
+
+  var title = titleInp.value.trim();
+  var desc  = descInp ? descInp.value.trim() : '';
+  var icon  = overlay ? overlay._selectedIcon  : '📚';
+  var color = overlay ? overlay._selectedColor : '#6C63FF';
+
+  // Collect chapters
+  var chapters = [];
+  if (chList) {
+    chList.querySelectorAll('input').forEach(function(inp, i) {
+      var chTitle = inp.value.trim();
+      if (chTitle) {
+        chapters.push({ id: 'ch-' + Date.now() + '-' + i, title: chTitle, pages: '', icon: '📘', lessons: [] });
+      }
+    });
+  }
+  if (!chapters.length) {
+    chapters = [{ id: 'ch1', title: title, pages: '', icon: '📘', lessons: [] }];
+  }
+
+  var id = existingId || ('custom_' + Date.now());
+
+  var subjectData = { id: id, title: title, description: desc, icon: icon, color: color, chapters: chapters };
+
+  // Save to CURRICULUM
+  CURRICULUM[id] = subjectData;
+
+  // Save to custom subjects list
+  var custom = getCustomSubjects().filter(function(s){ return s.id !== id; });
+  custom.push(subjectData);
+  saveCustomSubjects(custom);
+
+  if (overlay) overlay.remove();
+
+  showToast('✅ تم ' + (existingId ? 'تعديل' : 'إنشاء') + ' بروفايل "' + title + '"', 'success');
+
+  // Refresh
+  renderSubjectCards('quick-subjects', 6);
+  var grid = document.getElementById('all-subjects-grid');
+  if (grid) renderSubjectCards('all-subjects-grid', 99);
+
+  // Navigate to new subject
+  if (!existingId) setTimeout(function(){ showSubject(id, 'lessons'); }, 300);
 }
 </script>
 

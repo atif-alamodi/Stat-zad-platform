@@ -13810,7 +13810,7 @@ function openLesson(subjectId, lessonId) {
     if (lessonContent) {
       lessonContent.innerHTML = '<div style="direction:rtl;padding:0">'
         + '<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">'
-        + '<button class="back-btn" onclick="history.back()||showSection('subjects')">←</button>'
+        + '<button class="back-btn" onclick="showSection(\'subjects\')">←</button>'
         + '<div style="flex:1"><div style="font-size:1.2rem;font-weight:900">' + aiLesson.lessonTitle + '</div>'
         + '<div style="font-size:0.78rem;color:var(--text-muted)">✨ درس مرفوع • ' + uploadBundle.fileName + '</div></div>'
         + '</div>'

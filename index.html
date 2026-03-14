@@ -13519,33 +13519,9 @@ function buildLessonsTab(subject, subjectId) {
   subject = getSubjectWithUploads(subjectId) || subject;
 
   // ── My uploaded lessons ──────────────────────────────────────
-  var myUploads = ZAD_UPLOADS.getAll().filter(function(u) {
-    var lid = u.lessonId || ('ai-' + u.id);
-    return u.subjectId === subjectId && !isLessonDeleted(subjectId, lid);
-  });
-
   var myLessonsHTML = '';
-  if (myUploads.length) {
-    var cards = myUploads.map(function(u) {
-      var t   = (u.lesson && u.lesson.title) || u.title || u.fileName || 'درس مرفوع';
-      var def = ((u.lesson && u.lesson.content && u.lesson.content.definition) || '').slice(0,60);
-      var lid = u.lessonId || ('ai-' + u.id);
-      var ok  = !!(u.lesson && (u.lesson.content || u.lesson.quiz));
-      var badge = ok ? '<span style="font-size:0.65rem;padding:2px 7px;background:rgba(40,202,65,0.15);color:#28CA41;border-radius:10px">✅ جاهز</span>'
-                     : '<span style="font-size:0.65rem;padding:2px 7px;background:rgba(255,214,0,0.12);color:#FFD600;border-radius:10px">⏳</span>';
-      return buildUploadedLessonCard(subjectId, lid, u.id, t, def, badge);
-    }).join('');
-    myLessonsHTML = '<div style="margin-bottom:16px;padding:14px 16px;background:rgba(108,99,255,0.08);border:1.5px solid rgba(108,99,255,0.25);border-radius:16px">'
-      + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">'
-      + '<span style="font-size:1.1rem">✨</span>'
-      + '<span style="font-weight:800;font-size:0.88rem">دروسي المرفوعة</span>'
-      + '<span style="margin-right:auto;font-size:0.72rem;padding:2px 8px;background:rgba(108,99,255,0.2);color:var(--primary);border-radius:10px">'+myUploads.length+' درس — اضغط مطولاً للحذف</span>'
-      + '</div>'
-      + cards
-      + '</div>';
-  }
 
-  var chaptersHTML = subject.chapters.map(function(ch, i) {
+    var chaptersHTML = subject.chapters.map(function(ch, i) {
     // Skip permanently deleted chapters
     if (typeof isChapterDeleted === 'function' && isChapterDeleted(subjectId, ch.id)) return '';
     // Filter deleted lessons
@@ -13584,7 +13560,8 @@ function buildLessonsTab(subject, subjectId) {
         + '</div>';
     }).join('');
 
-    return '<div class="chapter-item'+(i===0?' open':'')+'" id="ch-'+ch.id+'">'
+    var isUploadCh = ch.id && ch.id.startsWith('up-ch-');
+    return '<div class="chapter-item'+(i===0||isUploadCh?' open':'')+'" id="ch-'+ch.id+'">'
       + '<div class="chapter-header" onclick="toggleChapter(\''+ch.id+'\');"'
       + ' oncontextmenu="event.preventDefault();showDeleteChapterConfirm(\''+subjectId+'\',\''+ch.id+'\',\''+ch.title+'\')"'
       + ' ontouchstart="startLongPress(event,\'__ch__'+ch.id+'\',\'\',\''+subjectId+'\',\''+ch.title+'\');clearLongPress()"'
@@ -20435,44 +20412,48 @@ function getSubjectWithUploads(subjectId) {
     })
   };
 
-  // Inject uploaded lessons at the START of chapter 0
+  // Inject each upload as its own CHAPTER (visible like built-in chapters)
   var uploads = ZAD_UPLOADS.getAll().filter(function(u) {
     var lid = u.lessonId || ('ai-' + u.id);
     return u.subjectId === subjectId
       && u.lesson
-      && !isLessonDeleted(subjectId, lid);
+      && !isLessonDeleted(subjectId, lid)
+      && !isChapterDeleted(subjectId, 'up-ch-' + u.id);
   });
 
-  if (uploads.length && merged.chapters.length) {
-    var uploadedLessons = uploads.map(function(u) {
-      var l = u.lesson || {};
-      var lid = u.lessonId || ('ai-' + u.id);
-      return {
-        id: lid,
-        title: l.title || u.title || u.fileName || 'درس مرفوع',
-        type: 'concept',
-        aiGenerated: true,
-        sourceUploadId: u.id,
-        content: {
-          definition:   (l.content && l.content.definition)    || l.definition    || '',
-          whyLearn:     (l.content && l.content.whyLearn)      || l.whyLearn      || [],
-          keyTerms:     (l.content && l.content.keyTerms)      || l.keyTerms      || [],
-          realExamples: (l.content && l.content.realExamples)  || l.examples      || [],
-          steps:        (l.content && l.content.steps)         || l.steps         || [],
-          properties:   (l.content && l.content.properties)    || l.properties    || [],
-          types:        (l.content && l.content.types)         || l.types         || [],
-          mindMap:      (l.content && l.content.mindMap) || (l.mindMapBranches && l.mindMapBranches.length ? {
-            center: l.title || 'المادة',
-            branches: l.mindMapBranches.map(function(b){ return {label:b.label,color:b.color||'#6C63FF',children:b.children||[]}; })
-          } : null)
-        },
-        quiz:    l.quiz    || u.quiz    || [],
-        summary: l.summary || u.summary || ''
-      };
+  uploads.forEach(function(u) {
+    var l   = u.lesson || {};
+    var lid = u.lessonId || ('ai-' + u.id);
+    var chapterTitle = l.title || u.title || u.fileName || 'درس مرفوع';
+    // Build lesson object
+    var lessonObj = {
+      id: lid,
+      title: l.title || u.title || u.fileName || 'درس مرفوع',
+      type: 'concept',
+      aiGenerated: true,
+      sourceUploadId: u.id,
+      content: {
+        definition:   (l.content && l.content.definition)   || '',
+        whyLearn:     (l.content && l.content.whyLearn)     || [],
+        keyTerms:     (l.content && l.content.keyTerms)     || [],
+        realExamples: (l.content && l.content.realExamples) || [],
+        steps:        (l.content && l.content.steps)        || [],
+        properties:   (l.content && l.content.properties)   || [],
+        types:        (l.content && l.content.types)        || [],
+        mindMap:      (l.content && l.content.mindMap)      || null
+      },
+      quiz:    l.quiz    || [],
+      summary: l.summary || ''
+    };
+    // Each upload becomes its own chapter
+    merged.chapters.unshift({
+      id: 'up-ch-' + u.id,
+      title: chapterTitle,
+      pages: '✨ مرفوع',
+      icon: '📄',
+      lessons: [lessonObj]
     });
-    // Add to first chapter
-    merged.chapters[0].lessons = uploadedLessons.concat(merged.chapters[0].lessons);
-  }
+  });
 
   return merged;
 }

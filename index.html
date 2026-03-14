@@ -17740,6 +17740,15 @@ async function zadFetch(body) {
 }
 
 function showApiKeyPrompt(msg) {
+  // If platform key already loaded — no need for prompt
+  if (window._ZAD_PLATFORM_KEY) return;
+
+  // If still loading platform key — wait and retry
+  if (window._ZAD_KEY_LOADING) {
+    setTimeout(function() { showApiKeyPrompt(msg); }, 1500);
+    return;
+  }
+
   var existing = document.getElementById('api-key-modal');
   if (existing) existing.remove();
 
@@ -18248,6 +18257,7 @@ function updateApiBanner() {
 window._ZAD_PLATFORM_KEY = '';
 
 async function loadPlatformKey() {
+  window._ZAD_KEY_LOADING = true;
   try {
     const r = await fetch(ZAD_CONFIG.rawURL + '?t=' + Date.now());
     if (!r.ok) return;
@@ -18344,6 +18354,7 @@ async function loadPlatformKey() {
       if (typeof updateApiKeyStatusDisplay === 'function') updateApiKeyStatusDisplay();
     }
   } catch(e) { /* silent */ }
+  window._ZAD_KEY_LOADING = false;
 }
 loadPlatformKey();
 setInterval(loadPlatformKey, 600000); // refresh every 10 min

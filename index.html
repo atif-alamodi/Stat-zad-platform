@@ -13259,94 +13259,67 @@ function showSubject(subjectId, activeTab) {
 }
 
 function buildLessonsTab(subject, subjectId) {
-  // Always use merged subject with uploads
   var merged = getSubjectWithUploads(subjectId);
-  if (!merged || !merged.chapters) return '<div style="padding:20px;color:var(--text-muted)">لا توجد دروس</div>';
-
-  if (!merged.chapters.length) {
-    return '<div style="text-align:center;padding:40px;color:var(--text-muted)">'
-      + '<div style="font-size:2rem;margin-bottom:10px">📂</div>'
-      + '<div>لا توجد دروس — ارفع محتوى من تبويب "رفع محتوى"</div>'
-      + '</div>';
+  if (!merged || !merged.chapters || !merged.chapters.length) {
+    return '<div style="text-align:center;padding:40px;color:var(--text-muted)"><div style="font-size:2rem;margin-bottom:10px">📂</div><div>لا توجد دروس — ارفع محتوى من تبويب رفع محتوى</div></div>';
   }
 
-  var html = merged.chapters.map(function(ch, i) {
-    var isUpload = ch.id && ch.id.startsWith('up-ch-');
-    var lessonCount = ch.lessons ? ch.lessons.length : 0;
+  var chapHtml = '';
+  merged.chapters.forEach(function(ch, i) {
+    var isUpload  = ch.id && ch.id.startsWith('up-ch-');
+    var safeChId  = (ch.id||'').replace(/['"\\]/g,'');
+    var safeChTitle = (ch.title||'').replace(/['"\\]/g,'');
+    var lessCnt   = (ch.lessons||[]).length;
 
-    var chBadge = '';
+    var badge = '';
     if (isUpload) {
-      chBadge = '<span style="font-size:0.7rem;padding:2px 8px;background:rgba(108,99,255,0.15);color:var(--primary);border-radius:10px;border:1px solid rgba(108,99,255,0.3)">✨ مرفوع</span>';
+      badge = '<span style="font-size:0.7rem;padding:2px 8px;background:rgba(108,99,255,0.15);color:var(--primary);border-radius:10px;border:1px solid rgba(108,99,255,0.3)">✨ مرفوع</span>';
     } else {
-      var chDone = (ch.lessons||[]).filter(function(l){ var d=getLessonCompletion(subjectId,l.id); return d&&d.status==='completed'; }).length;
-      if (chDone===lessonCount && lessonCount>0)
-        chBadge = '<span style="font-size:0.72rem;background:rgba(40,202,65,0.15);color:#28CA41;padding:2px 8px;border-radius:20px">✅ مكتمل</span>';
-      else if (chDone>0)
-        chBadge = '<span style="font-size:0.72rem;background:rgba(255,214,0,0.12);color:#FFD600;padding:2px 8px;border-radius:20px">'+chDone+'/'+lessonCount+'</span>';
+      var done = (ch.lessons||[]).filter(function(l){ var d=getLessonCompletion(subjectId,l.id); return d&&d.status==="completed"; }).length;
+      if (done===lessCnt && lessCnt>0) badge = '<span style="font-size:0.72rem;background:rgba(40,202,65,0.15);color:#28CA41;padding:2px 8px;border-radius:20px">✅ مكتمل</span>';
+      else if (done>0) badge = '<span style="font-size:0.72rem;background:rgba(255,214,0,0.12);color:#FFD600;padding:2px 8px;border-radius:20px">'+done+'/'+lessCnt+'</span>';
     }
 
-    var safeChTitle = (ch.title||'').replace(/'/g,'').replace(/"/g,'');
-    var lessonsHTML = (ch.lessons||[]).map(function(l) {
-      var comp  = !isUpload ? getLessonCompletion(subjectId, l.id) : null;
-      var badge = '';
+    var lessonsHtml = '';
+    (ch.lessons||[]).forEach(function(l) {
+      var safeLId    = (l.id||'').replace(/['"\\]/g,'');
+      var safeLTitle = (l.title||'').replace(/['"\\]/g,'');
+      var safeUpRef  = (l.sourceUploadId||'').replace(/['"\\]/g,'');
+      var comp = !isUpload ? getLessonCompletion(subjectId, l.id) : null;
+      var badge2 = '';
       if (comp) {
-        if      (comp.status==='completed') badge = '<span style="font-size:0.72rem;background:rgba(40,202,65,0.12);color:#28CA41;padding:2px 8px;border-radius:20px;white-space:nowrap">✅ '+(comp.label||'مكتمل')+'</span>';
-        else if (comp.status==='partial')   badge = '<span style="font-size:0.72rem;background:rgba(255,214,0,0.1);color:#FFD600;padding:2px 8px;border-radius:20px;white-space:nowrap">⚠️ '+(comp.label||'جزئي')+'</span>';
+        if      (comp.status==="completed") badge2 = '<span style="font-size:0.72rem;background:rgba(40,202,65,0.12);color:#28CA41;padding:2px 8px;border-radius:20px;white-space:nowrap">✅ '+(comp.label||'مكتمل')+'</span>';
+        else if (comp.status==="partial")   badge2 = '<span style="font-size:0.72rem;background:rgba(255,214,0,0.1);color:#FFD600;padding:2px 8px;border-radius:20px;white-space:nowrap">⚠️ '+(comp.label||'جزئي')+'</span>';
       }
-      var safeLTitle = (l.title||'').replace(/'/g,'').replace(/"/g,'');
-      var uploadRef  = l.sourceUploadId || '';
-      var lid        = l.id || '';
-
-      var div = document.createElement('div');
-      div.className = 'lesson-item';
-      if (isUpload) div.style.borderRight = '3px solid var(--primary)';
-      div.innerHTML = '<span class="lesson-icon">' + (isUpload?'📄':getLessonTypeIcon(l.type)) + '</span>'
+      lessonsHtml += '<div class="lesson-item"'
+        + (isUpload ? ' style="border-right:3px solid var(--primary)"' : '')
+        + ' onclick="openLesson(\''+subjectId+'\',\''+safeLId+'\')"'
+        + ' oncontextmenu="event.preventDefault();showDeleteLessonConfirm(\''+subjectId+'\',\''+safeLId+'\',\''+safeLTitle+'\',\''+safeUpRef+'\')"'
+        + ' ontouchstart="startLongPress(event,\''+safeLId+'\',\''+safeUpRef+'\',\''+subjectId+'\',\''+safeLTitle+'\')" ontouchend="clearLongPress()" ontouchmove="clearLongPress()">'
+        + '<span class="lesson-icon">' + (isUpload ? '📄' : getLessonTypeIcon(l.type)) + '</span>'
         + '<span class="lesson-name" style="flex:1">' + (l.title||'درس') + '</span>'
-        + badge
-        + (isUpload ? '' : '<span class="lesson-type type-'+(l.type||'concept')+'">' + getLessonTypeLabel(l.type) + '</span>');
-      div.onclick = function() { openLesson(subjectId, lid); };
-      div.oncontextmenu = function(e) {
-        e.preventDefault();
-        showDeleteLessonConfirm(subjectId, lid, safeLTitle, uploadRef);
-        return false;
-      };
-      div.addEventListener('touchstart', function(e) { startLongPress(e, lid, uploadRef, subjectId, safeLTitle); }, {passive:true});
-      div.addEventListener('touchend',   function()  { clearLongPress(); });
-      div.addEventListener('touchmove',  function()  { clearLongPress(); });
-      return div.outerHTML;
-    }).join('');
+        + badge2
+        + (isUpload ? '' : '<span class="lesson-type type-'+(l.type||'concept')+'">' + getLessonTypeLabel(l.type) + '</span>')
+        + '</div>';
+    });
 
-    var chDiv = document.createElement('div');
-    chDiv.className = 'chapter-item' + (i===0 || isUpload ? ' open' : '');
-    chDiv.id = 'ch-' + ch.id;
-    chDiv.innerHTML =
-      '<div class="chapter-header">'
+    chapHtml += '<div class="chapter-item' + (i===0 || isUpload ? ' open' : '') + '" id="ch-' + safeChId + '">'
+      + '<div class="chapter-header"'
+      + ' onclick="toggleChapter(\''+safeChId+'\')"'
+      + ' oncontextmenu="event.preventDefault();showDeleteChapterConfirm(\''+subjectId+'\',\''+safeChId+'\',\''+safeChTitle+'\')"'
+      + ' ontouchstart="startLongPress(event,\'__ch__'+safeChId+'\',\'\',\''+subjectId+'\',\''+safeChTitle+'\');" ontouchend="clearLongPress()" ontouchmove="clearLongPress()">'
       + '<div class="chapter-num">' + (i+1) + '</div>'
       + '<div class="chapter-info">'
-        + '<div class="chapter-title" style="display:flex;align-items:center;gap:8px">' + (ch.icon||'📘') + ' ' + (ch.title||'') + ' ' + chBadge + '</div>'
+        + '<div class="chapter-title" style="display:flex;align-items:center;gap:8px">' + (ch.icon||'📘') + ' ' + (ch.title||'') + ' ' + badge + '</div>'
         + '<div class="chapter-pages">📄 ' + (ch.pages||'') + '</div>'
       + '</div>'
       + '<i class="fas fa-chevron-left chapter-chevron"></i>'
       + '</div>'
-      + '<div class="lesson-list">' + lessonsHTML + '</div>';
+      + '<div class="lesson-list">' + lessonsHtml + '</div>'
+      + '</div>';
+  });
 
-    // Chapter header events
-    chDiv.querySelector('.chapter-header').onclick = function() { toggleChapter(ch.id); };
-    chDiv.querySelector('.chapter-header').oncontextmenu = function(e) {
-      e.preventDefault();
-      showDeleteChapterConfirm(subjectId, ch.id, ch.title||'');
-      return false;
-    };
-    chDiv.querySelector('.chapter-header').addEventListener('touchstart', function(e) {
-      startLongPress(e, '__ch__'+ch.id, '', subjectId, ch.title||'');
-    }, {passive:true});
-    chDiv.querySelector('.chapter-header').addEventListener('touchend', clearLongPress);
-    chDiv.querySelector('.chapter-header').addEventListener('touchmove', clearLongPress);
-
-    return chDiv.outerHTML;
-  }).join('');
-
-  return '<div class="chapter-list">' + html + '</div>';
+  return '<div class="chapter-list">' + chapHtml + '</div>';
 }
 
 function buildMindMap(mm) {

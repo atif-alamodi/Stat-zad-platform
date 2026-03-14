@@ -13707,12 +13707,14 @@ function openLesson(subjectId, lessonId) {
   // 2. Standard CURRICULUM lesson
   var merged = getSubjectWithUploads(subjectId);
   if (!merged) return;
+  var subject = merged; // alias for template compatibility
   var allLessons = [];
   merged.chapters.forEach(function(ch) {
     (ch.lessons||[]).forEach(function(l) { allLessons.push({lesson:l,chapter:ch}); });
   });
   var idx = allLessons.findIndex(function(e) { return e.lesson.id === lessonId; });
   if (idx === -1) return;
+  var currentIdx = idx; // alias for template
 
   var lesson  = allLessons[idx].lesson;
   var chapter = allLessons[idx].chapter;

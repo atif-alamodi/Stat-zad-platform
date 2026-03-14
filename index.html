@@ -10584,12 +10584,19 @@ async function analyzeAndGenerate(text, subjectId, fileName) {
       const isFirst = ci === 0;
       const isEnglish = subjectId === 'english';
       const langNote = isEnglish
-        ? 'IMPORTANT: You MUST respond ENTIRELY in ENGLISH. Every field (lessonTitle, definition, keyTerms, examples, steps, mindMapBranches, quiz, summary) must be in English.'
+        ? `أنت مدرس لغة إنجليزية. الطالب عربي المتعلم. مهمتك:
+1. اقرأ النص الإنجليزي وافهمه جيداً.
+2. اشرح كل مفهوم وقاعدة بالعربية بشكل مبسط جداً وسهل الفهم.
+3. ترجم المصطلحات الإنجليزية وضعها في keyTerms (term بالإنجليزي، def بالعربي).
+4. الأمثلة تكون بالإنجليزي مع شرحها بالعربي.
+5. الخريطة الذهنية (mindMapBranches) تكون بالإنجليزي لأنها قواعد وكلمات.
+6. باقي الحقول (definition, whyLearn, steps, summary) باللغة العربية المبسطة.
+الهدف: يفهم الطالب العربي المحتوى الإنجليزي بسهولة.`
         : 'مهم: يجب أن تكون جميع الحقول باللغة العربية.';
       const prompt = isFirst
         ? `${langNote}
 
-${isEnglish ? 'Analyze this text from subject "'+subTitle+'" and produce a comprehensive educational lesson in ENGLISH.' : 'أنت مساعد تعليمي. حلل هذا النص من مادة "'+subTitle+'" وأنتج محتوى تعليمياً شاملاً.'}
+${isEnglish ? 'حلل هذا النص من مادة الإنجليزية التطبيقية واشرحه للطالب العربي بطريقة مبسطة جداً. الشرح والتعريف والأهمية باللغة العربية. المصطلحات الإنجليزية مع ترجمتها. الخريطة الذهنية بالإنجليزي (لأنها مفردات/قواعد).' : 'أنت مساعد تعليمي. حلل هذا النص من مادة "'+subTitle+'" وأنتج محتوى تعليمياً شاملاً.'}
 ${isEnglish ? 'Text (Part '+String(ci+1)+'/'+String(totalChunks)+'):' : 'النص (الجزء '+(ci+1)+'/'+(totalChunks)+'):'}
 ${chunks[ci]}
 

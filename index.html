@@ -5773,14 +5773,14 @@ function buildEnhancedMindMap(mm, lessonTitle) {
 // [removed duplicate] //
 
 function buildAdaptiveDashboard(subjectId) {
-  subject = getSubjectWithUploads(subjectId) || subject;
+  var subject = getSubjectWithUploads(subjectId) || CURRICULUM[subjectId];
   const p = ZAD_ADAPTIVE.getProfile();
   const tip = ZAD_ADAPTIVE.getPersonalizedTip();
   const overallPct = p.totalAnswers > 0 ? Math.round((p.correctAnswers/p.totalAnswers)*100) : 0;
   const levelLabel = { beginner:'مبتدئ 🌱', intermediate:'متوسط 📈', advanced:'متقدم 🏆' }[p.level] || 'مبتدئ 🌱';
   const levelColor = { beginner:'#FF7043', intermediate:'#FFD600', advanced:'#28CA41' }[p.level] || '#FF7043';
 
-  const subject = CURRICULUM[subjectId];
+  const subject = getSubjectWithUploads(subjectId) || CURRICULUM[subjectId];
   const subTitle = subject ? subject.title : subjectId;
   
   return `
@@ -8751,8 +8751,8 @@ function openMindMapModal(mmData, title, col) {
 }
 
 const _origBuildAllMindMaps = typeof buildAllMindMaps === 'function' ? buildAllMindMaps : null;
-function buildAllMindMaps(subject) {
-  subject = getSubjectWithUploads(subjectId) || subject;
+function buildAllMindMaps(subject, subjectId) {
+  if (subjectId) subject = getSubjectWithUploads(subjectId) || subject;
 
   window._ZAD_MM = window._ZAD_MM || {};
   let out = '<div style="display:flex;flex-direction:column;gap:20px">';
@@ -10362,7 +10362,7 @@ function openTypeCardModal(jsonStr, col) {
 
 const _origBuildInfoCards = typeof buildInfoCards === 'function' ? buildInfoCards : null;
 function buildInfoCards(subject, subjectId) {
-  subject = getSubjectWithUploads(subjectId) || subject;
+  if (subjectId) subject = getSubjectWithUploads(subjectId) || subject;
   const PAL = [
     {bg:'rgba(108,99,255,0.08)', b:'rgba(108,99,255,0.3)', a:'#6C63FF'},
     {bg:'rgba(0,191,165,0.08)',  b:'rgba(0,191,165,0.3)',  a:'#00BFA5'},
@@ -13348,7 +13348,7 @@ function showSubject(subjectId, activeTab) {
   let body = '';
   if (activeTab === 'lessons')  body = buildLessonsTab(subject, subjectId);
   if (activeTab === 'cards')    body = buildInfoCards(subject, subjectId);
-  if (activeTab === 'mindmaps') body = buildAllMindMaps(subject);
+  if (activeTab === 'mindmaps') body = buildAllMindMaps(subject, subjectId);
   if (activeTab === 'lab') {
     if (subjectId === 'communication') body = buildCommLab();
     else if (subjectId === 'english') body = buildEnglishLab();

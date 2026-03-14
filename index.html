@@ -10644,7 +10644,7 @@ async function analyzeAndGenerate(text, subjectId, fileName) {
   const steps = document.getElementById('ai-gen-steps');
   const out   = document.getElementById('ai-gen-output');
 
-  const updateStep = (icon, msg, pct) => {
+  const upd = function(icon, msg, pct) {
     if (bar)   bar.style.width = pct + '%';
     if (steps) steps.innerHTML = '<div style="font-size:0.82rem;color:var(--text-muted);padding:8px 12px;background:rgba(255,255,255,0.03);border-radius:8px;border-right:3px solid var(--primary)">' + icon + ' ' + msg + '</div>';
   };
@@ -10653,90 +10653,121 @@ async function analyzeAndGenerate(text, subjectId, fileName) {
   if (barWrap) barWrap.style.display = 'block';
 
   try {
-    updateStep('📖', 'تحليل المحتوى...', 10);
+    upd('📖', 'تحليل المحتوى...', 15);
 
     const detectedSubject = detectSubjectFromText(text) || subjectId;
     const subject  = CURRICULUM[detectedSubject];
-    const subTitle = subject ? subject.title : (detectedSubject || 'المادة الدراسية');
+    const subTitle = subject ? subject.title : (detectedSubject || 'المادة');
 
-    updateStep('📡', 'إرسال للذكاء الاصطناعي...', 30);
+    // Trim text to avoid token overflow
+    const safeText = text.slice(0, 5000).replace(/[\u0000-\u001F]/g, ' ');
+
+    upd('📡', 'إرسال للذكاء الاصطناعي...', 35);
 
     const response = await zadFetch({
       model: 'llama-3.3-70b-versatile',
-      max_tokens: 4000,
-      system: 'أنت مساعد تعليمي. أرجع JSON فقط بدون أي نص إضافي قبله أو بعده ولا علامات markdown.',
+      max_tokens: 3000,
+      system: 'You are an educational assistant. Return ONLY valid JSON, no markdown, no explanation.',
       messages: [{
         role: 'user',
-        content: 'المادة: ' + subTitle + '\nالملف: ' + fileName + '\n\nاقرأ هذا النص وأنشئ درساً:\n' + text.slice(0, 8000) + '\n\nأرجع JSON بهذا الشكل فقط (لا تضف أي نص قبله أو بعده):\n{"lessonTitle":"عنوان الدرس","definition":"تعريف الموضوع","whyLearn":["سبب1","سبب2"],"keyTerms":[{"term":"مصطلح","def":"تعريف"}],"types":[{"icon":"📌","name":"نوع","desc":"وصف","examples":["مثال"],"when":"متى"}],"examples":[{"icon":"📌","title":"عنوان","content":"تفاصيل"}],"steps":["خطوة1","خطوة2"],"mindMapBranches":[{"label":"فرع","color":"#6C63FF","children":["عنصر1","عنصر2"]}],"quiz":[{"q":"سؤال","options":["صح","خطأ1","خطأ2","خطأ3"],"answer":0,"explanation":"شرح"}],"summary":"ملخص","properties":["خاصية1","خاصية2"]}'
+        content: 'Create an educational lesson in Arabic from this text about "' + subTitle + '".\n\nText:\n' + safeText + '\n\nReturn ONLY this JSON structure (all values in Arabic, use simple text no special chars):\n{"lessonTitle":"title","definition":"definition text","whyLearn":["reason1","reason2","reason3"],"keyTerms":[{"term":"term1","def":"def1"},{"term":"term2","def":"def2"}],"examples":[{"icon":"example","title":"title1","content":"content1"}],"steps":["step1","step2","step3"],"mindMapBranches":[{"label":"branch1","color":"#6C63FF","children":["item1","item2","item3"]},{"label":"branch2","color":"#FF6584","children":["item1","item2","item3"]}],"quiz":[{"q":"question1","options":["correct","wrong1","wrong2","wrong3"],"answer":0,"explanation":"why"},{"q":"question2","options":["correct","wrong1","wrong2","wrong3"],"answer":0,"explanation":"why"},{"q":"question3","options":["correct","wrong1","wrong2","wrong3"],"answer":0,"explanation":"why"}],"summary":"summary text","properties":["prop1","prop2","prop3"]}'
       }]
     });
 
-    updateStep('⚙️', 'معالجة الرد...', 65);
+    upd('⚙️', 'معالجة الرد...', 65);
 
     const data = await response.json();
+    if (data.error) throw new Error('API: ' + (data.error.message || JSON.stringify(data.error)));
+    if (!data.content || !data.content[0]) throw new Error('رد فارغ');
 
-    // Check for API errors
-    if (data.error) {
-      throw new Error('خطأ API: ' + (data.error.message || data.error.type || JSON.stringify(data.error)));
-    }
+    let raw = (data.content[0].text || '').trim();
 
-    if (!data.content || !data.content[0]) {
-      throw new Error('رد فارغ من الذكاء الاصطناعي. stop_reason: ' + (data.stop_reason || 'unknown'));
-    }
+    // Robust JSON extraction and repair
+    let lesson = repairAndParseJSON(raw);
 
-    let rawText = (data.content[0].text || '').trim();
+    if (!lesson) throw new Error('فشل تحليل JSON — حاول مرة أخرى');
 
-    // Aggressive cleanup
-    rawText = rawText
-      .replace(/^[\s\S]*?(\{)/m, '$1')  // remove anything before first {
-      .replace(/\}[\s\S]*$/, '}');       // remove anything after last }
+    // Ensure required fields
+    lesson.lessonTitle     = lesson.lessonTitle     || fileName;
+    lesson.definition      = lesson.definition      || '';
+    lesson.whyLearn        = lesson.whyLearn        || [];
+    lesson.keyTerms        = lesson.keyTerms        || [];
+    lesson.examples        = lesson.examples        || [];
+    lesson.steps           = lesson.steps           || [];
+    lesson.mindMapBranches = lesson.mindMapBranches || [];
+    lesson.quiz            = lesson.quiz            || [];
+    lesson.summary         = lesson.summary         || '';
+    lesson.properties      = lesson.properties      || [];
+    lesson.types           = lesson.types           || [];
 
-    // More aggressive: find the JSON object
-    const firstBrace = rawText.indexOf('{');
-    const lastBrace  = rawText.lastIndexOf('}');
-    if (firstBrace >= 0 && lastBrace > firstBrace) {
-      rawText = rawText.slice(firstBrace, lastBrace + 1);
-    }
-
-    let lesson;
-    try {
-      lesson = JSON.parse(rawText);
-    } catch(parseErr) {
-      // Show what Claude actually returned
-      if (steps) steps.innerHTML = '<div style="color:#FFA726;padding:10px;border-radius:8px;background:rgba(255,167,38,0.1);font-size:0.75rem;direction:ltr;text-align:left;word-break:break-all"><b>Raw response:</b><br>' + rawText.slice(0,300) + '</div>';
-      throw new Error('JSON parsing failed: ' + parseErr.message.slice(0,100));
-    }
-
-    // Fill missing required fields
-    lesson.lessonTitle    = lesson.lessonTitle    || fileName;
-    lesson.definition     = lesson.definition     || 'محتوى الملف';
-    lesson.quiz           = lesson.quiz           || [];
-    lesson.keyTerms       = lesson.keyTerms       || [];
-    lesson.mindMapBranches= lesson.mindMapBranches|| [];
-    lesson.whyLearn       = lesson.whyLearn       || [];
-    lesson.examples       = lesson.examples       || [];
-    lesson.steps          = lesson.steps          || [];
-    lesson.types          = lesson.types          || [];
-    lesson.properties     = lesson.properties     || [];
-    lesson.summary        = lesson.summary        || '';
-
-    updateStep('💾', 'حفظ الدرس...', 85);
+    upd('💾', 'حفظ الدرس...', 85);
 
     if (typeof saveAILessonForUser === 'function') {
       saveAILessonForUser(lesson, detectedSubject, uploadId, fileName);
     }
     window._ZAD_AI_LESSON = { lesson, subjectId: detectedSubject, uploadId, fileName };
 
-    updateStep('✅', 'تم! الدرس جاهز', 100);
+    upd('تم! الدرس جاهز', 'انتقل للدروس', 100);
     if (out) out.innerHTML = renderAILesson(lesson);
     showUploadStatus('success', 'تم إنشاء الدرس بنجاح!');
     setTimeout(function() { refreshAllTabsWithAILesson(lesson, detectedSubject); }, 500);
 
   } catch(err) {
     if (err.message === 'NO_API_KEY' || err.message === 'INVALID_API_KEY') return;
-    if (steps) steps.innerHTML = '<div style="color:#FF5252;padding:10px;border-radius:8px;background:rgba(239,83,80,0.1);border:1px solid rgba(239,83,80,0.3)">❌ ' + err.message + '</div>';
-    showUploadStatus('error', err.message.slice(0, 120));
+    if (steps) steps.innerHTML = '<div style="color:#FF5252;padding:10px;border-radius:8px;background:rgba(239,83,80,0.1)">خطأ: ' + err.message + '</div>';
+    showUploadStatus('error', err.message.slice(0, 150));
   }
+}
+
+function repairAndParseJSON(raw) {
+  // Step 1: strip markdown fences
+  raw = raw.replace(/^```[a-z]*\n?/im, '').replace(/\n?```$/m, '').trim();
+
+  // Step 2: extract content between first { and last }
+  var first = raw.indexOf('{');
+  var last  = raw.lastIndexOf('}');
+  if (first < 0 || last < 0 || last <= first) return null;
+  raw = raw.slice(first, last + 1);
+
+  // Step 3: try direct parse
+  try { return JSON.parse(raw); } catch(e) {}
+
+  // Step 4: aggressive repair
+  var fixed = raw
+    // Remove control characters
+    .replace(/[\u0000-\u001F\u007F]/g, ' ')
+    // Fix trailing commas before ] or }
+    .replace(/,(\s*[}\]])/g, '$1')
+    // Fix missing quotes on keys
+    .replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)(\s*:)/g, '$1"$2"$3')
+    // Fix single quotes to double quotes (only outside values)
+    .replace(/'/g, '"');
+
+  try { return JSON.parse(fixed); } catch(e) {}
+
+  // Step 5: try to truncate at last complete object
+  var truncated = fixed.replace(/,?\s*"[^"]*"\s*:\s*[^,}\]]*$/, '');
+  // Close any open arrays/objects
+  var opens = (truncated.match(/\{/g)||[]).length - (truncated.match(/\}/g)||[]).length;
+  var arrOpens = (truncated.match(/\[/g)||[]).length - (truncated.match(/\]/g)||[]).length;
+  for (var i=0; i<arrOpens; i++) truncated += ']';
+  for (var j=0; j<opens; j++)    truncated += '}';
+
+  try { return JSON.parse(truncated); } catch(e) {}
+
+  // Step 6: build minimal lesson from what we can extract
+  var title = raw.match(/"lessonTitle"\s*:\s*"([^"]+)"/);
+  var def   = raw.match(/"definition"\s*:\s*"([^"]+)"/);
+  if (title || def) {
+    return {
+      lessonTitle: title ? title[1] : 'درس من الملف',
+      definition:  def   ? def[1]   : raw.slice(0, 200),
+      quiz: [], keyTerms: [], mindMapBranches: [], whyLearn: [],
+      examples: [], steps: [], properties: [], summary: ''
+    };
+  }
+
+  return null;
 }
 
 function refreshAllTabsWithAILesson(lesson, subjectId) {

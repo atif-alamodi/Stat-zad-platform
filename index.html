@@ -1752,7 +1752,7 @@ CURRICULUM['english'] = {
 };
 
 function generateQuiz(subjectId, count = 10, difficulty = 'mixed') {
-  const subject = CURRICULUM[subjectId];
+  const subject = (getSubjectWithUploads(subjectId) || CURRICULUM[subjectId]);
   if (!subject) return [];
 
   const allQuestions = [];
@@ -1803,7 +1803,7 @@ function generateMixedExam(count = 20, selectedSubjects = null) {
 }
 
 function getQuestionCount(subjectId) {
-  const s = CURRICULUM[subjectId];
+  const s = (getSubjectWithUploads(subjectId) || CURRICULUM[subjectId]);
   if (!s) return 0;
   let count = 0;
   s.chapters.forEach(ch => ch.lessons.forEach(l => { if(l.quiz) count += l.quiz.length; }));
@@ -8697,6 +8697,8 @@ function makeTypeCardClickable(html, types, colors) {
 }
 
 function buildInfoCards(subject, subjectId) {
+  subject = getSubjectWithUploads(subjectId) || subject;
+
   const PAL = [
     {bg:'rgba(108,99,255,0.08)', b:'rgba(108,99,255,0.3)', a:'#6C63FF'},
     {bg:'rgba(0,191,165,0.08)',  b:'rgba(0,191,165,0.3)',  a:'#00BFA5'},
@@ -8912,6 +8914,8 @@ function openMindMapModal(mmData, title, col) {
 
 const _origBuildAllMindMaps = typeof buildAllMindMaps === 'function' ? buildAllMindMaps : null;
 function buildAllMindMaps(subject) {
+  subject = getSubjectWithUploads(subjectId) || subject;
+
   window._ZAD_MM = window._ZAD_MM || {};
   let out = '<div style="display:flex;flex-direction:column;gap:20px">';
   let found = 0;
@@ -13506,6 +13510,8 @@ function showSubject(subjectId, activeTab) {
 }
 
 function buildLessonsTab(subject, subjectId) {
+  subject = getSubjectWithUploads(subjectId) || subject;
+
   // ── My uploaded lessons ──────────────────────────────────────
   var myUploads = ZAD_UPLOADS.getAll().filter(function(u) {
     var lid = u.lessonId || ('ai-' + u.id);
@@ -20396,6 +20402,73 @@ function buildUploadedLessonCard(subjectId, lessonId, uploadId, title, def, badg
   div.addEventListener('mousedown',  function(e) { startLongPress(e, lessonId, uploadId, subjectId, title); });
   div.addEventListener('mouseup',    function()  { clearLongPress(); });
   return div.outerHTML;
+}
+
+// ══════════════════════════════════════════════════════════════
+// UNIFIED SUBJECT DATA — merges CURRICULUM + ZAD_UPLOADS
+// ALL tabs must call this instead of CURRICULUM[subjectId]
+// ══════════════════════════════════════════════════════════════
+
+function getSubjectWithUploads(subjectId) {
+  var subject = CURRICULUM[subjectId];
+  if (!subject) return null;
+
+  // Deep clone to avoid mutating CURRICULUM
+  var merged = {
+    id: subject.id, title: subject.title, icon: subject.icon,
+    color: subject.color, description: subject.description,
+    chapters: subject.chapters.map(function(ch) {
+      return {
+        id: ch.id, title: ch.title, pages: ch.pages, icon: ch.icon,
+        lessons: ch.lessons.filter(function(l) {
+          return !isLessonDeleted(subjectId, l.id) && !isChapterDeleted(subjectId, ch.id);
+        }).slice()
+      };
+    }).filter(function(ch) {
+      return !isChapterDeleted(subjectId, ch.id);
+    })
+  };
+
+  // Inject uploaded lessons at the START of chapter 0
+  var uploads = ZAD_UPLOADS.getAll().filter(function(u) {
+    var lid = u.lessonId || ('ai-' + u.id);
+    return u.subjectId === subjectId
+      && u.lesson
+      && !isLessonDeleted(subjectId, lid);
+  });
+
+  if (uploads.length && merged.chapters.length) {
+    var uploadedLessons = uploads.map(function(u) {
+      var l = u.lesson || {};
+      var lid = u.lessonId || ('ai-' + u.id);
+      return {
+        id: lid,
+        title: l.title || u.title || u.fileName || 'درس مرفوع',
+        type: 'concept',
+        aiGenerated: true,
+        sourceUploadId: u.id,
+        content: {
+          definition:   (l.content && l.content.definition)    || l.definition    || '',
+          whyLearn:     (l.content && l.content.whyLearn)      || l.whyLearn      || [],
+          keyTerms:     (l.content && l.content.keyTerms)      || l.keyTerms      || [],
+          realExamples: (l.content && l.content.realExamples)  || l.examples      || [],
+          steps:        (l.content && l.content.steps)         || l.steps         || [],
+          properties:   (l.content && l.content.properties)    || l.properties    || [],
+          types:        (l.content && l.content.types)         || l.types         || [],
+          mindMap:      (l.content && l.content.mindMap) || (l.mindMapBranches && l.mindMapBranches.length ? {
+            center: l.title || 'المادة',
+            branches: l.mindMapBranches.map(function(b){ return {label:b.label,color:b.color||'#6C63FF',children:b.children||[]}; })
+          } : null)
+        },
+        quiz:    l.quiz    || u.quiz    || [],
+        summary: l.summary || u.summary || ''
+      };
+    });
+    // Add to first chapter
+    merged.chapters[0].lessons = uploadedLessons.concat(merged.chapters[0].lessons);
+  }
+
+  return merged;
 }
 </script>
 

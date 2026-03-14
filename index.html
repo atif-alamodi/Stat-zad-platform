@@ -13527,10 +13527,12 @@ function buildLessonsTab(subject, subjectId) {
           else if (comp.status==='partial') badge = `<span style="font-size:0.72rem;background:rgba(255,214,0,0.1);color:#FFD600;padding:2px 8px;border-radius:20px;margin-right:auto;white-space:nowrap">⚠️ ${comp.label||'غير مكتمل'}</span>`;
           else badge = `<span style="font-size:0.72rem;background:rgba(255,82,82,0.1);color:#FF5252;padding:2px 8px;border-radius:20px;margin-right:auto;white-space:nowrap">❌ ${comp.label||'لم يُتم'}</span>`;
         }
+        var uploadRef = l.sourceUploadId || l.id.replace('ai-','');
         const delBtn = l.aiGenerated
-          ? `<button onclick="event.stopPropagation();confirmDeleteUpload('${l.sourceUploadId||l.id}','${subjectId}')"
-              style="padding:3px 8px;border-radius:6px;border:none;background:rgba(255,82,82,0.12);
-              color:#FF5252;cursor:pointer;font-size:0.72rem;flex-shrink:0;font-family:var(--font)">🗑️ حذف</button>`
+          ? `<button onclick="event.stopPropagation();deleteAILesson('${l.id}','${uploadRef}','${subjectId}')"
+              style="padding:5px 10px;border-radius:8px;border:1.5px solid rgba(255,82,82,0.4);
+              background:rgba(255,82,82,0.1);color:#FF5252;cursor:pointer;font-size:0.75rem;
+              flex-shrink:0;font-family:var(--font);font-weight:700">🗑️</button>`
           : '';
         return `<div class="lesson-item" style="display:flex;align-items:center;gap:8px" onclick="openLesson('${subjectId}','${l.id}')">
           <span class="lesson-icon">${getLessonTypeIcon(l.type)}</span>
@@ -18449,21 +18451,22 @@ function showUploadStatus(type, msg) {
 }
 
 function _injectLessonToCurriculum(lesson, subjectId) {
-  const subject = CURRICULUM[subjectId];
-  if (!subject) return;
+  var subject = CURRICULUM[subjectId];
+  if (!subject || !subject.chapters || !subject.chapters.length) return;
 
-  let aiChapter = subject.chapters.find(ch => ch.id === 'ai-generated');
-  if (!aiChapter) {
-    aiChapter = {
-      id: 'ai-generated',
-      title: '📂 ملفاتي المرفوعة',
-      pages: '', icon: '📂', lessons: [],
-    };
-    subject.chapters.push(aiChapter);
-  }
+  // Add to the FIRST chapter so it appears among regular lessons
+  var firstChapter = subject.chapters[0];
 
-  aiChapter.lessons = aiChapter.lessons.filter(l => l.sourceUploadId !== lesson.sourceUploadId);
-  aiChapter.lessons.push(lesson);
+  // Remove old version of same lesson (by sourceUploadId or id)
+  firstChapter.lessons = firstChapter.lessons.filter(function(l) {
+    return l.sourceUploadId !== lesson.sourceUploadId && l.id !== lesson.id;
+  });
+
+  // Mark as AI-generated for delete button visibility
+  lesson.aiGenerated = true;
+
+  // Add at the beginning of the chapter
+  firstChapter.lessons.unshift(lesson);
 }
 
 function restoreUserAILessons() {
@@ -19668,6 +19671,50 @@ document.addEventListener('click', function(e) {
 function adminRefreshActivity() {
   var body = document.getElementById('admin-body');
   if (body) buildAdminActivityAsync(body);
+}
+
+// Delete AI lesson — only from current user's account
+function deleteAILesson(lessonId, uploadId, subjectId) {
+  var overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;padding:20px;direction:rtl';
+  overlay.innerHTML = '<div style="background:#1C1917;border:1.5px solid rgba(255,82,82,0.4);border-radius:20px;padding:24px;max-width:360px;width:100%;text-align:center">'
+    + '<div style="font-size:2rem;margin-bottom:10px">🗑️</div>'
+    + '<div style="font-weight:900;font-size:0.95rem;margin-bottom:8px">حذف الدرس المرفوع؟</div>'
+    + '<div style="font-size:0.8rem;color:#aaa;margin-bottom:20px;line-height:1.6">'
+    + 'سيُحذف من حسابك فقط ولن يؤثر على باقي الطلاب</div>'
+    + '<div style="display:flex;gap:10px;justify-content:center">'
+    + '<button id="del-lesson-cancel" style="padding:10px 22px;border-radius:10px;border:1px solid #555;background:transparent;color:#aaa;font-family:var(--font);cursor:pointer">إلغاء</button>'
+    + '<button id="del-lesson-ok" style="padding:10px 22px;border-radius:10px;border:none;background:linear-gradient(135deg,#FF5252,#C62828);color:white;font-family:var(--font);font-weight:700;cursor:pointer">🗑️ حذف من حسابي</button>'
+    + '</div></div>';
+
+  document.body.appendChild(overlay);
+
+  document.getElementById('del-lesson-cancel').onclick = function() { overlay.remove(); };
+  document.getElementById('del-lesson-ok').onclick = function() {
+    overlay.remove();
+
+    // 1. Remove from CURRICULUM in memory (current user's view only)
+    if (subjectId && CURRICULUM[subjectId]) {
+      CURRICULUM[subjectId].chapters.forEach(function(ch) {
+        ch.lessons = ch.lessons.filter(function(l) {
+          return l.id !== lessonId && l.sourceUploadId !== uploadId;
+        });
+      });
+    }
+
+    // 2. Remove from ZAD_UPLOADS localStorage (current user only)
+    var uploads = ZAD_UPLOADS.getAll();
+    var updated = uploads.filter(function(u) {
+      return u.id !== uploadId && u.lessonId !== lessonId;
+    });
+    localStorage.setItem(ZAD_UPLOADS._key(), JSON.stringify(updated));
+
+    showToast('🗑️ تم حذف الدرس من حسابك', 'success');
+
+    // 3. Refresh the lessons tab
+    if (typeof showSubject === 'function') showSubject(subjectId, 'lessons');
+    if (typeof refreshUserCurriculumSection === 'function') refreshUserCurriculumSection();
+  };
 }
 </script>
 

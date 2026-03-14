@@ -7554,6 +7554,17 @@ function buildUploadTab(subjectId) {
       </button>
     </div>
 
+    <!-- شريط التقدم -->
+    <div id="ai-gen-progress" style="display:none;margin-bottom:12px">
+      <div style="background:rgba(255,255,255,0.06);border-radius:20px;height:6px;overflow:hidden">
+        <div id="ai-gen-bar" style="width:0%;height:100%;background:linear-gradient(90deg,var(--primary),var(--secondary));border-radius:20px;transition:width 0.4s ease"></div>
+      </div>
+      <div id="ai-gen-steps" style="margin-top:6px"></div>
+    </div>
+
+    <!-- نتيجة الذكاء الاصطناعي -->
+    <div id="ai-gen-output"></div>
+
     <!-- نتيجة التحليل -->
     <div id="upload-result"></div>
   </div>`;
@@ -10717,6 +10728,7 @@ async function analyzeAndGenerate(text, subjectId, fileName) {
 
   const barWrap = document.getElementById('ai-gen-progress');
   if (barWrap) barWrap.style.display = 'block';
+  if (out) { out.innerHTML = ''; out.style.opacity = '1'; }
 
   try {
     upd('📖', 'تحليل المحتوى...', 15);
@@ -10861,11 +10873,13 @@ function refreshAllTabsWithAILesson(lesson, subjectId) {
   // Auto-clear success card after 9 seconds
   setTimeout(function() {
     var out2 = document.getElementById('ai-gen-output');
+    var bar2 = document.getElementById('ai-gen-progress');
     if (out2) {
       out2.style.transition = 'opacity 0.8s ease';
       out2.style.opacity = '0';
       setTimeout(function() {
         if (out2) { out2.innerHTML = ''; out2.style.opacity = '1'; }
+        if (bar2) bar2.style.display = 'none';
       }, 800);
     }
   }, 9000);

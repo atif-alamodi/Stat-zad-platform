@@ -13259,68 +13259,94 @@ function showSubject(subjectId, activeTab) {
 }
 
 function buildLessonsTab(subject, subjectId) {
-  subject = getSubjectWithUploads(subjectId) || subject;
+  // Always use merged subject with uploads
+  var merged = getSubjectWithUploads(subjectId);
+  if (!merged || !merged.chapters) return '<div style="padding:20px;color:var(--text-muted)">لا توجد دروس</div>';
 
-  // ── My uploaded lessons ──────────────────────────────────────
-  var myLessonsHTML = '';
+  if (!merged.chapters.length) {
+    return '<div style="text-align:center;padding:40px;color:var(--text-muted)">'
+      + '<div style="font-size:2rem;margin-bottom:10px">📂</div>'
+      + '<div>لا توجد دروس — ارفع محتوى من تبويب "رفع محتوى"</div>'
+      + '</div>';
+  }
 
-    var chaptersHTML = subject.chapters.map(function(ch, i) {
-    // Skip permanently deleted chapters
-    if (typeof isChapterDeleted === 'function' && isChapterDeleted(subjectId, ch.id)) return '';
-    // Filter deleted lessons
-    var visibleLessons = ch.lessons.filter(function(l) {
-      return !l.aiGenerated && !isLessonDeleted(subjectId, l.id);
-    });
-    // Only hide if ALL lessons deleted AND not first chapter
-    // (Keep chapter visible so user knows it exists)
+  var html = merged.chapters.map(function(ch, i) {
+    var isUpload = ch.id && ch.id.startsWith('up-ch-');
+    var lessonCount = ch.lessons ? ch.lessons.length : 0;
 
-    var chDone  = visibleLessons.filter(function(l){ var d=getLessonCompletion(subjectId,l.id); return d&&d.status==='completed'; }).length;
-    var chTotal = visibleLessons.length;
-    var chBadge = chDone===chTotal && chTotal>0
-      ? '<span style="font-size:0.75rem;background:rgba(40,202,65,0.15);color:#28CA41;padding:2px 8px;border-radius:20px">✅ مكتمل</span>'
-      : chDone>0
-      ? '<span style="font-size:0.75rem;background:rgba(255,214,0,0.12);color:#FFD600;padding:2px 8px;border-radius:20px">'+chDone+'/'+chTotal+'</span>'
-      : '';
+    var chBadge = '';
+    if (isUpload) {
+      chBadge = '<span style="font-size:0.7rem;padding:2px 8px;background:rgba(108,99,255,0.15);color:var(--primary);border-radius:10px;border:1px solid rgba(108,99,255,0.3)">✨ مرفوع</span>';
+    } else {
+      var chDone = (ch.lessons||[]).filter(function(l){ var d=getLessonCompletion(subjectId,l.id); return d&&d.status==='completed'; }).length;
+      if (chDone===lessonCount && lessonCount>0)
+        chBadge = '<span style="font-size:0.72rem;background:rgba(40,202,65,0.15);color:#28CA41;padding:2px 8px;border-radius:20px">✅ مكتمل</span>';
+      else if (chDone>0)
+        chBadge = '<span style="font-size:0.72rem;background:rgba(255,214,0,0.12);color:#FFD600;padding:2px 8px;border-radius:20px">'+chDone+'/'+lessonCount+'</span>';
+    }
 
-    var lessonsHTML = visibleLessons.map(function(l) {
-      var comp  = getLessonCompletion(subjectId, l.id);
+    var safeChTitle = (ch.title||'').replace(/'/g,'').replace(/"/g,'');
+    var lessonsHTML = (ch.lessons||[]).map(function(l) {
+      var comp  = !isUpload ? getLessonCompletion(subjectId, l.id) : null;
       var badge = '';
       if (comp) {
-        if      (comp.status==='completed') badge = '<span style="font-size:0.72rem;background:rgba(40,202,65,0.12);color:#28CA41;padding:2px 8px;border-radius:20px;margin-right:auto;white-space:nowrap">✅ '+(comp.label||'مكتمل')+'</span>';
-        else if (comp.status==='partial')   badge = '<span style="font-size:0.72rem;background:rgba(255,214,0,0.1);color:#FFD600;padding:2px 8px;border-radius:20px;margin-right:auto;white-space:nowrap">⚠️ '+(comp.label||'جزئي')+'</span>';
-        else                                badge = '<span style="font-size:0.72rem;background:rgba(255,82,82,0.1);color:#FF5252;padding:2px 8px;border-radius:20px;margin-right:auto;white-space:nowrap">❌ '+(comp.label||'لم يُتم')+'</span>';
+        if      (comp.status==='completed') badge = '<span style="font-size:0.72rem;background:rgba(40,202,65,0.12);color:#28CA41;padding:2px 8px;border-radius:20px;white-space:nowrap">✅ '+(comp.label||'مكتمل')+'</span>';
+        else if (comp.status==='partial')   badge = '<span style="font-size:0.72rem;background:rgba(255,214,0,0.1);color:#FFD600;padding:2px 8px;border-radius:20px;white-space:nowrap">⚠️ '+(comp.label||'جزئي')+'</span>';
       }
-      var safeTitle = l.title.replace(/'/g,"&#39;").replace(/"/g,"&quot;");
-      return '<div class="lesson-item" style="user-select:none"'
-        + ' onclick="openLesson(\''+subjectId+'\',\''+l.id+'\')"'
-        + ' oncontextmenu="event.preventDefault();showDeleteLessonConfirm(\''+subjectId+'\',\''+l.id+'\',\''+safeTitle+'\',\'\');return false;"'
-        + ' ontouchstart="startLongPress(event,\''+l.id+'\',\'\',\''+subjectId+'\',\''+safeTitle+'\')"'
-        + ' ontouchend="clearLongPress()" ontouchmove="clearLongPress()">'
-        + '<span class="lesson-icon">'+getLessonTypeIcon(l.type)+'</span>'
-        + '<span class="lesson-name" style="flex:1">'+l.title+'</span>'
+      var safeLTitle = (l.title||'').replace(/'/g,'').replace(/"/g,'');
+      var uploadRef  = l.sourceUploadId || '';
+      var lid        = l.id || '';
+
+      var div = document.createElement('div');
+      div.className = 'lesson-item';
+      if (isUpload) div.style.borderRight = '3px solid var(--primary)';
+      div.innerHTML = '<span class="lesson-icon">' + (isUpload?'📄':getLessonTypeIcon(l.type)) + '</span>'
+        + '<span class="lesson-name" style="flex:1">' + (l.title||'درس') + '</span>'
         + badge
-        + '<span class="lesson-type type-'+(l.type||'concept')+'">'+getLessonTypeLabel(l.type)+'</span>'
-        + '</div>';
+        + (isUpload ? '' : '<span class="lesson-type type-'+(l.type||'concept')+'">' + getLessonTypeLabel(l.type) + '</span>');
+      div.onclick = function() { openLesson(subjectId, lid); };
+      div.oncontextmenu = function(e) {
+        e.preventDefault();
+        showDeleteLessonConfirm(subjectId, lid, safeLTitle, uploadRef);
+        return false;
+      };
+      div.addEventListener('touchstart', function(e) { startLongPress(e, lid, uploadRef, subjectId, safeLTitle); }, {passive:true});
+      div.addEventListener('touchend',   function()  { clearLongPress(); });
+      div.addEventListener('touchmove',  function()  { clearLongPress(); });
+      return div.outerHTML;
     }).join('');
 
-    var isUploadCh = ch.id && ch.id.startsWith('up-ch-');
-    return '<div class="chapter-item'+(i===0||isUploadCh?' open':'')+'" id="ch-'+ch.id+'">'
-      + '<div class="chapter-header" onclick="toggleChapter(\''+ch.id+'\');"'
-      + ' oncontextmenu="event.preventDefault();showDeleteChapterConfirm(\''+subjectId+'\',\''+ch.id+'\',\''+ch.title+'\')"'
-      + ' ontouchstart="startLongPress(event,\'__ch__'+ch.id+'\',\'\',\''+subjectId+'\',\''+ch.title+'\');clearLongPress()"'
-      + ' ontouchend="clearLongPress()" ontouchmove="clearLongPress()">'
-        + '<div class="chapter-num">'+(i+1)+'</div>'
-        + '<div class="chapter-info">'
-          + '<div class="chapter-title" style="display:flex;align-items:center;gap:8px">'+(ch.icon||'📘')+' '+ch.title+' '+chBadge+'</div>'
-          + '<div class="chapter-pages">📄 '+ch.pages+'</div>'
-        + '</div>'
-        + '<i class="fas fa-chevron-left chapter-chevron"></i>'
+    var chDiv = document.createElement('div');
+    chDiv.className = 'chapter-item' + (i===0 || isUpload ? ' open' : '');
+    chDiv.id = 'ch-' + ch.id;
+    chDiv.innerHTML =
+      '<div class="chapter-header">'
+      + '<div class="chapter-num">' + (i+1) + '</div>'
+      + '<div class="chapter-info">'
+        + '<div class="chapter-title" style="display:flex;align-items:center;gap:8px">' + (ch.icon||'📘') + ' ' + (ch.title||'') + ' ' + chBadge + '</div>'
+        + '<div class="chapter-pages">📄 ' + (ch.pages||'') + '</div>'
       + '</div>'
-      + '<div class="lesson-list">'+lessonsHTML+'</div>'
-      + '</div>';
+      + '<i class="fas fa-chevron-left chapter-chevron"></i>'
+      + '</div>'
+      + '<div class="lesson-list">' + lessonsHTML + '</div>';
+
+    // Chapter header events
+    chDiv.querySelector('.chapter-header').onclick = function() { toggleChapter(ch.id); };
+    chDiv.querySelector('.chapter-header').oncontextmenu = function(e) {
+      e.preventDefault();
+      showDeleteChapterConfirm(subjectId, ch.id, ch.title||'');
+      return false;
+    };
+    chDiv.querySelector('.chapter-header').addEventListener('touchstart', function(e) {
+      startLongPress(e, '__ch__'+ch.id, '', subjectId, ch.title||'');
+    }, {passive:true});
+    chDiv.querySelector('.chapter-header').addEventListener('touchend', clearLongPress);
+    chDiv.querySelector('.chapter-header').addEventListener('touchmove', clearLongPress);
+
+    return chDiv.outerHTML;
   }).join('');
 
-  return myLessonsHTML + '<div class="chapter-list">' + chaptersHTML + '</div>';
+  return '<div class="chapter-list">' + html + '</div>';
 }
 
 function buildMindMap(mm) {
@@ -13498,69 +13524,57 @@ function toggleChapter(id) {
 function openLesson(subjectId, lessonId) {
   if (typeof trackUserActivity === 'function') trackUserActivity('درس: '+lessonId);
 
-  // ── Check ZAD_UPLOADS first (AI/uploaded lessons) ──────────
+  // 1. Check ZAD_UPLOADS first
   var uploads = ZAD_UPLOADS.getAll();
-  var uploadBundle = uploads.find(function(u) {
+  var bundle  = uploads.find(function(u) {
     return u.lessonId === lessonId || ('ai-'+u.id) === lessonId || u.id === lessonId;
   });
 
-  if (uploadBundle && uploadBundle.lesson) {
-    var ul = uploadBundle.lesson;
-    // Build a proper lesson object for display
+  if (bundle) {
+    var ul = bundle.lesson || {};
     var aiLesson = {
-      lessonTitle     : ul.title || uploadBundle.title || 'درس مرفوع',
-      definition      : (ul.content && ul.content.definition) || '',
-      whyLearn        : (ul.content && ul.content.whyLearn) || [],
-      keyTerms        : (ul.content && ul.content.keyTerms) || [],
-      examples        : (ul.content && ul.content.realExamples) || [],
-      steps           : (ul.content && ul.content.steps) || [],
-      properties      : (ul.content && ul.content.properties) || [],
-      mindMapBranches : ul.content && ul.content.mindMap ? ul.content.mindMap.branches : [],
-      quiz            : ul.quiz || [],
-      summary         : ul.summary || '',
-      types           : (ul.content && ul.content.types) || [],
+      lessonTitle:     ul.title || bundle.title || bundle.fileName || 'درس مرفوع',
+      definition:      (ul.content && ul.content.definition)    || '',
+      whyLearn:        (ul.content && ul.content.whyLearn)      || [],
+      keyTerms:        (ul.content && ul.content.keyTerms)      || [],
+      examples:        (ul.content && ul.content.realExamples)  || [],
+      steps:           (ul.content && ul.content.steps)         || [],
+      properties:      (ul.content && ul.content.properties)    || [],
+      types:           (ul.content && ul.content.types)         || [],
+      mindMapBranches: ul.content && ul.content.mindMap ? ul.content.mindMap.branches : [],
+      quiz:            ul.quiz  || [],
+      summary:         ul.summary || ''
     };
-    // Store for quiz use
     window._ZAD_AI_LESSON = { lesson: aiLesson, subjectId: subjectId };
     window._ZAD_AI_QUIZ   = aiLesson.quiz;
-
-    // Navigate to lesson page and render
     showSection('lesson');
     showPage('page-app');
-    var lessonContent = document.getElementById('lesson-content');
-    if (lessonContent) {
-      lessonContent.innerHTML = '<div style="direction:rtl;padding:0">'
+    var lc = document.getElementById('lesson-content');
+    if (lc) {
+      lc.innerHTML = '<div style="direction:rtl;padding:0">'
         + '<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">'
-        + '<button class="back-btn" onclick="showSection(\'subjects\')">←</button>'
-        + '<div style="flex:1"><div style="font-size:1.2rem;font-weight:900">' + aiLesson.lessonTitle + '</div>'
-        + '<div style="font-size:0.78rem;color:var(--text-muted)">✨ درس مرفوع • ' + uploadBundle.fileName + '</div></div>'
-        + '</div>'
-        + renderAILesson(aiLesson)
-        + '</div>';
+        + '<button class="back-btn" onclick="showSubject(\''+subjectId+'\',\'lessons\')">←</button>'
+        + '<div><div style="font-size:1.1rem;font-weight:900">'+aiLesson.lessonTitle+'</div>'
+        + '<div style="font-size:0.75rem;color:var(--text-muted)">✨ '+bundle.fileName+'</div></div></div>'
+        + renderAILesson(aiLesson)+'</div>';
     }
     return;
   }
 
-  // ── Standard CURRICULUM lesson ──────────────────────────────
-  const subject = CURRICULUM[subjectId] || { id: subjectId, title: subjectId, chapters: [], icon:'📚', color:'#6C63FF' };
-  let lesson = null;
-  let chapter = null;
-
-  const allLessons = [];
-  subject.chapters.forEach(ch => {
-    ch.lessons.forEach(l => {
-      allLessons.push({ lesson: l, chapter: ch });
-    });
+  // 2. Standard CURRICULUM lesson
+  var merged = getSubjectWithUploads(subjectId);
+  if (!merged) return;
+  var allLessons = [];
+  merged.chapters.forEach(function(ch) {
+    (ch.lessons||[]).forEach(function(l) { allLessons.push({lesson:l,chapter:ch}); });
   });
+  var idx = allLessons.findIndex(function(e) { return e.lesson.id === lessonId; });
+  if (idx === -1) return;
 
-  const currentIdx = allLessons.findIndex(e => e.lesson.id === lessonId);
-  if (currentIdx === -1) return;
-
-  lesson = allLessons[currentIdx].lesson;
-  chapter = allLessons[currentIdx].chapter;
-
-  const prevEntry = currentIdx > 0 ? allLessons[currentIdx - 1] : null;
-  const nextEntry = currentIdx < allLessons.length - 1 ? allLessons[currentIdx + 1] : null;
+  var lesson  = allLessons[idx].lesson;
+  var chapter = allLessons[idx].chapter;
+  var prev    = idx > 0 ? allLessons[idx-1] : null;
+  var next    = idx < allLessons.length-1 ? allLessons[idx+1] : null;
   const lessonNum = currentIdx + 1;
   const totalLessons = allLessons.length;
 
@@ -19575,58 +19589,39 @@ function showDeleteLessonConfirm(subjectId, lessonId, lessonTitle, uploadId) {
   if (existing) existing.remove();
 
   var overlay = document.createElement('div');
-  overlay.id = 'zad-del-lesson-overlay';
+  overlay.id  = 'zad-del-lesson-overlay';
   overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;padding:20px;direction:rtl';
-
   overlay.innerHTML = '<div style="background:#1C1917;border:1.5px solid rgba(255,82,82,0.5);border-radius:20px;padding:24px;max-width:360px;width:100%;text-align:center">'
     + '<div style="font-size:2.5rem;margin-bottom:10px">🗑️</div>'
     + '<div style="font-weight:900;font-size:1rem;margin-bottom:8px">حذف الدرس؟</div>'
-    + '<div style="font-size:0.82rem;font-weight:700;color:var(--text);margin-bottom:6px;overflow:hidden;text-overflow:ellipsis">' + (lessonTitle||'الدرس') + '</div>'
-    + '<div style="font-size:0.78rem;color:#aaa;margin-bottom:20px;line-height:1.7">'
-    + 'سيُحذف نهائياً من حسابك — من الدروس والبطاقات والاختبارات<br>'
-    + '<b style="color:#FF5252">لا يمكن التراجع</b> • لن يؤثر على حسابات الطلاب الآخرين'
-    + '</div>'
+    + '<div style="font-size:0.82rem;font-weight:700;color:var(--text);margin-bottom:6px;overflow:hidden;text-overflow:ellipsis">'+(lessonTitle||'الدرس')+'</div>'
+    + '<div style="font-size:0.78rem;color:#aaa;margin-bottom:20px;line-height:1.6">سيُحذف نهائياً من حسابك فقط<br><b style="color:#FF5252">لا يمكن التراجع</b></div>'
     + '<div style="display:flex;gap:10px;justify-content:center">'
-    + '<button id="del-l-cancel" style="padding:11px 22px;border-radius:10px;border:1px solid #555;background:transparent;color:#aaa;font-family:var(--font);cursor:pointer;font-size:0.88rem">إلغاء</button>'
-    + '<button id="del-l-ok" style="padding:11px 22px;border-radius:10px;border:none;background:linear-gradient(135deg,#FF5252,#C62828);color:white;font-family:var(--font);font-weight:800;cursor:pointer;font-size:0.88rem">🗑️ حذف نهائياً</button>'
+    + '<button id="del-l-cancel" style="padding:11px 22px;border-radius:10px;border:1px solid #555;background:transparent;color:#aaa;font-family:var(--font);cursor:pointer">إلغاء</button>'
+    + '<button id="del-l-ok" style="padding:11px 22px;border-radius:10px;border:none;background:linear-gradient(135deg,#FF5252,#C62828);color:white;font-family:var(--font);font-weight:800;cursor:pointer">🗑️ حذف نهائياً</button>'
     + '</div></div>';
-
   document.body.appendChild(overlay);
 
   document.getElementById('del-l-cancel').onclick = function() { overlay.remove(); };
   document.getElementById('del-l-ok').onclick = function() {
     overlay.remove();
-
-    // 1. Mark as permanently deleted for this student
+    // Mark lesson as deleted
     markLessonDeleted(subjectId, lessonId);
-
-    // 2. Remove from CURRICULUM in memory (this student's session)
-    if (subjectId && CURRICULUM[subjectId]) {
-      CURRICULUM[subjectId].chapters.forEach(function(ch) {
-        ch.lessons = ch.lessons.filter(function(l) {
-          return l.id !== lessonId;
-        });
-      });
-    }
-
-    // 3. If AI lesson — remove from ZAD_UPLOADS too
+    // If upload, remove from ZAD_UPLOADS
     if (uploadId) {
-      var uploads = ZAD_UPLOADS.getAll().filter(function(u) {
+      var remaining = ZAD_UPLOADS.getAll().filter(function(u){
         return u.id !== uploadId && u.lessonId !== lessonId;
       });
-      localStorage.setItem(ZAD_UPLOADS._key(), JSON.stringify(uploads));
+      localStorage.setItem(ZAD_UPLOADS._key(), JSON.stringify(remaining));
     }
-
-    // 4. Remove from quiz history for this student
-    try {
-      var qKey = 'zad_quiz_upload_' + (uploadId||lessonId);
-      localStorage.removeItem(qKey);
-    } catch(e) {}
-
-    showToast('🗑️ تم حذف الدرس من حسابك نهائياً', 'success');
-
-    // 5. Refresh all views
-    if (APP.currentSubject) showSubject(APP.currentSubject, 'lessons');
+    // Remove from CURRICULUM in memory
+    if (CURRICULUM[subjectId]) {
+      CURRICULUM[subjectId].chapters.forEach(function(ch) {
+        ch.lessons = (ch.lessons||[]).filter(function(l){ return l.id !== lessonId; });
+      });
+    }
+    showToast('🗑️ تم حذف الدرس من حسابك', 'success');
+    showSubject(subjectId, 'lessons');
     if (typeof refreshUserCurriculumSection === 'function') refreshUserCurriculumSection();
   };
 }
@@ -19712,63 +19707,47 @@ function showDeleteChapterConfirm(subjectId, chapterId, chapterTitle) {
   var existing = document.getElementById('zad-del-ch-overlay');
   if (existing) existing.remove();
 
-  // Count lessons in chapter - use merged subject including uploads
-  var subject = (typeof getSubjectWithUploads === 'function')
-    ? getSubjectWithUploads(subjectId)
-    : CURRICULUM[subjectId];
-  var ch = subject && subject.chapters.find(function(c){ return c.id === chapterId; });
-  var lessonCount = ch ? ch.lessons.filter(function(l){ return !isLessonDeleted(subjectId, l.id); }).length : 0;
+  // Find chapter in merged subject
+  var merged  = getSubjectWithUploads(subjectId);
+  var ch      = merged && merged.chapters.find(function(c){ return c.id === chapterId; });
+  var lessCnt = ch ? (ch.lessons||[]).length : 0;
+  var isUpload = chapterId && chapterId.startsWith('up-ch-');
 
   var overlay = document.createElement('div');
-  overlay.id = 'zad-del-ch-overlay';
+  overlay.id  = 'zad-del-ch-overlay';
   overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;padding:20px;direction:rtl';
-
   overlay.innerHTML = '<div style="background:#1C1917;border:1.5px solid rgba(255,82,82,0.5);border-radius:20px;padding:24px;max-width:360px;width:100%;text-align:center">'
     + '<div style="font-size:2.5rem;margin-bottom:10px">🗂️</div>'
     + '<div style="font-weight:900;font-size:1rem;margin-bottom:8px">حذف القسم كاملاً؟</div>'
-    + '<div style="font-size:0.85rem;font-weight:700;color:var(--text);margin-bottom:6px">' + (chapterTitle||'القسم') + '</div>'
+    + '<div style="font-size:0.85rem;font-weight:700;color:var(--text);margin-bottom:6px">'+(chapterTitle||'القسم')+'</div>'
     + '<div style="font-size:0.78rem;color:#aaa;margin-bottom:20px;line-height:1.7">'
-    + 'سيُحذف هذا القسم و<b style="color:#FF5252">' + lessonCount + ' درس</b> منه نهائياً من حسابك<br>'
-    + 'لن يؤثر على حسابات الطلاب الآخرين'
-    + '</div>'
+    + 'سيُحذف هذا القسم و<b style="color:#FF5252">'+lessCnt+' درس</b> نهائياً من حسابك<br>لن يؤثر على الطلاب الآخرين</div>'
     + '<div style="display:flex;gap:10px;justify-content:center">'
     + '<button id="del-ch-cancel" style="padding:11px 22px;border-radius:10px;border:1px solid #555;background:transparent;color:#aaa;font-family:var(--font);cursor:pointer">إلغاء</button>'
     + '<button id="del-ch-ok" style="padding:11px 22px;border-radius:10px;border:none;background:linear-gradient(135deg,#FF5252,#C62828);color:white;font-family:var(--font);font-weight:800;cursor:pointer">🗑️ حذف القسم</button>'
     + '</div></div>';
-
   document.body.appendChild(overlay);
 
   document.getElementById('del-ch-cancel').onclick = function() { overlay.remove(); };
   document.getElementById('del-ch-ok').onclick = function() {
     overlay.remove();
 
-    if (!subject || !ch) { showToast('لم يُعثر على القسم', 'error'); return; }
-
-    // Mark chapter as deleted (persists across reloads)
+    // Mark chapter as deleted
     markChapterDeleted(subjectId, chapterId);
 
-    // Mark all lessons in chapter as deleted
-    ch.lessons.forEach(function(l) {
-      markLessonDeleted(subjectId, l.id);
-    });
-
-    // Remove chapter from CURRICULUM in memory (for regular chapters)
-    if (CURRICULUM[subjectId]) {
-      CURRICULUM[subjectId].chapters = CURRICULUM[subjectId].chapters.filter(function(ch){ return ch.id !== chapterId; });
-    }
-    // For upload chapters: also remove from ZAD_UPLOADS
-    if (chapterId.startsWith('up-ch-')) {
+    if (isUpload) {
+      // Delete upload from ZAD_UPLOADS
       var uploadId = chapterId.replace('up-ch-', '');
-      var uploads = ZAD_UPLOADS.getAll().filter(function(u){ return u.id !== uploadId; });
-      localStorage.setItem(ZAD_UPLOADS._key(), JSON.stringify(uploads));
+      var remaining = ZAD_UPLOADS.getAll().filter(function(u){ return u.id !== uploadId; });
+      localStorage.setItem(ZAD_UPLOADS._key(), JSON.stringify(remaining));
+    } else {
+      // Mark all lessons as deleted
+      if (ch) (ch.lessons||[]).forEach(function(l) { markLessonDeleted(subjectId, l.id); });
+      // Remove from CURRICULUM in memory
+      if (CURRICULUM[subjectId]) {
+        CURRICULUM[subjectId].chapters = (CURRICULUM[subjectId].chapters||[]).filter(function(c){ return c.id !== chapterId; });
+      }
     }
-
-    // Remove any AI uploads for these lessons
-    var lessonIds = ch.lessons.map(function(l){ return l.id; });
-    var uploads = ZAD_UPLOADS.getAll().filter(function(u) {
-      return !lessonIds.includes(u.lessonId);
-    });
-    localStorage.setItem(ZAD_UPLOADS._key(), JSON.stringify(uploads));
 
     showToast('🗑️ تم حذف القسم من حسابك', 'success');
     showSubject(subjectId, 'lessons');
@@ -20025,71 +20004,68 @@ function buildUploadedLessonCard(subjectId, lessonId, uploadId, title, def, badg
 // ══════════════════════════════════════════════════════════════
 
 function getSubjectWithUploads(subjectId) {
-  var subject = CURRICULUM[subjectId];
-  if (!subject) return null;
+  var base = CURRICULUM[subjectId];
+  var chapters = base ? (base.chapters || []) : [];
 
-  // Deep clone to avoid mutating CURRICULUM
-  var chapters = subject.chapters || [];
-  var merged = {
-    id: subject.id || subjectId, title: subject.title || subjectId,
-    icon: subject.icon || '📚', color: subject.color || '#6C63FF',
-    description: subject.description || '',
-    chapters: chapters.map(function(ch) {
+  // Deep-clone base chapters, filtering deleted ones
+  var merged_chapters = chapters
+    .filter(function(ch) { return !isChapterDeleted(subjectId, ch.id); })
+    .map(function(ch) {
       return {
-        id: ch.id, title: ch.title, pages: ch.pages, icon: ch.icon,
-        lessons: ch.lessons.filter(function(l) {
-          return !isLessonDeleted(subjectId, l.id) && !isChapterDeleted(subjectId, ch.id);
-        }).slice()
+        id: ch.id, title: ch.title, pages: ch.pages||'', icon: ch.icon||'📘',
+        lessons: (ch.lessons||[]).filter(function(l) {
+          return !l.aiGenerated && !isLessonDeleted(subjectId, l.id);
+        })
       };
-    }).filter(function(ch) {
-      return !isChapterDeleted(subjectId, ch.id);
-    })
-  };
-
-  // Inject each upload as its own CHAPTER (visible like built-in chapters)
-  var uploads = ZAD_UPLOADS.getAll().filter(function(u) {
-    var lid = u.lessonId || ('ai-' + u.id);
-    return u.subjectId === subjectId
-      && u.lesson
-      && !isLessonDeleted(subjectId, lid)
-      && !isChapterDeleted(subjectId, 'up-ch-' + u.id);
-  });
-
-  uploads.forEach(function(u) {
-    var l   = u.lesson || {};
-    var lid = u.lessonId || ('ai-' + u.id);
-    var chapterTitle = l.title || u.title || u.fileName || 'درس مرفوع';
-    // Build lesson object
-    var lessonObj = {
-      id: lid,
-      title: l.title || u.title || u.fileName || 'درس مرفوع',
-      type: 'concept',
-      aiGenerated: true,
-      sourceUploadId: u.id,
-      content: {
-        definition:   (l.content && l.content.definition)   || '',
-        whyLearn:     (l.content && l.content.whyLearn)     || [],
-        keyTerms:     (l.content && l.content.keyTerms)     || [],
-        realExamples: (l.content && l.content.realExamples) || [],
-        steps:        (l.content && l.content.steps)        || [],
-        properties:   (l.content && l.content.properties)   || [],
-        types:        (l.content && l.content.types)        || [],
-        mindMap:      (l.content && l.content.mindMap)      || null
-      },
-      quiz:    l.quiz    || [],
-      summary: l.summary || ''
-    };
-    // Each upload becomes its own chapter
-    merged.chapters.unshift({
-      id: 'up-ch-' + u.id,
-      title: chapterTitle,
-      pages: '✨ مرفوع',
-      icon: '📄',
-      lessons: [lessonObj]
     });
+
+  // Add each upload as its own chapter at the top
+  var uploads = ZAD_UPLOADS.getAll().filter(function(u) {
+    var lid = u.lessonId || ('ai-'+u.id);
+    return u.subjectId === subjectId
+      && !isLessonDeleted(subjectId, lid)
+      && !isChapterDeleted(subjectId, 'up-ch-'+u.id);
   });
 
-  return merged;
+  var upload_chapters = uploads.map(function(u) {
+    var l   = u.lesson || {};
+    var lid = u.lessonId || ('ai-'+u.id);
+    var title = (l.title) || u.title || u.fileName || 'درس مرفوع';
+    return {
+      id:      'up-ch-' + u.id,
+      title:   title,
+      pages:   '✨ مرفوع',
+      icon:    '📄',
+      lessons: [{
+        id: lid,
+        title: title,
+        type: 'concept',
+        aiGenerated: true,
+        sourceUploadId: u.id,
+        content: (l.content) || {
+          definition: l.definition||'',
+          whyLearn: l.whyLearn||[],
+          keyTerms: l.keyTerms||[],
+          realExamples: l.examples||[],
+          steps: l.steps||[],
+          properties: l.properties||[],
+          types: l.types||[],
+          mindMap: null
+        },
+        quiz: l.quiz || [],
+        summary: l.summary || ''
+      }]
+    };
+  });
+
+  return {
+    id: subjectId,
+    title: base ? base.title : subjectId,
+    icon: base ? (base.icon||'📚') : '📚',
+    color: base ? (base.color||'#6C63FF') : '#6C63FF',
+    description: base ? (base.description||'') : '',
+    chapters: upload_chapters.concat(merged_chapters)
+  };
 }
 </script>
 

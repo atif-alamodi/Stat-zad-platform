@@ -10890,13 +10890,14 @@ function refreshAllTabsWithAILesson(lesson, subjectId) {
 
   showToast('✅ تم إنشاء الدرس! اضغط "عرض في الدروس"', 'success');
 
-  // Navigate to lessons tab immediately
+  // Navigate to lessons tab - small delay to ensure save completes
   if (subjectId && typeof showSubject === 'function') {
     setTimeout(function() {
+      // Force re-inject before navigating
+      if (typeof restoreUserLessons === 'function') restoreUserLessons();
       showSubject(subjectId, 'lessons');
-      // Also refresh dashboard curriculum section
       refreshUserCurriculumSection();
-    }, 500);
+    }, 800);
   }
 
   // Clear output after 3 seconds
@@ -13517,7 +13518,8 @@ function buildLessonsTab(subject, subjectId) {
       : chDone>0
         ? `<span style="font-size:0.75rem;background:rgba(255,214,0,0.12);color:#FFD600;padding:2px 8px;border-radius:20px;border:1px solid rgba(255,214,0,0.25)">${chDone}/${chTotal}</span>`
         : '';
-    return `<div class="chapter-item" id="ch-${ch.id}">
+    const hasAI = ch.lessons.some(l => l.aiGenerated);
+    return `<div class="chapter-item${i===0||hasAI?' open':''}" id="ch-${ch.id}">
       <div class="chapter-header" onclick="toggleChapter('${ch.id}')">
         <div class="chapter-num">${i+1}</div>
         <div class="chapter-info">

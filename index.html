@@ -5587,7 +5587,7 @@ async function submitHomework(subjectId) {
 
   try {
     const response = await zadFetch({
-        model: 'claude-sonnet-4-6',
+        model: 'llama-3.3-70b-versatile',
         max_tokens: 1500,
         system: `أنت مصحّح تعليمي ذكي لمنصة "زاد" التعليمية.
 مهمتك: تصحيح إجابات الطلاب ومساعدتهم على التحسن.
@@ -5663,7 +5663,7 @@ async function submitHomeworkWithImage(subjectId, base64, mediaType) {
   
   try {
     const response = await zadFetch({
-        model: 'claude-sonnet-4-6',
+        model: 'llama-3.3-70b-versatile',
         max_tokens: 1500,
         system: `أنت مصحّح تعليمي. صحّح ما تراه في الصورة، حدد الأخطاء، اشرحها، وأعط درجة من 100 مع اقتراحات تحسين. اكتب بالعربية.`,
         messages: [{
@@ -5993,7 +5993,7 @@ async function loadAdaptiveRecommendations(subjectId) {
     const timeout = setTimeout(() => controller.abort(), 12000);
 
     const response = await zadFetch({
-        model: 'claude-sonnet-4-6',
+        model: 'llama-3.3-70b-versatile',
         max_tokens: 900,
         system: `أنت مرشد تعليمي خبير لمنصة "زاد" للتعليم الجامعي السعودي.
 مهمتك: تحليل أداء الطالب وتقديم توصيات شخصية دقيقة وواقعية تساعده فعلاً على التطور.
@@ -7687,7 +7687,7 @@ async function analyzeImageFile(file, subjectId) {
     const mediaType = file.type || 'image/jpeg';
 
     const resp = await zadFetch({
-      model: 'claude-sonnet-4-6',
+      model: 'llama-3.3-70b-versatile',
       max_tokens: 3000,
       system: 'أنت مساعد تعليمي. حلّل محتوى الصورة واستخرج المعلومات الدراسية منها. أرجع JSON فقط بدون أي نص.',
       messages: [{
@@ -7779,7 +7779,7 @@ async function generateLessonWithAI(text, subjectId, title, subject) {
     updateStep('🤖', 'Claude AI يحلل المحتوى...', 30);
 
     const response = await zadFetch({
-        model: 'claude-sonnet-4-6',
+        model: 'llama-3.3-70b-versatile',
         max_tokens: 3000,
         system: systemPrompt,
         messages: [{
@@ -10293,7 +10293,7 @@ async function openMoreExplanationModal(conceptName, conceptData, col, cardId) {
 
   try {
     const response = await zadFetch({
-        model: 'claude-sonnet-4-6',
+        model: 'llama-3.3-70b-versatile',
         max_tokens: 600,
         system: 'أنت مُعلم خبير. اشرح المفهوم بأسلوب سهل وواضح باللغة العربية مع مثال واحد صغير. لا تزيد عن 5 جمل.',
         messages: [{
@@ -10662,7 +10662,7 @@ async function analyzeAndGenerate(text, subjectId, fileName) {
     updateStep('📡', 'إرسال للذكاء الاصطناعي...', 30);
 
     const response = await zadFetch({
-      model: 'claude-sonnet-4-6',
+      model: 'llama-3.3-70b-versatile',
       max_tokens: 4000,
       system: 'أنت مساعد تعليمي. أرجع JSON فقط بدون أي نص إضافي قبله أو بعده ولا علامات markdown.',
       messages: [{
@@ -17580,7 +17580,7 @@ function refreshUserCurriculumSection() {
   if (newSec) parent.replaceChild(newSec, sec);
 }
 
-const ZAD_API_KEY = 'zad_anthropic_key_v1';
+const ZAD_API_KEY = 'zad_groq_key_v1';
 
 function getApiKey() {
   return localStorage.getItem(ZAD_API_KEY) || '';
@@ -17594,26 +17594,63 @@ function clearApiKey() {
 
 async function zadFetch(body) {
   const key = getApiKey();
-  if (!key) {
-    showApiKeyPrompt();
-    throw new Error('NO_API_KEY');
+  if (!key) { showApiKeyPrompt(); throw new Error('NO_API_KEY'); }
+
+  // Convert Anthropic format → OpenAI/Groq format
+  const messages = [];
+  if (body.system) messages.push({ role: 'system', content: body.system });
+
+  const userContent = body.messages && body.messages[0] ? body.messages[0].content : '';
+  if (Array.isArray(userContent)) {
+    // Handle image + text
+    const textParts = userContent.filter(function(p){ return p.type==='text'; });
+    const imgParts  = userContent.filter(function(p){ return p.type==='image'; });
+    if (imgParts.length > 0) {
+      // Groq vision: use llama-4-scout-17b
+      const contentParts = [];
+      imgParts.forEach(function(img) {
+        contentParts.push({ type:'image_url', image_url:{ url:'data:'+img.source.media_type+';base64,'+img.source.data } });
+      });
+      textParts.forEach(function(t){ contentParts.push({ type:'text', text:t.text }); });
+      messages.push({ role:'user', content: contentParts });
+    } else {
+      messages.push({ role:'user', content: textParts.map(function(t){return t.text;}).join('\n') });
+    }
+  } else {
+    messages.push({ role:'user', content: userContent });
   }
-  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+
+  const hasImage = Array.isArray(userContent) && userContent.some(function(p){ return p.type==='image'; });
+  const model = hasImage ? 'meta-llama/llama-4-scout-17b-16e-instruct' : 'llama-3.3-70b-versatile';
+
+  const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-api-key': key,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true'
+      'Authorization': 'Bearer ' + key
     },
-    body: JSON.stringify(body)
+    body: JSON.stringify({
+      model: model,
+      messages: messages,
+      max_tokens: body.max_tokens || 4000,
+      temperature: 0.3
+    })
   });
-  if (resp.status === 401) {
+
+  if (resp.status === 401 || resp.status === 403) {
     clearApiKey();
-    showApiKeyPrompt('❌ مفتاح API غير صحيح — أدخله مجدداً');
+    showApiKeyPrompt('❌ مفتاح Groq غير صحيح — أدخله مجدداً');
     throw new Error('INVALID_API_KEY');
   }
-  return resp;
+
+  const groqData = await resp.json();
+  if (groqData.error) throw new Error('Groq: ' + (groqData.error.message || JSON.stringify(groqData.error)));
+
+  const text = groqData.choices?.[0]?.message?.content || '';
+  return {
+    status: 200,
+    json: async function() { return { content: [{ type:'text', text: text }] }; }
+  };
 }
 
 function showApiKeyPrompt(msg) {
@@ -17631,10 +17668,10 @@ function showApiKeyPrompt(msg) {
         box-shadow:0 24px 60px rgba(108,99,255,0.3)">
         <div style="text-align:center;margin-bottom:18px">
           <div style="font-size:2.5rem;margin-bottom:8px">🔑</div>
-          <div style="font-weight:900;font-size:1.1rem;margin-bottom:6px">مفتاح Anthropic API</div>
+          <div style="font-weight:900;font-size:1.1rem;margin-bottom:6px">مفتاح Groq API</div>
           <div style="font-size:0.8rem;color:var(--text-muted);line-height:1.6">
             المنصة تستخدم الذكاء الاصطناعي لتحليل ملفاتك.<br>
-            أدخل مفتاحك من <b style="color:var(--primary)">console.anthropic.com</b><br>
+            أدخل مفتاحك من <b style="color:var(--primary)">console.groq.com</b><br>
             <span style="font-size:0.72rem;color:#66BB6A">يُحفظ محلياً في جهازك فقط ولا يُرسل لأي جهة</span>
           </div>
         </div>
@@ -17642,7 +17679,7 @@ function showApiKeyPrompt(msg) {
           border-radius:10px;padding:8px 12px;margin-bottom:12px;
           color:#EF5350;font-size:0.8rem;text-align:center">${msg}</div>` : ''}
         <input id="api-key-input" type="password" value="${savedKey}"
-          placeholder="sk-ant-api03-..."
+          placeholder="gsk_..."
           style="width:100%;padding:12px 16px;border-radius:12px;border:1.5px solid rgba(108,99,255,0.4);
           background:rgba(108,99,255,0.08);color:var(--text);font-family:monospace;font-size:0.82rem;
           outline:none;box-sizing:border-box;margin-bottom:12px;direction:ltr"
@@ -17650,7 +17687,7 @@ function showApiKeyPrompt(msg) {
         <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:12px;
           background:rgba(255,255,255,0.04);border-radius:8px;padding:8px;line-height:1.7">
           📌 كيف تحصل على المفتاح:<br>
-          1. اذهب إلى <b>console.anthropic.com</b><br>
+          1. اذهب إلى <b>console.groq.com</b><br>
           2. من القائمة: <b>API Keys → Create Key</b><br>
           3. انسخ المفتاح والصقه هنا
         </div>
@@ -17678,7 +17715,7 @@ function saveApiKey() {
   var inp = document.getElementById('api-key-input');
   if (!inp) return;
   var key = inp.value.trim();
-  if (!key || !key.startsWith('sk-')) {
+  if (!key || !key.startsWith('gsk_') || key.length > 20) {
     inp.style.borderColor = '#EF5350';
     inp.placeholder = 'المفتاح يجب أن يبدأ بـ sk-';
     return;
@@ -18061,7 +18098,7 @@ function saveSettingsApiKey() {
   if (!inp) return;
   var key = inp.value.trim();
   if (!key) return showToast('أدخل المفتاح أولاً', 'error');
-  if (!key.startsWith('sk-')) return showToast('المفتاح يجب أن يبدأ بـ sk-', 'error');
+  if (!key.startsWith('gsk_') || key.length > 20) return showToast('المفتاح يجب أن يبدأ بـ sk-', 'error');
   setApiKey(key);
   inp.value = '';
   updateApiKeyStatusDisplay();
@@ -18762,7 +18799,7 @@ body.light-mode .theme-btn-light {
     <div 
     <!-- ─── مفتاح الذكاء الاصطناعي ─── -->
     <div class="settings-section" style="border-color:rgba(108,99,255,0.3)">
-      <div class="settings-label" style="color:var(--primary)">🔑 مفتاح Anthropic API</div>
+      <div class="settings-label" style="color:var(--primary)">🔑 مفتاح Groq API</div>
       <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:10px;line-height:1.6">
         مطلوب لتحليل الملفات بالذكاء الاصطناعي — يُحفظ في جهازك فقط
       </div>
@@ -18772,7 +18809,7 @@ body.light-mode .theme-btn-light {
       </div>
       <div style="display:flex;gap:8px">
         <input id="settings-api-key-input" type="password"
-          placeholder="sk-ant-api03-..."
+          placeholder="gsk_..."
           style="flex:1;padding:9px 12px;border-radius:10px;
             border:1.5px solid rgba(108,99,255,0.35);
             background:rgba(108,99,255,0.07);
@@ -18794,12 +18831,12 @@ body.light-mode .theme-btn-light {
             font-family:var(--font);font-size:0.77rem;font-weight:700">
           🗑️ حذف المفتاح
         </button>
-        <a href="https://console.anthropic.com" target="_blank"
+        <a href="https://console.groq.com" target="_blank"
           style="flex:1;padding:7px;border-radius:8px;border:1px solid rgba(108,99,255,0.3);
             background:rgba(108,99,255,0.07);color:var(--primary);cursor:pointer;
             font-family:var(--font);font-size:0.77rem;font-weight:700;
             text-decoration:none;display:flex;align-items:center;justify-content:center">
-          🌐 احصل على مفتاح
+          🌐 احصل على مفتاح مجاني
         </a>
       </div>
     </div>

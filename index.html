@@ -17675,25 +17675,45 @@ function clearApiKey() {
 }
 
 async function zadFetch(body) {
-  // Get key: personal → platform (from GitHub config)
-  const userKey     = (typeof getApiKey === 'function') ? getApiKey() : '';
-  const platformKey = window._ZAD_PLATFORM_KEY || '';
-  const key = userKey || platformKey;
+  // Avoid infinite recursion from retry
+  var isRetry = body._retry || false;
+
+  // Step 1: Get user key
+  var userKey = (typeof getApiKey === 'function') ? getApiKey() : '';
+
+  // Step 2: If no user key, wait for platform key to finish loading
+  if (!userKey && !window._ZAD_PLATFORM_KEY) {
+    if (window._ZAD_KEY_LOADING) {
+      // Wait up to 5 seconds for platform key
+      for (var t = 0; t < 10; t++) {
+        await new Promise(function(r){ setTimeout(r, 500); });
+        if (window._ZAD_PLATFORM_KEY || !window._ZAD_KEY_LOADING) break;
+      }
+    }
+    // Try one more fresh fetch if still empty
+    if (!window._ZAD_PLATFORM_KEY && !isRetry) {
+      await loadPlatformKey();
+    }
+  }
+
+  var platformKey = window._ZAD_PLATFORM_KEY || '';
+  var key = userKey || platformKey;
 
   if (!key) {
-    showApiKeyPrompt();
+    if (typeof showApiKeyPrompt === 'function') showApiKeyPrompt();
     throw new Error('NO_API_KEY');
   }
 
-  const messages = [];
+  // Build messages in OpenAI format
+  var messages = [];
   if (body.system) messages.push({ role: 'system', content: body.system });
 
-  const userContent = body.messages && body.messages[0] ? body.messages[0].content : '';
+  var userContent = body.messages && body.messages[0] ? body.messages[0].content : '';
   if (Array.isArray(userContent)) {
-    const textParts = userContent.filter(function(p){ return p.type==='text'; });
-    const imgParts  = userContent.filter(function(p){ return p.type==='image'; });
+    var textParts = userContent.filter(function(p){ return p.type==='text'; });
+    var imgParts  = userContent.filter(function(p){ return p.type==='image'; });
     if (imgParts.length > 0) {
-      const parts = [];
+      var parts = [];
       imgParts.forEach(function(img) {
         parts.push({ type:'image_url', image_url:{ url:'data:'+img.source.media_type+';base64,'+img.source.data } });
       });
@@ -17706,10 +17726,10 @@ async function zadFetch(body) {
     messages.push({ role:'user', content: userContent });
   }
 
-  const hasImage = Array.isArray(userContent) && userContent.some(function(p){ return p.type==='image'; });
-  const model = hasImage ? 'meta-llama/llama-4-scout-17b-16e-instruct' : 'llama-3.3-70b-versatile';
+  var hasImage = Array.isArray(userContent) && userContent.some(function(p){ return p.type==='image'; });
+  var model = hasImage ? 'meta-llama/llama-4-scout-17b-16e-instruct' : 'llama-3.3-70b-versatile';
 
-  const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+  var resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -17725,14 +17745,23 @@ async function zadFetch(body) {
 
   if (resp.status === 401 || resp.status === 403) {
     if (userKey && typeof clearApiKey === 'function') clearApiKey();
-    if (!platformKey) showApiKeyPrompt('مفتاح Groq غير صحيح');
+    // If platform key failed, try reloading it once
+    if (platformKey && !isRetry) {
+      window._ZAD_PLATFORM_KEY = '';
+      await loadPlatformKey();
+      if (window._ZAD_PLATFORM_KEY) {
+        body._retry = true;
+        return zadFetch(body);
+      }
+    }
+    if (!window._ZAD_PLATFORM_KEY && typeof showApiKeyPrompt === 'function') showApiKeyPrompt('مفتاح Groq غير صحيح');
     throw new Error('INVALID_API_KEY');
   }
 
-  const groqData = await resp.json();
+  var groqData = await resp.json();
   if (groqData.error) throw new Error('Groq: ' + (groqData.error.message || JSON.stringify(groqData.error)));
 
-  const text = groqData.choices?.[0]?.message?.content || '';
+  var text = groqData.choices?.[0]?.message?.content || '';
   return {
     status: 200,
     json: async function() { return { content: [{ type:'text', text: text }] }; }

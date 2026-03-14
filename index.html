@@ -11271,6 +11271,7 @@ body {
   margin-right: 280px;
   min-height: 100vh;
   padding: 30px;
+  overflow-x: hidden;
 }
 
 /* ============ TOPBAR ============ */
@@ -13544,11 +13545,14 @@ function buildLessonsTab(subject, subjectId) {
 
   // ── Curriculum chapters ──────────────────────────────────────
   var chaptersHTML = subject.chapters.map(function(ch, i) {
-    // Filter hidden lessons
+    // Skip permanently deleted chapters
+    if (typeof isChapterDeleted === 'function' && isChapterDeleted(subjectId, ch.id)) return '';
+    // Filter deleted lessons
     var visibleLessons = ch.lessons.filter(function(l) {
-      return !l.aiGenerated && !isLessonHidden(subjectId, l.id);
+      return !l.aiGenerated && !isLessonDeleted(subjectId, l.id);
     });
-    if (!visibleLessons.length && i > 0) return '';
+    // Only hide if ALL lessons deleted AND not first chapter
+    // (Keep chapter visible so user knows it exists)
 
     var chDone  = visibleLessons.filter(function(l){ var d=getLessonCompletion(subjectId,l.id); return d&&d.status==='completed'; }).length;
     var chTotal = visibleLessons.length;
@@ -19842,6 +19846,24 @@ function markLessonDeleted(subjectId, lessonId) {
   localStorage.setItem(_deletedKey(), JSON.stringify(deleted));
 }
 
+function _deletedChKey() {
+  var email = (APP.student.email||'guest').replace(/[^a-z0-9]/gi,'_');
+  return 'zad_deleted_chapters_' + email;
+}
+function getDeletedChapters() {
+  try { return JSON.parse(localStorage.getItem(_deletedChKey()) || '[]'); }
+  catch(e) { return []; }
+}
+function markChapterDeleted(subjectId, chapterId) {
+  var deleted = getDeletedChapters();
+  var key = subjectId + '__' + chapterId;
+  if (!deleted.includes(key)) deleted.push(key);
+  localStorage.setItem(_deletedChKey(), JSON.stringify(deleted));
+}
+function isChapterDeleted(subjectId, chapterId) {
+  return getDeletedChapters().includes(subjectId + '__' + chapterId);
+}
+
 function isLessonDeleted(subjectId, lessonId) {
   return getDeletedLessons().includes(subjectId + '__' + lessonId);
 }
@@ -20073,6 +20095,9 @@ function showDeleteChapterConfirm(subjectId, chapterId, chapterTitle) {
     overlay.remove();
 
     if (!subject || !ch) { showToast('لم يُعثر على القسم', 'error'); return; }
+
+    // Mark chapter as deleted (persists across reloads)
+    markChapterDeleted(subjectId, chapterId);
 
     // Mark all lessons in chapter as deleted
     ch.lessons.forEach(function(l) {

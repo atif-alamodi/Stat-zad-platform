@@ -7792,7 +7792,7 @@ async function generateLessonWithAI(text, subjectId, title, subject) {
 توليد: 3-5 keyPoints، 4-6 keyTerms، 2-3 examples، 3-4 mindMapBranches، 4-5 quiz questions.
 الاختبارات: ذات جودة عالية تقيس الفهم وليس الحفظ.`;
 
-    updateStep('🤖', 'Claude AI يحلل المحتوى...', 30);
+    updateStep('🤖', 'الذكاء الاصطناعي يحلل المحتوى...', 30);
 
     const response = await zadFetch({
         model: 'claude-sonnet-4-20250514',
@@ -17626,7 +17626,7 @@ function refreshUserCurriculumSection() {
   if (newSec) parent.replaceChild(newSec, sec);
 }
 
-const ZAD_API_KEY = 'zad_anthropic_key_v1';
+const ZAD_API_KEY = 'zad_gemini_key_v1';
 
 function getApiKey() {
   return localStorage.getItem(ZAD_API_KEY) || '';
@@ -17638,28 +17638,63 @@ function clearApiKey() {
   localStorage.removeItem(ZAD_API_KEY);
 }
 
+function _convertToGemini(body) {
+  const gemini = {
+    generationConfig: {
+      maxOutputTokens: body.max_tokens || 2000,
+      temperature: 0.7
+    }
+  };
+  if (body.system) {
+    gemini.systemInstruction = { parts: [{ text: body.system }] };
+  }
+  gemini.contents = (body.messages || []).map(function(msg) {
+    var parts = [];
+    if (typeof msg.content === 'string') {
+      parts.push({ text: msg.content });
+    } else if (Array.isArray(msg.content)) {
+      msg.content.forEach(function(block) {
+        if (block.type === 'text') {
+          parts.push({ text: block.text });
+        } else if (block.type === 'image') {
+          parts.push({ inlineData: { mimeType: block.source.media_type, data: block.source.data } });
+        }
+      });
+    }
+    return { role: msg.role === 'assistant' ? 'model' : 'user', parts: parts };
+  });
+  return gemini;
+}
+
 async function zadFetch(body) {
   const key = getApiKey();
   if (!key) {
     showApiKeyPrompt();
     throw new Error('NO_API_KEY');
   }
-  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+  const geminiBody = _convertToGemini(body);
+  const resp = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + encodeURIComponent(key), {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': key,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true'
-    },
-    body: JSON.stringify(body)
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(geminiBody)
   });
-  if (resp.status === 401) {
-    clearApiKey();
-    showApiKeyPrompt('❌ مفتاح API غير صحيح — أدخله مجدداً');
-    throw new Error('INVALID_API_KEY');
+  const rawData = await resp.json().catch(function() { return {}; });
+  if (!resp.ok) {
+    const errMsg = rawData.error?.message || '';
+    if (errMsg.includes('API key') || resp.status === 401 || resp.status === 403) {
+      clearApiKey();
+      showApiKeyPrompt('❌ مفتاح API غير صحيح — أدخله مجدداً');
+      throw new Error('INVALID_API_KEY');
+    }
   }
-  return resp;
+  const text = rawData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  return {
+    ok: resp.ok,
+    status: resp.status,
+    json: async function() {
+      return { content: [{ text: text }] };
+    }
+  };
 }
 
 function showApiKeyPrompt(msg) {
@@ -17676,11 +17711,11 @@ function showApiKeyPrompt(msg) {
         padding:28px;max-width:460px;width:100%;
         box-shadow:0 24px 60px rgba(108,99,255,0.3)">
         <div style="text-align:center;margin-bottom:18px">
-          <div style="font-size:2.5rem;margin-bottom:8px">🔑</div>
-          <div style="font-weight:900;font-size:1.1rem;margin-bottom:6px">مفتاح Anthropic API</div>
+          <div style="font-size:2.5rem;margin-bottom:8px">🤖</div>
+          <div style="font-weight:900;font-size:1.1rem;margin-bottom:6px">تفعيل الذكاء الاصطناعي (مجاني)</div>
           <div style="font-size:0.8rem;color:var(--text-muted);line-height:1.6">
-            المنصة تستخدم الذكاء الاصطناعي لتحليل ملفاتك.<br>
-            أدخل مفتاحك من <b style="color:var(--primary)">console.anthropic.com</b><br>
+            المنصة تستخدم <b style="color:#4285F4">Google Gemini</b> المجاني لتحليل ملفاتك.<br>
+            <span style="color:#66BB6A;font-weight:700">✨ مجاني بالكامل — لا يحتاج بطاقة دفع</span><br>
             <span style="font-size:0.72rem;color:#66BB6A">يُحفظ محلياً في جهازك فقط ولا يُرسل لأي جهة</span>
           </div>
         </div>
@@ -17688,24 +17723,25 @@ function showApiKeyPrompt(msg) {
           border-radius:10px;padding:8px 12px;margin-bottom:12px;
           color:#EF5350;font-size:0.8rem;text-align:center">${msg}</div>` : ''}
         <input id="api-key-input" type="password" value="${savedKey}"
-          placeholder="sk-ant-api03-..."
+          placeholder="AIzaSy..."
           style="width:100%;padding:12px 16px;border-radius:12px;border:1.5px solid rgba(108,99,255,0.4);
           background:rgba(108,99,255,0.08);color:var(--text);font-family:monospace;font-size:0.82rem;
           outline:none;box-sizing:border-box;margin-bottom:12px;direction:ltr"
           onkeydown="if(event.key==='Enter')saveApiKey()">
         <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:12px;
           background:rgba(255,255,255,0.04);border-radius:8px;padding:8px;line-height:1.7">
-          📌 كيف تحصل على المفتاح:<br>
-          1. اذهب إلى <b>console.anthropic.com</b><br>
-          2. من القائمة: <b>API Keys → Create Key</b><br>
-          3. انسخ المفتاح والصقه هنا
+          📌 كيف تحصل على المفتاح المجاني (30 ثانية):<br>
+          1. اذهب إلى <a href="https://aistudio.google.com/apikey" target="_blank" style="color:#4285F4;text-decoration:underline;font-weight:700">aistudio.google.com/apikey</a><br>
+          2. سجّل بحساب Google (Gmail)<br>
+          3. اضغط <b>Create API Key</b> → انسخ المفتاح والصقه هنا<br>
+          <span style="color:#66BB6A">⚡ لا يحتاج بطاقة بنكية — مجاني تماماً</span>
         </div>
         <div style="display:flex;gap:8px">
           <button onclick="saveApiKey()"
             style="flex:1;padding:11px;border-radius:12px;border:none;cursor:pointer;
-            background:linear-gradient(135deg,var(--primary),#a78bfa);color:white;
+            background:linear-gradient(135deg,#4285F4,#34A853);color:white;
             font-family:var(--font);font-size:0.88rem;font-weight:800">
-            💾 حفظ المفتاح</button>
+            ✅ تفعيل الذكاء الاصطناعي</button>
           <button onclick="document.getElementById('api-key-modal').remove()"
             style="padding:11px 16px;border-radius:12px;border:1px solid rgba(255,255,255,0.15);
             background:rgba(255,255,255,0.06);color:var(--text-muted);cursor:pointer;font-family:var(--font)">
@@ -17714,9 +17750,9 @@ function showApiKeyPrompt(msg) {
       </div>
     </div>`;
   document.body.insertAdjacentHTML('beforeend', html);
-  setTimeout(function(){ 
+  setTimeout(function(){
     var inp = document.getElementById('api-key-input');
-    if(inp) inp.focus(); 
+    if(inp) inp.focus();
   }, 100);
 }
 
@@ -17724,14 +17760,14 @@ function saveApiKey() {
   var inp = document.getElementById('api-key-input');
   if (!inp) return;
   var key = inp.value.trim();
-  if (!key || !key.startsWith('sk-')) {
+  if (!key || key.length < 10) {
     inp.style.borderColor = '#EF5350';
-    inp.placeholder = 'المفتاح يجب أن يبدأ بـ sk-';
+    inp.placeholder = 'الصق مفتاح Google AI هنا';
     return;
   }
   setApiKey(key);
   document.getElementById('api-key-modal').remove();
-  showToast('✅ تم حفظ مفتاح API — المنصة جاهزة للذكاء الاصطناعي!', 'success');
+  showToast('✅ تم التفعيل — الذكاء الاصطناعي جاهز مجاناً!', 'success');
 
   refreshApiKeyStatus();
 }

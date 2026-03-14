@@ -10492,77 +10492,106 @@ async function analyzeAndGenerate(text, subjectId, fileName) {
     if (bar)   bar.style.width = pct + '%';
     if (steps) steps.innerHTML = '<div style="font-size:0.82rem;color:var(--text-muted);padding:8px 12px;background:rgba(255,255,255,0.03);border-radius:8px;border-right:3px solid var(--primary)">' + icon + ' ' + msg + '</div>';
   };
-
   const barWrap = document.getElementById('ai-gen-progress');
   if (barWrap) barWrap.style.display = 'block';
   if (out) { out.innerHTML = ''; out.style.opacity = '1'; }
 
   try {
     upd('📖', 'تحليل المحتوى...', 15);
-
-    // ALWAYS use the subject the user chose - never override
-    const detectedSubject = subjectId;
     const subject  = CURRICULUM[subjectId];
-    const subTitle = subject ? subject.title : 'المادة';
-
-    // Trim text to avoid token overflow
-    const safeText = text.slice(0, 5000).replace(/[\u0000-\u001F]/g, ' ');
+    const subTitle = subject ? subject.title : (subjectId || 'المادة');
+    const safeText = text.replace(/[\u0000-\u001F]/g, ' ').slice(0, 12000);
 
     upd('📡', 'إرسال للذكاء الاصطناعي...', 35);
 
     const response = await zadFetch({
       model: 'llama-3.3-70b-versatile',
-      max_tokens: 3000,
-      system: 'You are an educational assistant. Return ONLY valid JSON, no markdown, no explanation.',
+      max_tokens: 4000,
+      system: 'أنت مساعد تعليمي خبير. مهمتك تحليل النص وإنتاج محتوى تعليمي تفاعلي شامل باللغة العربية. أجب بـ JSON صالح فقط بدون أي نص خارجه.',
       messages: [{
         role: 'user',
-        content: 'Read this text about ' + subTitle + ' and create a JSON lesson. Text: ' + safeText.slice(0,3000) + ' --- Respond with ONLY valid JSON like this template (fill in Arabic values, NO extra text outside JSON): {"lessonTitle":"...","definition":"...","whyLearn":["...","...","..."],"keyTerms":[{"term":"...","def":"..."},{"term":"...","def":"..."}],"examples":[{"icon":"example","title":"...","content":"..."}],"steps":["...","...","..."],"mindMapBranches":[{"label":"...","color":"#6C63FF","children":["...","...","..."]},{"label":"...","color":"#FF6584","children":["...","...","..."]}],"quiz":[{"q":"...","options":["correct answer","wrong1","wrong2","wrong3"],"answer":0,"explanation":"..."},{"q":"...","options":["correct answer","wrong1","wrong2","wrong3"],"answer":0,"explanation":"..."}],"summary":"...","properties":["...","...","..."]}'
+        content: `حلل النص التالي من مادة "${subTitle}" وأنتج درساً تعليمياً شاملاً.
+
+النص:
+${safeText}
+
+أجب بـ JSON صالح فقط بهذا الشكل الكامل (ملء جميع الحقول بالعربية، لا تترك أي حقل فارغاً):
+{
+  "lessonTitle": "عنوان الدرس المستخرج من النص",
+  "definition": "تعريف شامل للموضوع الرئيسي (3-5 جمل)",
+  "whyLearn": ["سبب 1 لأهمية هذا الموضوع", "سبب 2", "سبب 3"],
+  "keyTerms": [
+    {"term": "المصطلح الأول", "def": "تعريفه"},
+    {"term": "المصطلح الثاني", "def": "تعريفه"},
+    {"term": "المصطلح الثالث", "def": "تعريفه"},
+    {"term": "المصطلح الرابع", "def": "تعريفه"},
+    {"term": "المصطلح الخامس", "def": "تعريفه"}
+  ],
+  "examples": [
+    {"icon": "💡", "title": "مثال تطبيقي 1", "content": "شرح المثال"},
+    {"icon": "📌", "title": "مثال تطبيقي 2", "content": "شرح المثال"},
+    {"icon": "🔍", "title": "مثال تطبيقي 3", "content": "شرح المثال"}
+  ],
+  "steps": ["خطوة أو نقطة رئيسية 1", "خطوة 2", "خطوة 3", "خطوة 4"],
+  "properties": ["خاصية أو مميزة 1", "خاصية 2", "خاصية 3"],
+  "types": ["نوع أو تصنيف 1", "نوع 2", "نوع 3"],
+  "mindMapBranches": [
+    {"label": "المحور الرئيسي 1", "color": "#6C63FF", "children": ["فرع 1", "فرع 2", "فرع 3"]},
+    {"label": "المحور الرئيسي 2", "color": "#FF6584", "children": ["فرع 1", "فرع 2", "فرع 3"]},
+    {"label": "المحور الرئيسي 3", "color": "#00BFA5", "children": ["فرع 1", "فرع 2"]},
+    {"label": "المحور الرئيسي 4", "color": "#FFD600", "children": ["فرع 1", "فرع 2"]}
+  ],
+  "quiz": [
+    {"q": "سؤال من النص", "options": ["الإجابة الصحيحة", "خطأ 1", "خطأ 2", "خطأ 3"], "answer": 0, "explanation": "شرح الإجابة"},
+    {"q": "سؤال 2", "options": ["الإجابة الصحيحة", "خطأ 1", "خطأ 2", "خطأ 3"], "answer": 0, "explanation": "شرح"},
+    {"q": "سؤال 3", "options": ["الإجابة الصحيحة", "خطأ 1", "خطأ 2", "خطأ 3"], "answer": 0, "explanation": "شرح"},
+    {"q": "سؤال 4", "options": ["الإجابة الصحيحة", "خطأ 1", "خطأ 2", "خطأ 3"], "answer": 0, "explanation": "شرح"},
+    {"q": "سؤال 5", "options": ["الإجابة الصحيحة", "خطأ 1", "خطأ 2", "خطأ 3"], "answer": 0, "explanation": "شرح"}
+  ],
+  "summary": "ملخص شامل للدرس في 3-4 جمل"
+}`
       }]
     });
 
     upd('⚙️', 'معالجة الرد...', 65);
-
     const data = await response.json();
     if (data.error) throw new Error('API: ' + (data.error.message || JSON.stringify(data.error)));
-    if (!data.content || !data.content[0]) throw new Error('رد فارغ');
+    if (!data.content || !data.content[0]) throw new Error('رد فارغ من الذكاء الاصطناعي');
 
     let raw = (data.content[0].text || '').trim();
-
-    // Robust JSON extraction and repair
     let lesson = repairAndParseJSON(raw);
+    if (!lesson) throw new Error('تعذّر قراءة رد الذكاء الاصطناعي — حاول مرة أخرى');
 
-    if (!lesson) throw new Error('فشل تحليل JSON — حاول مرة أخرى');
-
-    // Ensure required fields
-    lesson.lessonTitle     = lesson.lessonTitle     || fileName;
+    // Ensure all fields exist
+    lesson.lessonTitle     = lesson.lessonTitle     || fileName || 'درس جديد';
     lesson.definition      = lesson.definition      || '';
     lesson.whyLearn        = lesson.whyLearn        || [];
     lesson.keyTerms        = lesson.keyTerms        || [];
     lesson.examples        = lesson.examples        || [];
     lesson.steps           = lesson.steps           || [];
+    lesson.properties      = lesson.properties      || [];
+    lesson.types           = lesson.types           || [];
     lesson.mindMapBranches = lesson.mindMapBranches || [];
     lesson.quiz            = lesson.quiz            || [];
     lesson.summary         = lesson.summary         || '';
-    lesson.properties      = lesson.properties      || [];
-    lesson.types           = lesson.types           || [];
 
     upd('💾', 'حفظ الدرس...', 85);
 
     if (typeof saveAILessonForUser === 'function') {
-      saveAILessonForUser(lesson, detectedSubject, uploadId, fileName);
+      saveAILessonForUser(lesson, subjectId, uploadId, fileName);
     }
-    window._ZAD_AI_LESSON = { lesson, subjectId: detectedSubject, uploadId, fileName };
+    window._ZAD_AI_LESSON = { lesson, subjectId, uploadId, fileName };
+    window._ZAD_LAST_UPLOAD_SUBJECT = subjectId;
 
-    upd('✅ تم! الدرس جاهز', 'جاري الانتقال للدروس...', 100);
-    showUploadStatus('success', '✅ تم إنشاء الدرس! يمكنك الآن الانتقال للتبويبات');
-    refreshAllTabsWithAILesson(lesson, detectedSubject);
+    upd('✅', 'تم إنشاء الدرس!', 100);
+    refreshAllTabsWithAILesson(lesson, subjectId);
 
   } catch(err) {
-    if (err.message === 'NO_API_KEY' || err.message === 'INVALID_API_KEY') return;
-    var errMsg = err.message || String(err);
-    if (steps) steps.innerHTML = '<div style="color:#FF5252;padding:10px;border-radius:8px;background:rgba(239,83,80,0.1)">❌ خطأ: ' + errMsg + '</div>';
+    if (err.message === 'NO_API_KEY' || err.message === 'INVALID_API_KEY' || err.message === 'BACKEND_NOT_CONFIGURED') return;
+    var errMsg = String(err.message || err);
+    if (steps) steps.innerHTML = '<div style="color:#FF5252;padding:10px;border-radius:8px;background:rgba(239,83,80,0.1)">❌ ' + errMsg + '</div>';
     showUploadStatus('error', '❌ ' + errMsg.slice(0, 200));
-    console.error('analyzeAndGenerate error:', err);
+    console.error('analyzeAndGenerate:', err);
   }
 }
 

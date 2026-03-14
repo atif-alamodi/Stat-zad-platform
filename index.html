@@ -7577,7 +7577,7 @@ function handleUploadDrop(event, subjectId) {
   if (file) processUploadedFile(file, subjectId);
 }
 
-async async function handleUploadFile(event, subjectId) {
+async function handleUploadFile(event, subjectId) {
   const file = event.target?.files?.[0];
   if (!file) return;
   showUploadStatus('loading', '⏳ جاري تحليل "' + file.name + '"...');

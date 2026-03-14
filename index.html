@@ -13588,7 +13588,10 @@ function buildLessonsTab(subject, subjectId) {
     }).join('');
 
     return '<div class="chapter-item'+(i===0?' open':'')+'" id="ch-'+ch.id+'">'
-      + '<div class="chapter-header" onclick="toggleChapter(\''+ch.id+'\')">'
+      + '<div class="chapter-header" onclick="toggleChapter(\''+ch.id+'\');"'
+      + ' oncontextmenu="event.preventDefault();showDeleteChapterConfirm(\''+subjectId+'\',\''+ch.id+'\',\''+ch.title+'\')"'
+      + ' ontouchstart="startLongPress(event,\'__ch__'+ch.id+'\',\'\',\''+subjectId+'\',\''+ch.title+'\');clearLongPress()"'
+      + ' ontouchend="clearLongPress()" ontouchmove="clearLongPress()">'
         + '<div class="chapter-num">'+(i+1)+'</div>'
         + '<div class="chapter-info">'
           + '<div class="chapter-title" style="display:flex;align-items:center;gap:8px">'+(ch.icon||'📘')+' '+ch.title+' '+chBadge+'</div>'
@@ -19901,7 +19904,13 @@ function startLongPress(e, lessonId, uploadRef, subjectId, lessonTitle) {
   _lpTimer = setTimeout(function() {
     _lpTimer = null;
     if (navigator.vibrate) navigator.vibrate(60);
-    showDeleteLessonConfirm(subjectId, lessonId, lessonTitle||'', uploadRef||'');
+    // Check if it's a chapter (id starts with __ch__)
+    if (lessonId && lessonId.startsWith('__ch__')) {
+      var chId = lessonId.replace('__ch__', '');
+      showDeleteChapterConfirm(subjectId, chId, lessonTitle||'');
+    } else {
+      showDeleteLessonConfirm(subjectId, lessonId, lessonTitle||'', uploadRef||'');
+    }
   }, 600);
 }
 function clearLongPress() {
@@ -20012,6 +20021,61 @@ function patchChapterHeaders(subjectId) {
     el.addEventListener('touchend', function(){ clearTimeout(tp); });
     el.addEventListener('touchmove', function(){ clearTimeout(tp); });
   });
+}
+
+function showDeleteChapterConfirm(subjectId, chapterId, chapterTitle) {
+  var existing = document.getElementById('zad-del-ch-overlay');
+  if (existing) existing.remove();
+
+  // Count lessons in chapter
+  var subject = CURRICULUM[subjectId];
+  var ch = subject && subject.chapters.find(function(c){ return c.id === chapterId; });
+  var lessonCount = ch ? ch.lessons.filter(function(l){ return !isLessonDeleted(subjectId, l.id); }).length : 0;
+
+  var overlay = document.createElement('div');
+  overlay.id = 'zad-del-ch-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;padding:20px;direction:rtl';
+
+  overlay.innerHTML = '<div style="background:#1C1917;border:1.5px solid rgba(255,82,82,0.5);border-radius:20px;padding:24px;max-width:360px;width:100%;text-align:center">'
+    + '<div style="font-size:2.5rem;margin-bottom:10px">🗂️</div>'
+    + '<div style="font-weight:900;font-size:1rem;margin-bottom:8px">حذف القسم كاملاً؟</div>'
+    + '<div style="font-size:0.85rem;font-weight:700;color:var(--text);margin-bottom:6px">' + (chapterTitle||'القسم') + '</div>'
+    + '<div style="font-size:0.78rem;color:#aaa;margin-bottom:20px;line-height:1.7">'
+    + 'سيُحذف هذا القسم و<b style="color:#FF5252">' + lessonCount + ' درس</b> منه نهائياً من حسابك<br>'
+    + 'لن يؤثر على حسابات الطلاب الآخرين'
+    + '</div>'
+    + '<div style="display:flex;gap:10px;justify-content:center">'
+    + '<button id="del-ch-cancel" style="padding:11px 22px;border-radius:10px;border:1px solid #555;background:transparent;color:#aaa;font-family:var(--font);cursor:pointer">إلغاء</button>'
+    + '<button id="del-ch-ok" style="padding:11px 22px;border-radius:10px;border:none;background:linear-gradient(135deg,#FF5252,#C62828);color:white;font-family:var(--font);font-weight:800;cursor:pointer">🗑️ حذف القسم</button>'
+    + '</div></div>';
+
+  document.body.appendChild(overlay);
+
+  document.getElementById('del-ch-cancel').onclick = function() { overlay.remove(); };
+  document.getElementById('del-ch-ok').onclick = function() {
+    overlay.remove();
+
+    if (!subject || !ch) { showToast('لم يُعثر على القسم', 'error'); return; }
+
+    // Mark all lessons in chapter as deleted
+    ch.lessons.forEach(function(l) {
+      markLessonDeleted(subjectId, l.id);
+    });
+
+    // Remove chapter from CURRICULUM in memory
+    subject.chapters = subject.chapters.filter(function(c) { return c.id !== chapterId; });
+
+    // Remove any AI uploads for these lessons
+    var lessonIds = ch.lessons.map(function(l){ return l.id; });
+    var uploads = ZAD_UPLOADS.getAll().filter(function(u) {
+      return !lessonIds.includes(u.lessonId);
+    });
+    localStorage.setItem(ZAD_UPLOADS._key(), JSON.stringify(uploads));
+
+    showToast('🗑️ تم حذف القسم من حسابك', 'success');
+    showSubject(subjectId, 'lessons');
+    if (typeof refreshUserCurriculumSection === 'function') refreshUserCurriculumSection();
+  };
 }
 </script>
 

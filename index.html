@@ -17738,16 +17738,18 @@ function saveApiKey() {
   var inp = document.getElementById('api-key-input');
   if (!inp) return;
   var key = inp.value.trim();
-  if (!key || !key.startsWith('gsk_') || key.length > 20) {
+  if (!key || key.length < 10) {
     inp.style.borderColor = '#EF5350';
-    inp.placeholder = 'المفتاح يجب أن يبدأ بـ gsk_';
+    inp.placeholder = 'المفتاح قصير — تأكد من نسخه كاملاً';
     return;
   }
   setApiKey(key);
-  document.getElementById('api-key-modal').remove();
-  showToast('✅ تم حفظ مفتاح API — المنصة جاهزة للذكاء الاصطناعي!', 'success');
-
-  refreshApiKeyStatus();
+  var modal = document.getElementById('api-key-modal');
+  if (modal) modal.remove();
+  showToast('تم حفظ مفتاح API — المنصة جاهزة', 'success');
+  if (typeof refreshApiKeyStatus    === 'function') refreshApiKeyStatus();
+  if (typeof updateApiBanner        === 'function') updateApiBanner();
+  if (typeof updateApiKeyStatusDisplay === 'function') updateApiKeyStatusDisplay();
 }
 
 function refreshApiKeyStatus() {
@@ -18121,7 +18123,7 @@ function saveSettingsApiKey() {
   if (!inp) return;
   var key = inp.value.trim();
   if (!key) return showToast('أدخل المفتاح أولاً', 'error');
-  if (!key.startsWith('gsk_') || key.length > 20) return showToast('المفتاح يجب أن يبدأ بـ sk-', 'error');
+  if (key.length < 10) return showToast('المفتاح يجب أن يبدأ بـ gsk_', 'error');
   setApiKey(key);
   inp.value = '';
   updateApiKeyStatusDisplay();

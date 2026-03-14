@@ -17682,7 +17682,7 @@ function clearApiKey() {
 async function zadFetch(body) {
   // ── Backend proxy URL (Cloudflare Worker) ──────────────────
   // Change this to your Worker URL after deployment
-  var BACKEND_URL = window._ZAD_BACKEND_URL || 'https://zad-proxy.YOUR_NAME.workers.dev';
+  var BACKEND_URL = window._ZAD_BACKEND_URL || 'https://zad-proxy.atif-alamodi.workers.dev';
 
   // If no backend configured, show clear message (not API key prompt)
   if (!BACKEND_URL || BACKEND_URL.includes('YOUR_NAME')) {

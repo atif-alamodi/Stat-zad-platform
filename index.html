@@ -8097,21 +8097,28 @@ function showUploadStatus(type, msg) {
   if (!out) return;
   const colors = { loading: '#FFD600', error: '#FF5252', warning: '#FF9800', success: '#28CA41', info: '#2196F3' };
   const icons  = { loading: '⏳', error: '❌', warning: '⚠️', success: '✅', info: 'ℹ️' };
+  out.style.opacity = '1';
   out.innerHTML = `
     <div style="padding:14px 16px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);
       border-radius:12px;margin-top:8px;display:flex;align-items:center;gap:10px">
       <span style="font-size:1.2rem">${icons[type]||'ℹ️'}</span>
-      <span style="font-size:0.85rem;color:${colors[type]||'var(--text)'}">${msg}</span>
+      <span style="font-size:0.85rem;color:${colors[type]||'var(--text)'};">${msg}</span>
       ${type==='loading'?'<div style="margin-right:auto;width:20px;height:20px;border:2px solid rgba(255,255,255,0.1);border-top-color:var(--primary);border-radius:50%;animation:spin 0.8s linear infinite"></div>':''}
     </div>`;
-  // Auto-dismiss all messages (loading after 30s, others after 9s)
+
+  // Scroll into view
+  out.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  // Auto-dismiss: 9s for all non-loading, 60s for loading
   clearTimeout(window._uploadStatusTimer);
-  var delay = (type === 'loading') ? 30000 : 9000;
+  var delay = (type === 'loading') ? 60000 : 9000;
   window._uploadStatusTimer = setTimeout(function() {
     if (out) {
       out.style.transition = 'opacity 0.6s ease';
       out.style.opacity = '0';
-      setTimeout(function() { out.innerHTML = ''; out.style.opacity = '1'; }, 600);
+      setTimeout(function() {
+        if (out) { out.innerHTML = ''; out.style.opacity = '1'; out.style.transition = ''; }
+      }, 600);
     }
   }, delay);
 }
@@ -10851,6 +10858,17 @@ function refreshAllTabsWithAILesson(lesson, subjectId) {
     out.innerHTML = buildUploadSuccessCard(lesson, subjectId);
   }
   showToast('✅ تم إنشاء الدرس التفاعلي بنجاح!', 'success');
+  // Auto-clear success card after 9 seconds
+  setTimeout(function() {
+    var out2 = document.getElementById('ai-gen-output');
+    if (out2) {
+      out2.style.transition = 'opacity 0.8s ease';
+      out2.style.opacity = '0';
+      setTimeout(function() {
+        if (out2) { out2.innerHTML = ''; out2.style.opacity = '1'; }
+      }, 800);
+    }
+  }, 9000);
 }
 
 function buildUploadSuccessCard(lesson, subjectId) {
@@ -17697,15 +17715,18 @@ async function handleCurriculumUpload(input) {
     'اختر رقم المادة:\n1-الإحصاء  2-Python  3-أنظمة التشغيل  4-التواصل  5-الإنجليزية',
     '1'
   );
+  if (!choice) return;
   var subjectId = subjectMap[choice] || 'statistics';
 
-  showToast('جاري تحليل الملف...', 'success');
+  // Show loading immediately — no error before processing
+  showUploadStatus('loading', '⏳ جاري رفع ومعالجة "' + file.name + '"...');
+
   try {
     await processUploadedFile(file, subjectId);
     setTimeout(refreshUserCurriculumSection, 2000);
   } catch(err) {
     if (err && (err.message==='NO_API_KEY'||err.message==='INVALID_API_KEY')) return;
-    showToast('خطأ في الرفع: ' + (err?err.message:''), 'error');
+    showUploadStatus('error', 'خطأ: ' + (err?err.message:''));
   }
 }
 function handleCurriculumDrop(event) {
@@ -18273,11 +18294,42 @@ function adminUploadForOneStudent(email) {
 }
 
 function deleteMyUpload(uploadId, subjectId) {
-  if (!confirm('حذف هذا الملف من حسابك نهائياً؟')) return;
+  // Show inline confirmation toast instead of browser confirm()
+  var toastId = 'del-confirm-' + uploadId;
+  if (document.getElementById(toastId)) return; // already showing
+
+  var div = document.createElement('div');
+  div.id = toastId;
+  div.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:99999;'
+    + 'background:rgba(239,83,80,0.95);color:white;padding:14px 20px;border-radius:14px;'
+    + 'font-family:var(--font);font-size:0.85rem;font-weight:700;text-align:center;'
+    + 'box-shadow:0 8px 24px rgba(239,83,80,0.4);backdrop-filter:blur(10px);direction:rtl';
+  div.innerHTML = 'هل تريد حذف هذا الدرس نهائياً؟<br>'
+    + '<div style="display:flex;gap:8px;justify-content:center;margin-top:10px">'
+    + '<button onclick="confirmDeleteUpload(\''+uploadId+'\',\''+subjectId+'\',\''+toastId+'\')" '
+    + 'style="padding:6px 16px;background:white;color:#EF5350;border:none;border-radius:8px;cursor:pointer;font-weight:800;font-size:0.82rem">نعم، احذف</button>'
+    + '<button onclick="document.getElementById(\''+toastId+'\').remove()" '
+    + 'style="padding:6px 16px;background:rgba(255,255,255,0.2);color:white;border:none;border-radius:8px;cursor:pointer;font-size:0.82rem">إلغاء</button>'
+    + '</div>';
+  document.body.appendChild(div);
+  setTimeout(function(){ if(document.getElementById(toastId)) document.getElementById(toastId).remove(); }, 8000);
+}
+
+function confirmDeleteUpload(uploadId, subjectId, toastId) {
+  if (document.getElementById(toastId)) document.getElementById(toastId).remove();
   ZAD_UPLOADS.delete(uploadId, subjectId);
 
+  // Remove from CURRICULUM in memory too
+  if (subjectId && CURRICULUM[subjectId]) {
+    CURRICULUM[subjectId].chapters.forEach(function(ch) {
+      ch.lessons = ch.lessons.filter(function(l){ return l.id !== 'ai-' + uploadId && l.sourceUploadId !== uploadId; });
+    });
+  }
+
+  // Refresh section
   var sec = document.getElementById('user-curriculum-section');
   if (sec) sec.outerHTML = buildUserCurriculumSection();
+  showToast('🗑️ تم حذف الدرس', 'success');
 }
 
 function saveSettingsApiKey() {

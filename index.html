@@ -7972,6 +7972,7 @@ function renderAILesson(lesson, subjectId, originalTitle, originalText) {
     </div>`;
 
   out.innerHTML = html;
+  return html;
 }
 
 function buildAIQuiz(questions, title) {
@@ -13597,7 +13598,7 @@ function openLesson(subjectId, lessonId) {
         + '<button class="back-btn" onclick="showSubject(\''+subjectId+'\',\'lessons\')">←</button>'
         + '<div><div style="font-size:1.1rem;font-weight:900">'+aiLesson.lessonTitle+'</div>'
         + '<div style="font-size:0.75rem;color:var(--text-muted)">✨ '+bundle.fileName+'</div></div></div>'
-        + renderAILesson(aiLesson)+'</div>';
+        + (renderAILesson(aiLesson)||buildAILessonFallback(aiLesson))+'</div>';
     }
     return;
   }
@@ -20108,6 +20109,71 @@ function getSubjectWithUploads(subjectId) {
     description: base ? (base.description||'') : '',
     chapters: upload_chapters.concat(merged_chapters)
   };
+}
+
+function buildAILessonFallback(lesson) {
+  if (!lesson) return '<div style="color:var(--text-muted);padding:20px">لا يوجد محتوى</div>';
+  var html = '<div style="direction:rtl;padding:10px">';
+
+  if (lesson.definition) {
+    html += '<div style="background:rgba(108,99,255,0.08);border:1.5px solid rgba(108,99,255,0.25);border-radius:16px;padding:16px;margin-bottom:14px">'
+      + '<div style="font-weight:800;margin-bottom:8px">📖 التعريف</div>'
+      + '<div style="font-size:0.88rem;line-height:1.7">' + lesson.definition + '</div></div>';
+  }
+
+  if (lesson.keyTerms && lesson.keyTerms.length) {
+    html += '<div style="background:rgba(0,191,165,0.06);border:1px solid rgba(0,191,165,0.2);border-radius:14px;padding:14px;margin-bottom:12px">'
+      + '<div style="font-weight:800;margin-bottom:10px">🔑 المصطلحات الأساسية</div>'
+      + lesson.keyTerms.map(function(k) {
+          return '<div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05)">'
+            + '<span style="font-weight:700;color:#00BFA5">' + k.term + '</span>'
+            + '<span style="color:var(--text-muted)"> — ' + k.def + '</span></div>';
+        }).join('') + '</div>';
+  }
+
+  if (lesson.whyLearn && lesson.whyLearn.length) {
+    html += '<div style="background:rgba(255,214,0,0.06);border:1px solid rgba(255,214,0,0.2);border-radius:14px;padding:14px;margin-bottom:12px">'
+      + '<div style="font-weight:800;margin-bottom:8px">💡 لماذا ندرس هذا؟</div>'
+      + lesson.whyLearn.map(function(w){ return '<div style="padding:4px 0;font-size:0.85rem">• ' + w + '</div>'; }).join('')
+      + '</div>';
+  }
+
+  if (lesson.examples && lesson.examples.length) {
+    html += '<div style="background:rgba(255,107,53,0.06);border:1px solid rgba(255,107,53,0.2);border-radius:14px;padding:14px;margin-bottom:12px">'
+      + '<div style="font-weight:800;margin-bottom:10px">📌 أمثلة تطبيقية</div>'
+      + lesson.examples.map(function(ex) {
+          return '<div style="padding:8px;background:rgba(255,255,255,0.03);border-radius:10px;margin-bottom:6px">'
+            + '<div style="font-weight:700">' + (ex.icon||'💡') + ' ' + (ex.title||'') + '</div>'
+            + '<div style="font-size:0.82rem;color:var(--text-muted);margin-top:4px">' + (ex.content||ex.desc||'') + '</div></div>';
+        }).join('') + '</div>';
+  }
+
+  if (lesson.steps && lesson.steps.length) {
+    html += '<div style="background:rgba(108,99,255,0.05);border:1px solid rgba(108,99,255,0.15);border-radius:14px;padding:14px;margin-bottom:12px">'
+      + '<div style="font-weight:800;margin-bottom:8px">📋 النقاط الرئيسية</div>'
+      + lesson.steps.map(function(s,i){ return '<div style="padding:5px 0;font-size:0.85rem"><span style="color:var(--primary);font-weight:700">' + (i+1) + '. </span>' + s + '</div>'; }).join('')
+      + '</div>';
+  }
+
+  if (lesson.quiz && lesson.quiz.length) {
+    html += '<div style="background:rgba(40,202,65,0.05);border:1px solid rgba(40,202,65,0.2);border-radius:14px;padding:14px;margin-bottom:12px">'
+      + '<div style="font-weight:800;margin-bottom:10px">❓ أسئلة تدريبية (' + lesson.quiz.length + ' سؤال)</div>'
+      + lesson.quiz.slice(0,3).map(function(q,i) {
+          return '<div style="padding:8px;background:rgba(255,255,255,0.03);border-radius:8px;margin-bottom:6px;font-size:0.82rem">'
+            + '<div style="font-weight:700;margin-bottom:4px">' + (i+1) + '. ' + q.q + '</div>'
+            + (q.options||[]).map(function(o,oi){ return '<div style="padding:2px 0;color:'+(oi===q.answer?'#28CA41':'var(--text-muted)')+'">' + (oi===q.answer?'✅':'○') + ' ' + o + '</div>'; }).join('')
+            + '</div>';
+        }).join('')
+      + '</div>';
+  }
+
+  if (lesson.summary) {
+    html += '<div style="background:rgba(255,255,255,0.04);border-radius:14px;padding:14px;margin-bottom:12px">'
+      + '<div style="font-weight:800;margin-bottom:6px">📝 الملخص</div>'
+      + '<div style="font-size:0.85rem;line-height:1.7">' + lesson.summary + '</div></div>';
+  }
+
+  return html + '</div>';
 }
 </script>
 

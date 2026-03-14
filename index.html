@@ -10502,12 +10502,12 @@ async function analyzeAndGenerate(text, subjectId, fileName) {
     const cleanText = text.replace(/[\u0000-\u001F]/g, ' ').trim();
 
     // ── Split into chunks for full coverage ──────────────────
-    const CHUNK = 12000;
+    const CHUNK = 50000;
     const chunks = [];
     for (let i = 0; i < cleanText.length; i += CHUNK) {
       chunks.push(cleanText.slice(i, i + CHUNK));
     }
-    const totalChunks = Math.min(chunks.length, 8); // max 8 chunks = 96000 chars
+    const totalChunks = Math.min(chunks.length, 20); // max 20 chunks = 1,000,000 chars
 
     upd('📖', `قراءة الملف كاملاً (${cleanText.length} حرف في ${totalChunks} أجزاء)...`, 10);
 

@@ -5773,6 +5773,7 @@ function buildEnhancedMindMap(mm, lessonTitle) {
 // [removed duplicate] //
 
 function buildAdaptiveDashboard(subjectId) {
+  subject = getSubjectWithUploads(subjectId) || subject;
   const p = ZAD_ADAPTIVE.getProfile();
   const tip = ZAD_ADAPTIVE.getPersonalizedTip();
   const overallPct = p.totalAnswers > 0 ? Math.round((p.correctAnswers/p.totalAnswers)*100) : 0;
@@ -10309,6 +10310,7 @@ function openTypeCardModal(jsonStr, col) {
 
 const _origBuildInfoCards = typeof buildInfoCards === 'function' ? buildInfoCards : null;
 function buildInfoCards(subject, subjectId) {
+  subject = getSubjectWithUploads(subjectId) || subject;
   const PAL = [
     {bg:'rgba(108,99,255,0.08)', b:'rgba(108,99,255,0.3)', a:'#6C63FF'},
     {bg:'rgba(0,191,165,0.08)',  b:'rgba(0,191,165,0.3)',  a:'#00BFA5'},
@@ -18006,6 +18008,7 @@ function refreshApiKeyStatus() {
 }
 
 function buildAIQuizUI(questions, title) {
+  subject = getSubjectWithUploads(subjectId) || subject;
   if (!questions || !questions.length) return '<div style="color:var(--text-muted);text-align:center;padding:20px">لا توجد أسئلة</div>';
   
   window._ZAD_AI_QUIZ_STATE = { questions, current: 0, answers: [], score: 0 };

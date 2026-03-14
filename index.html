@@ -16567,6 +16567,7 @@ let _settingsAutoResume = localStorage.getItem('zad_autoresume') !== 'false';
 function openSettingsPanel() {
   const overlay = document.getElementById('settings-overlay');
   if (!overlay) return;
+  updateApiKeyStatusDisplay();
   overlay.style.display = 'flex';
   overlay.style.alignItems = 'center';
   overlay.style.justifyContent = 'center';
@@ -18054,6 +18055,42 @@ function deleteMyUpload(uploadId, subjectId) {
   var sec = document.getElementById('user-curriculum-section');
   if (sec) sec.outerHTML = buildUserCurriculumSection();
 }
+
+function saveSettingsApiKey() {
+  var inp = document.getElementById('settings-api-key-input');
+  if (!inp) return;
+  var key = inp.value.trim();
+  if (!key) return showToast('أدخل المفتاح أولاً', 'error');
+  if (!key.startsWith('sk-')) return showToast('المفتاح يجب أن يبدأ بـ sk-', 'error');
+  setApiKey(key);
+  inp.value = '';
+  updateApiKeyStatusDisplay();
+  showToast('تم حفظ مفتاح API بنجاح', 'success');
+}
+
+function clearSettingsApiKey() {
+  if (!confirm('حذف مفتاح API؟')) return;
+  clearApiKey();
+  updateApiKeyStatusDisplay();
+  showToast('تم حذف المفتاح', 'success');
+}
+
+function updateApiKeyStatusDisplay() {
+  var el = document.getElementById('api-key-status-display');
+  if (!el) return;
+  var key = getApiKey ? getApiKey() : '';
+  if (key) {
+    el.style.background = 'rgba(102,187,106,0.1)';
+    el.style.borderColor = 'rgba(102,187,106,0.3)';
+    el.style.color = '#66BB6A';
+    el.innerHTML = '✅ مفعّل — ' + key.slice(0,16) + '...';
+  } else {
+    el.style.background = 'rgba(239,83,80,0.08)';
+    el.style.borderColor = 'rgba(239,83,80,0.25)';
+    el.style.color = '#EF5350';
+    el.innerHTML = '❌ غير مضبوط — أدخل المفتاح أدناه';
+  }
+}
 </script>
 
 
@@ -18722,7 +18759,52 @@ body.light-mode .theme-btn-light {
     </div>
 
     <!-- ─── حذف الحساب ─── -->
-    <div class="settings-section" style="border-color:rgba(255,82,82,0.2)">
+    <div 
+    <!-- ─── مفتاح الذكاء الاصطناعي ─── -->
+    <div class="settings-section" style="border-color:rgba(108,99,255,0.3)">
+      <div class="settings-label" style="color:var(--primary)">🔑 مفتاح Anthropic API</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:10px;line-height:1.6">
+        مطلوب لتحليل الملفات بالذكاء الاصطناعي — يُحفظ في جهازك فقط
+      </div>
+      <div id="api-key-status-display" style="margin-bottom:10px;font-size:0.8rem;padding:6px 12px;border-radius:8px;
+        background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1)">
+        جارٍ التحقق...
+      </div>
+      <div style="display:flex;gap:8px">
+        <input id="settings-api-key-input" type="password"
+          placeholder="sk-ant-api03-..."
+          style="flex:1;padding:9px 12px;border-radius:10px;
+            border:1.5px solid rgba(108,99,255,0.35);
+            background:rgba(108,99,255,0.07);
+            color:var(--text);font-family:monospace;font-size:0.78rem;
+            outline:none;direction:ltr"
+          onkeydown="if(event.key==='Enter') saveSettingsApiKey()">
+        <button onclick="saveSettingsApiKey()"
+          style="padding:9px 16px;border-radius:10px;border:none;cursor:pointer;
+            background:linear-gradient(135deg,var(--primary),#a78bfa);
+            color:white;font-family:var(--font);font-size:0.8rem;font-weight:700;
+            white-space:nowrap">
+          💾 حفظ
+        </button>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button onclick="clearSettingsApiKey()"
+          style="flex:1;padding:7px;border-radius:8px;border:1px solid rgba(239,83,80,0.3);
+            background:rgba(239,83,80,0.07);color:#EF5350;cursor:pointer;
+            font-family:var(--font);font-size:0.77rem;font-weight:700">
+          🗑️ حذف المفتاح
+        </button>
+        <a href="https://console.anthropic.com" target="_blank"
+          style="flex:1;padding:7px;border-radius:8px;border:1px solid rgba(108,99,255,0.3);
+            background:rgba(108,99,255,0.07);color:var(--primary);cursor:pointer;
+            font-family:var(--font);font-size:0.77rem;font-weight:700;
+            text-decoration:none;display:flex;align-items:center;justify-content:center">
+          🌐 احصل على مفتاح
+        </a>
+      </div>
+    </div>
+
+class="settings-section" style="border-color:rgba(255,82,82,0.2)">
       <div class="settings-label" style="color:#FF5252">⚠️ منطقة الخطر</div>
       <div style="background:rgba(255,82,82,0.07);border:1px solid rgba(255,82,82,0.2);border-radius:12px;padding:14px;font-size:0.83rem;color:var(--text-muted);line-height:1.7;margin-bottom:12px">
         حذف الحساب سيؤدي إلى <strong style="color:#FF5252">زوال جميع بياناتك نهائياً</strong>: الدروس المكتملة، الملفات المرفوعة، نقاط التقدم، والإنجازات — <strong>ولا يمكن التراجع!</strong>

@@ -17125,12 +17125,103 @@ function adminTab(tab) {
   });
   var body = document.getElementById('admin-body');
   if (!body) return;
-  if      (tab==='overview')   body.innerHTML = buildAdminOverview();
-  else if (tab==='users')      body.innerHTML = buildAdminUsers();
-  else if (tab==='activity')   body.innerHTML = buildAdminActivity();
-  else if (tab==='roles')      body.innerHTML = buildAdminRoles();
-  else if (tab==='bans')       body.innerHTML = buildAdminBans();
-  else if (tab==='curriculum') body.innerHTML = buildAdminCurriculum();
+
+  if (tab === 'overview') {
+    // Use async version for real data
+    if (typeof buildAdminOverviewAsync === 'function') {
+      buildAdminOverviewAsync();
+    } else {
+      body.innerHTML = buildAdminOverview();
+    }
+  } else if (tab === 'activity') {
+    // Show loading then fetch real data
+    body.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-muted)">⏳ جاري تحميل النشاط...</div>';
+    buildAdminActivityAsync(body);
+  } else if (tab === 'users')      { body.innerHTML = buildAdminUsers(); }
+  else if (tab === 'roles')        { body.innerHTML = buildAdminRoles(); }
+  else if (tab === 'bans')         { body.innerHTML = buildAdminBans(); }
+  else if (tab === 'curriculum')   { body.innerHTML = buildAdminCurriculum(); }
+}
+
+async function buildAdminActivityAsync(container) {
+  // Try to get real data from Worker
+  var workerData = null;
+  try {
+    var r = await fetch(ZAD_WORKER + '/students');
+    if (r.ok) workerData = await r.json();
+  } catch(e) {}
+
+  var localAct = getAct();
+  var localDb  = getAllStudents();
+  var now      = Date.now();
+
+  var students;
+  if (workerData && workerData.students && workerData.students.length) {
+    students = workerData.students.sort(function(a,b){ return (b.lastSeen||0)-(a.lastSeen||0); });
+  } else {
+    // fallback to local
+    students = Object.keys(localAct).map(function(email) {
+      var a = localAct[email];
+      var prog = ((localDb[email]||{}).progress)||{};
+      var scores = prog.scores||[];
+      return {
+        email: email,
+        name: a.name || email,
+        lastSeen: a.lastSeen,
+        tab: a.tab || '—',
+        level: a.level || 'beginner',
+        online: (now - a.lastSeen) < 5*60*1000,
+        avgScore: scores.length ? Math.round(scores.reduce(function(x,y){return x+y;},0)/scores.length) : 0
+      };
+    }).sort(function(a,b){ return (b.lastSeen||0)-(a.lastSeen||0); });
+  }
+
+  if (!students.length) {
+    container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted)">لا يوجد نشاط بعد<br><small>سيظهر المستخدمون هنا عند تسجيل دخولهم</small></div>';
+    return;
+  }
+
+  var rows = students.map(function(s) {
+    var diff = now - (s.lastSeen||0);
+    var isOn = s.online || diff < 5*60*1000;
+    var ago  = diff<60000?'منذ لحظات':
+               diff<3600000?Math.round(diff/60000)+' دق':
+               diff<86400000?Math.round(diff/3600000)+' ساعة':
+               Math.round(diff/86400000)+' يوم';
+    var avgSc = s.avgScore || 0;
+
+    return '<div style="display:flex;align-items:center;gap:10px;padding:11px 13px;'
+      + 'background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);'
+      + 'border-radius:12px;margin-bottom:6px">'
+      + '<div style="width:10px;height:10px;border-radius:50%;flex-shrink:0;background:'+(isOn?'#66BB6A':'#555')+';'+(isOn?'box-shadow:0 0 6px #66BB6A':'')+'"></div>'
+      + '<div style="flex:1;min-width:0">'
+        + '<div style="font-size:0.82rem;font-weight:700">'+(s.name||s.email)+'</div>'
+        + '<div style="font-size:0.68rem;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(s.email||'')+'</div>'
+      + '</div>'
+      + '<div style="font-size:0.7rem;text-align:left;flex-shrink:0">'
+        + '<div style="color:'+(isOn?'#66BB6A':'var(--text-muted)')+(isOn?';font-weight:700':'')+'">'+( isOn?'● متصل الآن':ago)+'</div>'
+        + '<div style="color:var(--text-muted);margin-top:2px">'+(s.tab||'—')+'</div>'
+        + (avgSc ? '<div style="color:#E8A020;margin-top:2px">'+avgSc+'%</div>' : '')
+      + '</div>'
+      + '</div>';
+  }).join('');
+
+  var onlineCount = students.filter(function(s){ return s.online || (now-(s.lastSeen||0))<5*60*1000; }).length;
+
+  container.innerHTML = '<div style="direction:rtl">'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'
+    + '<div>'
+      + '<div style="font-weight:900;font-size:0.95rem">📡 النشاط المباشر</div>'
+      + '<div style="font-size:0.75rem;color:var(--text-muted);margin-top:3px">'
+        + '<span style="color:#66BB6A;font-weight:700">● '+onlineCount+' متصل</span>'
+        + ' من أصل '+students.length+' مستخدم'
+      + '</div>'
+    + '</div>'
+    + '<button onclick="adminRefreshActivity()" style="padding:7px 14px;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,0.04);color:var(--text-muted);cursor:pointer;font-size:0.78rem">🔄 تحديث</button>'
+    + '</div>'
+    + '<div style="max-height:450px;overflow-y:auto">' + rows + '</div>'
+    + (workerData ? '' : '<div style="font-size:0.7rem;color:var(--text-muted);text-align:center;margin-top:10px;padding:6px;background:rgba(255,255,255,0.02);border-radius:8px">⚠️ بيانات محلية — للبيانات الحقيقية تأكد من اتصال الطلاب بالمنصة</div>')
+    + '</div>';
 }
 
 function buildAdminOverview() {
@@ -19558,6 +19649,11 @@ document.addEventListener('click', function(e) {
     if (m) window._currentTab = m[1];
   }
 });
+
+function adminRefreshActivity() {
+  var body = document.getElementById('admin-body');
+  if (body) buildAdminActivityAsync(body);
+}
 </script>
 
 

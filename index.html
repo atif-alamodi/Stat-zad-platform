@@ -9006,8 +9006,7 @@ function saveAILessonForUser(lesson, subjectId, uploadId, originalFileName) {
   const email = APP.student.email;
   if (!email) return;
 
-  const subject = CURRICULUM[subjectId];
-  if (!subject) return;
+  const subject = CURRICULUM[subjectId] || { title: subjectId, chapters: [], icon:'📚' };
 
   const lessonId = 'ai-' + uploadId;
 
@@ -10558,8 +10557,10 @@ async function analyzeAndGenerate(text, subjectId, fileName) {
 
   } catch(err) {
     if (err.message === 'NO_API_KEY' || err.message === 'INVALID_API_KEY') return;
-    if (steps) steps.innerHTML = '<div style="color:#FF5252;padding:10px;border-radius:8px;background:rgba(239,83,80,0.1)">خطأ: ' + err.message + '</div>';
-    showUploadStatus('error', err.message.slice(0, 150));
+    var errMsg = err.message || String(err);
+    if (steps) steps.innerHTML = '<div style="color:#FF5252;padding:10px;border-radius:8px;background:rgba(239,83,80,0.1)">❌ خطأ: ' + errMsg + '</div>';
+    showUploadStatus('error', '❌ ' + errMsg.slice(0, 200));
+    console.error('analyzeAndGenerate error:', err);
   }
 }
 
@@ -13204,8 +13205,7 @@ function showSubject(subjectId, activeTab) {
   if (typeof restoreCustomSubjects === 'function') restoreCustomSubjects();
   if (typeof restoreUserLessons === 'function') restoreUserLessons();
   APP.currentSubject = subjectId;
-  const subject = CURRICULUM[subjectId];
-  if (!subject) return;
+  const subject = CURRICULUM[subjectId] || { id: subjectId, title: subjectId, chapters: [], icon:'📚', color:'#6C63FF' };
   if (APP.student.email) saveLocation({ type: 'subject', subjectId });
   activeTab = activeTab || 'lessons';
   showSection('subject-detail');
@@ -13542,8 +13542,7 @@ function openLesson(subjectId, lessonId) {
   }
 
   // ── Standard CURRICULUM lesson ──────────────────────────────
-  const subject = CURRICULUM[subjectId];
-  if (!subject) return;
+  const subject = CURRICULUM[subjectId] || { id: subjectId, title: subjectId, chapters: [], icon:'📚', color:'#6C63FF' };
   let lesson = null;
   let chapter = null;
 
@@ -18292,8 +18291,7 @@ function restoreUserAILessons() {
 }
 
 function removeAILessonFromCurriculum(uploadId, subjectId) {
-  const subject = CURRICULUM[subjectId];
-  if (!subject) return;
+  const subject = CURRICULUM[subjectId] || { id: subjectId, title: subjectId, chapters: [], icon:'📚', color:'#6C63FF' };
   const aiCh = subject.chapters.find(ch => ch.id === 'ai-generated');
   if (!aiCh) return;
   aiCh.lessons = aiCh.lessons.filter(l => l.sourceUploadId !== uploadId);

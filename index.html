@@ -5698,45 +5698,42 @@ function readFileAsBase64(file) {
 function buildEnhancedMindMap(mm, lessonTitle) {
   if (!mm || !mm.branches) return '';
   var branches = mm.branches || [];
-  var center = (mm.center || lessonTitle || '').replace(/</g,'&lt;');
+  var center = (mm.center || lessonTitle || '').replace(/</g,'&lt;').replace(/"/g,'&quot;');
   var n = branches.length;
   var PALETTE = ['#6C63FF','#00BFA5','#FF7043','#FFD600','#E91E63','#00B0FF','#8BC34A','#FF5722'];
 
-  // Larger canvas for more space
-  var W = 1100, H = 700, cx = 550, cy = 350;
-  var R  = 200;  // branch distance from center
-  var RC = 380;  // child distance from center
-
+  var W = 1200, H = 750, cx = 600, cy = 375;
+  var R = 210, RC = 410;
   var svgLines = '', svgNodes = '';
 
-  // Helper: wrap text into max 2 lines of maxChars each
-  function wrapLabel(text, maxChars) {
-    if (!text) return [''];
-    text = String(text);
-    if (text.length <= maxChars) return [text];
-    // Try to split at a space
-    var mid = Math.floor(text.length / 2);
-    var split = text.lastIndexOf(' ', mid);
-    if (split < 1) split = mid;
-    var line1 = text.slice(0, split).trim();
-    var line2 = text.slice(split).trim();
-    // Truncate if still too long
-    if (line2.length > maxChars) line2 = line2.slice(0, maxChars - 1) + '…';
-    if (line1.length > maxChars) line1 = line1.slice(0, maxChars - 1) + '…';
-    return [line1, line2];
+  // Split long text into multiple tspan lines (no cutting)
+  function splitText(text, maxCharsPerLine) {
+    text = String(text || '').trim();
+    if (text.length <= maxCharsPerLine) return [text];
+    var words = text.split(' ');
+    var lines = [], cur = '';
+    for (var i = 0; i < words.length; i++) {
+      if ((cur + ' ' + words[i]).trim().length <= maxCharsPerLine) {
+        cur = (cur + ' ' + words[i]).trim();
+      } else {
+        if (cur) lines.push(cur);
+        cur = words[i];
+      }
+    }
+    if (cur) lines.push(cur);
+    return lines.length ? lines : [text];
   }
 
-  // Helper: render text (1 or 2 lines) centered at (x, y)
-  function renderText(x, y, lines, col, fontSize, fontWeight) {
-    if (lines.length === 1) {
-      return '<text x="'+x+'" y="'+(y+4)+'" text-anchor="middle" dominant-baseline="middle" '
-        + 'font-family="Cairo,sans-serif" font-size="'+fontSize+'" fill="'+col+'" font-weight="'+(fontWeight||'700')+'">'+lines[0]+'</text>';
+  // Render multi-line text centered at (x,y) with given lineHeight
+  function mlText(x, y, lines, col, fontSize, weight) {
+    var lh = fontSize + 4;
+    var totalH = lines.length * lh;
+    var startY = y - totalH / 2 + lh / 2;
+    var out = '<text text-anchor="middle" font-family="Cairo,Arial,sans-serif" font-size="'+fontSize+'" fill="'+col+'" font-weight="'+(weight||'700')+'">';
+    for (var i = 0; i < lines.length; i++) {
+      out += '<tspan x="'+x+'" y="'+(startY + i * lh)+'">'+lines[i]+'</tspan>';
     }
-    // 2 lines
-    return '<text text-anchor="middle" font-family="Cairo,sans-serif" font-size="'+fontSize+'" fill="'+col+'" font-weight="'+(fontWeight||'700')+'">'
-      + '<tspan x="'+x+'" dy="'+(y - fontSize/2)+'" dominant-baseline="middle">'+lines[0]+'</tspan>'
-      + '<tspan x="'+x+'" dy="'+(fontSize+2)+'" dominant-baseline="middle">'+lines[1]+'</tspan>'
-      + '</text>';
+    return out + '</text>';
   }
 
   for (var i = 0; i < branches.length; i++) {
@@ -5745,50 +5742,44 @@ function buildEnhancedMindMap(mm, lessonTitle) {
     var ang = (2 * Math.PI * i / n) - Math.PI / 2;
     var bx  = Math.round(cx + R * Math.cos(ang));
     var by  = Math.round(cy + R * Math.sin(ang));
-    var lbl = (b.label || '').replace(/</g,'&lt;');
+    var lbl = (b.label || '').replace(/</g,'&lt;').replace(/"/g,'&quot;');
 
-    // Wrap branch label
-    var lblLines = wrapLabel(lbl, 10);
-    var isTwo    = lblLines.length > 1;
-    var brx      = Math.min(Math.max(Math.max(lblLines[0].length, isTwo ? lblLines[1].length : 0) * 7 + 16, 55), 120);
-    var bry      = isTwo ? 28 : 20;
+    var bLines = splitText(lbl, 12);
+    var brx    = Math.min(Math.max(Math.max.apply(null, bLines.map(function(l){return l.length;})) * 6.5 + 18, 58), 120);
+    var bry    = Math.max(bLines.length * 10 + 12, 22);
 
     svgLines += '<line x1="'+cx+'" y1="'+cy+'" x2="'+bx+'" y2="'+by+'" stroke="'+col+'" stroke-width="2.5" stroke-opacity="0.5" stroke-dasharray="8,4"/>';
     svgNodes += '<ellipse cx="'+bx+'" cy="'+by+'" rx="'+brx+'" ry="'+bry+'" fill="'+col+'28" stroke="'+col+'" stroke-width="2.2"/>';
-    svgNodes += renderText(bx, by, lblLines, col, 12, '900');
+    svgNodes += mlText(bx, by, bLines, col, 12, '900');
 
     var children = b.children || [];
-    var nch  = children.length;
-    var spreadStep = Math.min(0.5, 1.1 / Math.max(nch, 1));
+    var nch = children.length;
+    var spreadStep = Math.min(0.48, 1.05 / Math.max(nch, 1));
 
     for (var j = 0; j < nch; j++) {
-      var cs  = String(children[j] || '').replace(/</g,'&lt;');
-      var ca  = ang + (j - (nch - 1) / 2) * spreadStep;
-      var chx = Math.round(cx + RC * Math.cos(ca));
-      var chy = Math.round(cy + RC * Math.sin(ca));
+      var cs   = String(children[j] || '').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+      var ca   = ang + (j - (nch-1)/2) * spreadStep;
+      var chx  = Math.round(cx + RC * Math.cos(ca));
+      var chy  = Math.round(cy + RC * Math.sin(ca));
 
-      // Wrap child label
-      var csLines = wrapLabel(cs, 9);
-      var csTwo   = csLines.length > 1;
-      var crx     = Math.min(Math.max(Math.max(csLines[0].length, csTwo ? csLines[1].length : 0) * 6.5 + 12, 44), 110);
-      var cry     = csTwo ? 22 : 15;
+      var cLines = splitText(cs, 11);
+      var crx    = Math.min(Math.max(Math.max.apply(null, cLines.map(function(l){return l.length;})) * 6 + 14, 46), 110);
+      var cry    = Math.max(cLines.length * 9 + 10, 16);
 
       svgLines += '<line x1="'+bx+'" y1="'+by+'" x2="'+chx+'" y2="'+chy+'" stroke="'+col+'" stroke-width="1.4" stroke-opacity="0.4"/>';
-      svgNodes += '<rect x="'+(chx-crx)+'" y="'+(chy-cry)+'" width="'+(crx*2)+'" height="'+(cry*2)+'" rx="'+cry+'" fill="'+col+'1A" stroke="'+col+'" stroke-width="1.5"/>';
-      svgNodes += renderText(chx, chy, csLines, col, 11, '600');
+      svgNodes += '<rect x="'+(chx-crx)+'" y="'+(chy-cry)+'" width="'+(crx*2)+'" height="'+(cry*2)+'" rx="'+(cry)+'" fill="'+col+'1A" stroke="'+col+'" stroke-width="1.5"/>';
+      svgNodes += mlText(chx, chy, cLines, col, 11, '600');
     }
   }
 
-  // Center node
-  var centerLines = wrapLabel(center, 12);
-  var cnrx = Math.min(Math.max(Math.max(centerLines[0].length, centerLines.length>1?centerLines[1].length:0) * 8 + 20, 80), 150);
-  var cnry = centerLines.length > 1 ? 35 : 28;
-
+  var cLines = splitText(center, 14);
+  var cnrx = Math.min(Math.max(Math.max.apply(null, cLines.map(function(l){return l.length;})) * 7.5 + 20, 88), 155);
+  var cnry = Math.max(cLines.length * 10 + 14, 30);
   svgNodes += '<ellipse cx="'+cx+'" cy="'+cy+'" rx="'+cnrx+'" ry="'+cnry+'" fill="rgba(108,99,255,0.18)" stroke="#6C63FF" stroke-width="3"/>';
-  svgNodes += renderText(cx, cy, centerLines, '#fff', 14, '900');
+  svgNodes += mlText(cx, cy, cLines, '#fff', 13, '900');
 
-  return '<div style="overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;border-radius:16px">'
-    + '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;min-width:340px;max-width:'+W+'px;height:auto;display:block">'
+  return '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:16px">'
+    + '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;min-width:360px;max-width:'+W+'px;height:auto;display:block">'
     + '<rect width="'+W+'" height="'+H+'" fill="rgba(10,11,30,0.7)" rx="16"/>'
     + svgLines + svgNodes
     + '</svg></div>';

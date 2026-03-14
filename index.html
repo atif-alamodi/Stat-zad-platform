@@ -8884,8 +8884,8 @@ const COMM_MINDMAPS = {
 };
 
 function injectMindMapToLesson(subjectId, lessonId, mindMapData) {
-  const subject = CURRICULUM[subjectId];
-  if (!subject) return;
+  // Don't block if subject not in CURRICULUM (custom subjects)
+  const subject = CURRICULUM[subjectId] || { title: subjectId, chapters: [] };
   for (const ch of subject.chapters) {
     for (const lesson of ch.lessons) {
       if (lesson.id === lessonId && lesson.content && !lesson.content.mindMap) {
@@ -9058,7 +9058,13 @@ function saveAILessonForUser(lesson, subjectId, uploadId, originalFileName) {
   };
   ZAD_UPLOADS.save(bundle);
 
-  showToast('✅ تم حفظ الدرس في حسابك!', 'success');
+  // Verify save worked
+  var saved = ZAD_UPLOADS.getAll().find(function(u){ return u.id === uploadId; });
+  if (saved) {
+    showToast('✅ تم حفظ "' + (lesson.lessonTitle||'الدرس') + '" بنجاح', 'success');
+  } else {
+    showToast('⚠️ مشكلة في الحفظ — حاول مرة أخرى', 'error');
+  }
   // Immediately refresh curriculum section on dashboard
   if (typeof refreshUserCurriculumSection === 'function') {
     setTimeout(refreshUserCurriculumSection, 200);
@@ -10493,9 +10499,10 @@ async function analyzeAndGenerate(text, subjectId, fileName) {
   try {
     upd('📖', 'تحليل المحتوى...', 15);
 
-    const detectedSubject = detectSubjectFromText(text) || subjectId;
-    const subject  = CURRICULUM[detectedSubject];
-    const subTitle = subject ? subject.title : (detectedSubject || 'المادة');
+    // ALWAYS use the subject the user chose - never override
+    const detectedSubject = subjectId;
+    const subject  = CURRICULUM[subjectId];
+    const subTitle = subject ? subject.title : 'المادة';
 
     // Trim text to avoid token overflow
     const safeText = text.slice(0, 5000).replace(/[\u0000-\u001F]/g, ' ');
@@ -20014,10 +20021,12 @@ function getSubjectWithUploads(subjectId) {
   if (!subject) return null;
 
   // Deep clone to avoid mutating CURRICULUM
+  var chapters = subject.chapters || [];
   var merged = {
-    id: subject.id, title: subject.title, icon: subject.icon,
-    color: subject.color, description: subject.description,
-    chapters: subject.chapters.map(function(ch) {
+    id: subject.id || subjectId, title: subject.title || subjectId,
+    icon: subject.icon || '📚', color: subject.color || '#6C63FF',
+    description: subject.description || '',
+    chapters: chapters.map(function(ch) {
       return {
         id: ch.id, title: ch.title, pages: ch.pages, icon: ch.icon,
         lessons: ch.lessons.filter(function(l) {

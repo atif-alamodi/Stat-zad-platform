@@ -5587,7 +5587,7 @@ async function submitHomework(subjectId) {
 
   try {
     const response = await zadFetch({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-sonnet-4-6',
         max_tokens: 1500,
         system: `أنت مصحّح تعليمي ذكي لمنصة "زاد" التعليمية.
 مهمتك: تصحيح إجابات الطلاب ومساعدتهم على التحسن.
@@ -5663,7 +5663,7 @@ async function submitHomeworkWithImage(subjectId, base64, mediaType) {
   
   try {
     const response = await zadFetch({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-sonnet-4-6',
         max_tokens: 1500,
         system: `أنت مصحّح تعليمي. صحّح ما تراه في الصورة، حدد الأخطاء، اشرحها، وأعط درجة من 100 مع اقتراحات تحسين. اكتب بالعربية.`,
         messages: [{
@@ -5993,7 +5993,7 @@ async function loadAdaptiveRecommendations(subjectId) {
     const timeout = setTimeout(() => controller.abort(), 12000);
 
     const response = await zadFetch({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-sonnet-4-6',
         max_tokens: 900,
         system: `أنت مرشد تعليمي خبير لمنصة "زاد" للتعليم الجامعي السعودي.
 مهمتك: تحليل أداء الطالب وتقديم توصيات شخصية دقيقة وواقعية تساعده فعلاً على التطور.
@@ -6117,7 +6117,7 @@ async function engAICheck(text) {
   el.innerHTML = '<div style="padding:10px;color:var(--text-muted);font-size:0.82rem">🤖 يفحص النص...</div>';
   try {
     const r = await zadFetch({
-        model:'claude-sonnet-4-20250514', max_tokens:800,
+        model:'claude-sonnet-4-6', max_tokens:800,
         system:`أنت مصحّح قواعد لغة إنجليزية لطلاب جامعيين سعوديين.
 صحّح النص واشرح الأخطاء بالعربية بشكل مبسّط جداً.
 الأسلوب: مشجّع، واضح، مبسّط.
@@ -6144,7 +6144,7 @@ async function engExplainWord(word, arabic) {
   el.innerHTML = '<div style="color:var(--text-muted);font-size:0.8rem">🤖 يشرح الكلمة...</div>';
   try {
     const r = await zadFetch({
-        model:'claude-sonnet-4-20250514', max_tokens:600,
+        model:'claude-sonnet-4-6', max_tokens:600,
         system:`أنت معلم لغة إنجليزية لطلاب لديهم صعوبات تعلم.
 اشرح الكلمة الإنجليزية بطريقة ممتعة وسهلة جداً:
 ١. المعنى بالعربية (جملة واحدة واضحة)
@@ -7375,7 +7375,7 @@ async function engAskAI(question) {
   
   try {
     const r = await zadFetch({
-        model:'claude-sonnet-4-20250514', max_tokens:700,
+        model:'claude-sonnet-4-6', max_tokens:700,
         system:`أنت معلم لغة إنجليزية متخصص لطلاب جامعيين سعوديين لديهم صعوبات تعلم.
 أسلوبك: بسيط جداً، واضح، مشجّع، مع أمثلة من الحياة اليومية والبيئة السعودية.
 استخدم: ✅❌💡📌🔑 لتنظيم شرحك. اكتب بالعربية مع الإنجليزية بين قوسين.`,
@@ -7687,7 +7687,7 @@ async function analyzeImageFile(file, subjectId) {
     const mediaType = file.type || 'image/jpeg';
 
     const resp = await zadFetch({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-6',
       max_tokens: 3000,
       system: 'أنت مساعد تعليمي. حلّل محتوى الصورة واستخرج المعلومات الدراسية منها. أرجع JSON فقط بدون أي نص.',
       messages: [{
@@ -7779,7 +7779,7 @@ async function generateLessonWithAI(text, subjectId, title, subject) {
     updateStep('🤖', 'Claude AI يحلل المحتوى...', 30);
 
     const response = await zadFetch({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-sonnet-4-6',
         max_tokens: 3000,
         system: systemPrompt,
         messages: [{
@@ -10293,7 +10293,7 @@ async function openMoreExplanationModal(conceptName, conceptData, col, cardId) {
 
   try {
     const response = await zadFetch({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-sonnet-4-6',
         max_tokens: 600,
         system: 'أنت مُعلم خبير. اشرح المفهوم بأسلوب سهل وواضح باللغة العربية مع مثال واحد صغير. لا تزيد عن 5 جمل.',
         messages: [{
@@ -10709,7 +10709,7 @@ ${text.slice(0, 9000)}
     updateStep('📡', 'إرسال للذكاء الاصطناعي...', 40);
 
     const response = await zadFetch({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-6',
       max_tokens: 4000,
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }]
@@ -10718,21 +10718,47 @@ ${text.slice(0, 9000)}
     updateStep('⚙️', 'معالجة الاستجابة...', 65);
 
     const data = await response.json();
+
+    // Log full response for debugging
+    if (data.error) throw new Error('API Error: ' + (data.error.message || JSON.stringify(data.error)));
+
     let rawText = (data.content?.[0]?.text || '').trim();
-    rawText = rawText.replace(/^```json\s*/,'').replace(/^```\s*/,'').replace(/\s*```$/,'').trim();
+
+    // Strip markdown code blocks
+    rawText = rawText.replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/\s*```$/,'').trim();
 
     let lesson;
+    // Try direct parse first
     try {
       lesson = JSON.parse(rawText);
     } catch(e1) {
-      const jsonMatch = rawText.match(/\{[\s\S]+\}/);
+      // Extract first JSON object from response (Claude sometimes adds preamble)
+      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-        try { lesson = JSON.parse(jsonMatch[0]); }
-        catch(e2) { throw new Error('فشل في تحليل JSON: ' + rawText.slice(0,100)); }
+        try {
+          lesson = JSON.parse(jsonMatch[0]);
+        } catch(e2) {
+          // Try to find and fix common JSON issues
+          const cleaned = jsonMatch[0]
+            .replace(/,\s*}/g, '}')
+            .replace(/,\s*]/g, ']')
+            .replace(/([{,]\s*)(\w+)\s*:/g, '$1"$2":');
+          try {
+            lesson = JSON.parse(cleaned);
+          } catch(e3) {
+            throw new Error('لم يُرجع النموذج JSON صالحاً. الرد: ' + rawText.slice(0, 150));
+          }
+        }
       } else {
-        throw new Error('لم يرجع الذكاء الاصطناعي JSON صحيحاً');
+        throw new Error('لم يُرجع النموذج JSON. الرد: ' + rawText.slice(0, 150));
       }
     }
+    // Ensure required fields exist
+    if (!lesson.lessonTitle) lesson.lessonTitle = fileName;
+    if (!lesson.definition)  lesson.definition  = 'محتوى الملف: ' + fileName;
+    if (!lesson.quiz)        lesson.quiz         = [];
+    if (!lesson.keyTerms)    lesson.keyTerms     = [];
+    if (!lesson.mindMapBranches) lesson.mindMapBranches = [];
 
     updateStep('💾', 'حفظ الدرس...', 85);
 

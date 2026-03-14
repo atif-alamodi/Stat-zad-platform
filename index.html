@@ -5780,7 +5780,7 @@ function buildAdaptiveDashboard(subjectId) {
   const levelLabel = { beginner:'مبتدئ 🌱', intermediate:'متوسط 📈', advanced:'متقدم 🏆' }[p.level] || 'مبتدئ 🌱';
   const levelColor = { beginner:'#FF7043', intermediate:'#FFD600', advanced:'#28CA41' }[p.level] || '#FF7043';
 
-  const subject = getSubjectWithUploads(subjectId) || CURRICULUM[subjectId];
+  var _gsw = getSubjectWithUploads(subjectId);
   const subTitle = subject ? subject.title : subjectId;
   
   return `

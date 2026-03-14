@@ -19712,8 +19712,10 @@ function showDeleteChapterConfirm(subjectId, chapterId, chapterTitle) {
   var existing = document.getElementById('zad-del-ch-overlay');
   if (existing) existing.remove();
 
-  // Count lessons in chapter
-  var subject = CURRICULUM[subjectId];
+  // Count lessons in chapter - use merged subject including uploads
+  var subject = (typeof getSubjectWithUploads === 'function')
+    ? getSubjectWithUploads(subjectId)
+    : CURRICULUM[subjectId];
   var ch = subject && subject.chapters.find(function(c){ return c.id === chapterId; });
   var lessonCount = ch ? ch.lessons.filter(function(l){ return !isLessonDeleted(subjectId, l.id); }).length : 0;
 
@@ -19750,8 +19752,16 @@ function showDeleteChapterConfirm(subjectId, chapterId, chapterTitle) {
       markLessonDeleted(subjectId, l.id);
     });
 
-    // Remove chapter from CURRICULUM in memory
-    subject.chapters = subject.chapters.filter(function(c) { return c.id !== chapterId; });
+    // Remove chapter from CURRICULUM in memory (for regular chapters)
+    if (CURRICULUM[subjectId]) {
+      CURRICULUM[subjectId].chapters = CURRICULUM[subjectId].chapters.filter(function(ch){ return ch.id !== chapterId; });
+    }
+    // For upload chapters: also remove from ZAD_UPLOADS
+    if (chapterId.startsWith('up-ch-')) {
+      var uploadId = chapterId.replace('up-ch-', '');
+      var uploads = ZAD_UPLOADS.getAll().filter(function(u){ return u.id !== uploadId; });
+      localStorage.setItem(ZAD_UPLOADS._key(), JSON.stringify(uploads));
+    }
 
     // Remove any AI uploads for these lessons
     var lessonIds = ch.lessons.map(function(l){ return l.id; });

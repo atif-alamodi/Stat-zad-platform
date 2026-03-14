@@ -10646,146 +10646,96 @@ async function analyzeAndGenerate(text, subjectId, fileName) {
 
   const updateStep = (icon, msg, pct) => {
     if (bar)   bar.style.width = pct + '%';
-    if (steps) steps.innerHTML = `<div style="font-size:0.82rem;color:var(--text-muted);
-      padding:8px 12px;background:rgba(255,255,255,0.03);border-radius:8px;
-      border-right:3px solid var(--primary)">${icon} ${msg}</div>`;
+    if (steps) steps.innerHTML = '<div style="font-size:0.82rem;color:var(--text-muted);padding:8px 12px;background:rgba(255,255,255,0.03);border-radius:8px;border-right:3px solid var(--primary)">' + icon + ' ' + msg + '</div>';
   };
 
   const barWrap = document.getElementById('ai-gen-progress');
   if (barWrap) barWrap.style.display = 'block';
 
   try {
-    updateStep('📖', 'تحليل المحتوى وتحديد المادة...', 10);
+    updateStep('📖', 'تحليل المحتوى...', 10);
 
     const detectedSubject = detectSubjectFromText(text) || subjectId;
     const subject  = CURRICULUM[detectedSubject];
     const subTitle = subject ? subject.title : (detectedSubject || 'المادة الدراسية');
 
-    updateStep('🧠', 'الذكاء الاصطناعي يفهم المحتوى...', 25);
-
-    const systemPrompt = `أنت مساعد تعليمي ذكي لمنصة "زاد" التعليمية السعودية.
-حلّل المحتوى الدراسي وأنشئ درساً شاملاً بتنسيق JSON صحيح تماماً.
-قواعد مهمة:
-- استخدم فقط ما هو موجود في النص ولا تخترع معلومات
-- اللغة العربية حصراً
-- أرجع JSON صحيح فقط بدون أي نص قبله أو بعده
-- لا تستخدم علامات تنسيق markdown`;
-
-    const userPrompt = `المادة: ${subTitle}
-الملف: ${fileName}
-النص (${text.length} حرف):
-${text.slice(0, 9000)}
-
-أنشئ JSON بهذا الهيكل بالضبط:
-{
-  "lessonTitle": "عنوان واضح من المحتوى",
-  "definition": "تعريف شامل ومفصّل للموضوع في 3-5 جمل",
-  "whyLearn": ["سبب مهم 1", "سبب مهم 2", "سبب مهم 3"],
-  "keyTerms": [
-    {"term": "المصطلح", "def": "التعريف الدقيق"}
-  ],
-  "types": [
-    {"icon": "emoji", "name": "النوع/القسم", "desc": "وصف شامل", "examples": ["مثال 1", "مثال 2"], "when": "متى نستخدمه"}
-  ],
-  "examples": [
-    {"icon": "📌", "title": "عنوان المثال", "content": "تفاصيل وافية"}
-  ],
-  "steps": ["الخطوة الأولى بالتفصيل", "الخطوة الثانية بالتفصيل"],
-  "mindMapBranches": [
-    {"label": "الفرع الرئيسي", "color": "#6C63FF", "children": ["عنصر 1", "عنصر 2", "عنصر 3"]}
-  ],
-  "quiz": [
-    {
-      "q": "سؤال من المحتوى مباشرة",
-      "options": ["الخيار الصحيح", "خيار خاطئ", "خيار خاطئ", "خيار خاطئ"],
-      "answer": 0,
-      "explanation": "شرح مفصّل لماذا هذه الإجابة صحيحة"
-    }
-  ],
-  "summary": "ملخص شامل للمحتوى في فقرة",
-  "properties": ["خاصية مهمة 1", "خاصية مهمة 2", "خاصية مهمة 3"]
-}`;
-
-    updateStep('📡', 'إرسال للذكاء الاصطناعي...', 40);
+    updateStep('📡', 'إرسال للذكاء الاصطناعي...', 30);
 
     const response = await zadFetch({
       model: 'claude-sonnet-4-6',
       max_tokens: 4000,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: userPrompt }]
+      system: 'أنت مساعد تعليمي. أرجع JSON فقط بدون أي نص إضافي قبله أو بعده ولا علامات markdown.',
+      messages: [{
+        role: 'user',
+        content: 'المادة: ' + subTitle + '\nالملف: ' + fileName + '\n\nاقرأ هذا النص وأنشئ درساً:\n' + text.slice(0, 8000) + '\n\nأرجع JSON بهذا الشكل فقط (لا تضف أي نص قبله أو بعده):\n{"lessonTitle":"عنوان الدرس","definition":"تعريف الموضوع","whyLearn":["سبب1","سبب2"],"keyTerms":[{"term":"مصطلح","def":"تعريف"}],"types":[{"icon":"📌","name":"نوع","desc":"وصف","examples":["مثال"],"when":"متى"}],"examples":[{"icon":"📌","title":"عنوان","content":"تفاصيل"}],"steps":["خطوة1","خطوة2"],"mindMapBranches":[{"label":"فرع","color":"#6C63FF","children":["عنصر1","عنصر2"]}],"quiz":[{"q":"سؤال","options":["صح","خطأ1","خطأ2","خطأ3"],"answer":0,"explanation":"شرح"}],"summary":"ملخص","properties":["خاصية1","خاصية2"]}'
+      }]
     });
 
-    updateStep('⚙️', 'معالجة الاستجابة...', 65);
+    updateStep('⚙️', 'معالجة الرد...', 65);
 
     const data = await response.json();
 
-    // Log full response for debugging
-    if (data.error) throw new Error('API Error: ' + (data.error.message || JSON.stringify(data.error)));
+    // Check for API errors
+    if (data.error) {
+      throw new Error('خطأ API: ' + (data.error.message || data.error.type || JSON.stringify(data.error)));
+    }
 
-    let rawText = (data.content?.[0]?.text || '').trim();
+    if (!data.content || !data.content[0]) {
+      throw new Error('رد فارغ من الذكاء الاصطناعي. stop_reason: ' + (data.stop_reason || 'unknown'));
+    }
 
-    // Strip markdown code blocks
-    rawText = rawText.replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/\s*```$/,'').trim();
+    let rawText = (data.content[0].text || '').trim();
+
+    // Aggressive cleanup
+    rawText = rawText
+      .replace(/^[\s\S]*?(\{)/m, '$1')  // remove anything before first {
+      .replace(/\}[\s\S]*$/, '}');       // remove anything after last }
+
+    // More aggressive: find the JSON object
+    const firstBrace = rawText.indexOf('{');
+    const lastBrace  = rawText.lastIndexOf('}');
+    if (firstBrace >= 0 && lastBrace > firstBrace) {
+      rawText = rawText.slice(firstBrace, lastBrace + 1);
+    }
 
     let lesson;
-    // Try direct parse first
     try {
       lesson = JSON.parse(rawText);
-    } catch(e1) {
-      // Extract first JSON object from response (Claude sometimes adds preamble)
-      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        try {
-          lesson = JSON.parse(jsonMatch[0]);
-        } catch(e2) {
-          // Try to find and fix common JSON issues
-          const cleaned = jsonMatch[0]
-            .replace(/,\s*}/g, '}')
-            .replace(/,\s*]/g, ']')
-            .replace(/([{,]\s*)(\w+)\s*:/g, '$1"$2":');
-          try {
-            lesson = JSON.parse(cleaned);
-          } catch(e3) {
-            throw new Error('لم يُرجع النموذج JSON صالحاً. الرد: ' + rawText.slice(0, 150));
-          }
-        }
-      } else {
-        throw new Error('لم يُرجع النموذج JSON. الرد: ' + rawText.slice(0, 150));
-      }
+    } catch(parseErr) {
+      // Show what Claude actually returned
+      if (steps) steps.innerHTML = '<div style="color:#FFA726;padding:10px;border-radius:8px;background:rgba(255,167,38,0.1);font-size:0.75rem;direction:ltr;text-align:left;word-break:break-all"><b>Raw response:</b><br>' + rawText.slice(0,300) + '</div>';
+      throw new Error('JSON parsing failed: ' + parseErr.message.slice(0,100));
     }
-    // Ensure required fields exist
-    if (!lesson.lessonTitle) lesson.lessonTitle = fileName;
-    if (!lesson.definition)  lesson.definition  = 'محتوى الملف: ' + fileName;
-    if (!lesson.quiz)        lesson.quiz         = [];
-    if (!lesson.keyTerms)    lesson.keyTerms     = [];
-    if (!lesson.mindMapBranches) lesson.mindMapBranches = [];
+
+    // Fill missing required fields
+    lesson.lessonTitle    = lesson.lessonTitle    || fileName;
+    lesson.definition     = lesson.definition     || 'محتوى الملف';
+    lesson.quiz           = lesson.quiz           || [];
+    lesson.keyTerms       = lesson.keyTerms       || [];
+    lesson.mindMapBranches= lesson.mindMapBranches|| [];
+    lesson.whyLearn       = lesson.whyLearn       || [];
+    lesson.examples       = lesson.examples       || [];
+    lesson.steps          = lesson.steps          || [];
+    lesson.types          = lesson.types          || [];
+    lesson.properties     = lesson.properties     || [];
+    lesson.summary        = lesson.summary        || '';
 
     updateStep('💾', 'حفظ الدرس...', 85);
 
     if (typeof saveAILessonForUser === 'function') {
       saveAILessonForUser(lesson, detectedSubject, uploadId, fileName);
-    } else {
-      saveAILesson(lesson, detectedSubject);
     }
-
     window._ZAD_AI_LESSON = { lesson, subjectId: detectedSubject, uploadId, fileName };
 
-    updateStep('✅', 'تم! الدرس جاهز في جميع التبويبات', 100);
-
+    updateStep('✅', 'تم! الدرس جاهز', 100);
     if (out) out.innerHTML = renderAILesson(lesson);
+    showUploadStatus('success', 'تم إنشاء الدرس بنجاح!');
+    setTimeout(function() { refreshAllTabsWithAILesson(lesson, detectedSubject); }, 500);
 
-    showUploadStatus('success', '🎉 تم إنشاء الدرس — تفقّد جميع التبويبات!');
-
-    setTimeout(function() {
-      refreshAllTabsWithAILesson(lesson, detectedSubject);
-    }, 500);
-
-  } catch(e) {
-        if (e.message === 'NO_API_KEY' || e.message === 'INVALID_API_KEY') return;
-    if (steps) steps.innerHTML = `<div style="color:#FF5252;padding:10px;border-radius:8px;
-      background:rgba(239,83,80,0.1);border:1px solid rgba(239,83,80,0.3)">
-      ❌ خطأ: ${e.message}</div>`;
-    showUploadStatus('error', 'حدث خطأ: ' + e.message);
+  } catch(err) {
+    if (err.message === 'NO_API_KEY' || err.message === 'INVALID_API_KEY') return;
+    if (steps) steps.innerHTML = '<div style="color:#FF5252;padding:10px;border-radius:8px;background:rgba(239,83,80,0.1);border:1px solid rgba(239,83,80,0.3)">❌ ' + err.message + '</div>';
+    showUploadStatus('error', err.message.slice(0, 120));
   }
 }
 

@@ -12499,23 +12499,11 @@ body {
       <span class="nav-badge">6</span>
     </div>
     
-    <div class="nav-section-title">التعلم</div>
-    <div class="nav-item" onclick="showSubject('statistics')">
-      <span class="nav-icon">📊</span> الإحصاء وتحليل البيانات
+    <div class="nav-section-title" style="display:flex;align-items:center;justify-content:space-between;padding-left:16px">
+      <span>التعلم</span>
+      <button onclick="showSubjectProfileModal(null);closeSidebar()" style="padding:2px 8px;border-radius:6px;border:1px solid rgba(108,99,255,0.4);background:rgba(108,99,255,0.1);color:var(--primary);font-size:0.7rem;cursor:pointer">+ مادة</button>
     </div>
-    <div class="nav-item" onclick="showSubject('python')">
-      <span class="nav-icon">🐍</span> برمجة Python
-    </div>
-    <div class="nav-item" onclick="showSubject('os')">
-      <span class="nav-icon">💻</span> أنظمة التشغيل
-    </div>
-    <div class="nav-item" onclick="showSubject('communication')">
-      <span class="nav-icon">🗣️</span> مهارات التواصل
-    </div>
-    <div class="nav-item" onclick="showSubject('english')" style="border-right:2px solid rgba(33,150,243,0.4)">
-      <span class="nav-icon">🇬🇧</span> الإنجليزية التطبيقية
-      <span class="nav-badge" style="background:rgba(33,150,243,0.2);color:#2196F3;border:1px solid rgba(33,150,243,0.4)">ELG</span>
-    </div>
+    <div id="nav-subjects-list"></div>
     
     <div class="nav-section-title">الأدوات</div>
     <div class="nav-item" onclick="showSearchSection()">
@@ -19288,6 +19276,7 @@ function deleteSubject(subjectId) {
     localStorage.setItem(ZAD_UPLOADS._key(), JSON.stringify(uploads));
 
     showToast('🗑️ تم حذف "' + title + '" من حسابك', 'success');
+    if (typeof rebuildNavSubjects === 'function') rebuildNavSubjects();
     renderSubjectCards('quick-subjects', 6);
     var grid = document.getElementById('all-subjects-grid');
     if (grid) renderSubjectCards('all-subjects-grid', 99);
@@ -20285,6 +20274,7 @@ function saveSubjectProfile(existingId) {
   if (overlay) overlay.remove();
 
   showToast('✅ تم ' + (existingId ? 'تعديل' : 'إنشاء') + ' بروفايل "' + title + '"', 'success');
+  if (typeof rebuildNavSubjects === 'function') rebuildNavSubjects();
 
   // Refresh
   renderSubjectCards('quick-subjects', 6);
@@ -20294,6 +20284,38 @@ function saveSubjectProfile(existingId) {
   // Navigate to new subject
   if (!existingId) setTimeout(function(){ showSubject(id, 'lessons'); }, 300);
 }
+
+// ── Dynamic subject nav list ────────────────────────────────────
+function rebuildNavSubjects() {
+  var container = document.getElementById('nav-subjects-list');
+  if (!container) return;
+
+  var subjects = Object.keys(CURRICULUM);
+  if (!subjects.length) {
+    container.innerHTML = '<div style="padding:8px 25px;font-size:0.78rem;color:var(--text-muted)">لا توجد مواد</div>';
+    return;
+  }
+
+  container.innerHTML = subjects.map(function(sid) {
+    var s = CURRICULUM[sid];
+    if (!s) return '';
+    return '<div class="nav-item" style="display:flex;align-items:center;gap:4px;padding-left:12px">'
+      + '<span style="flex:1;cursor:pointer" onclick="showSubject(\''+sid+'\');closeSidebar()">'
+      + '<span class="nav-icon">'+(s.icon||'📚')+'</span> '+s.title
+      + '</span>'
+      + '<button onclick="event.stopPropagation();deleteSubject(\''+sid+'\')" '
+      + 'style="padding:3px 7px;border-radius:6px;border:none;background:transparent;color:var(--text-muted);font-size:0.75rem;cursor:pointer;opacity:0.6" '
+      + 'title="حذف المادة" onmouseover="this.style.opacity=\'1\';this.style.color=\'#FF5252\'" onmouseout="this.style.opacity=\'0.6\';this.style.color=\'var(--text-muted)\'">🗑️</button>'
+      + '</div>';
+  }).join('');
+}
+
+// Call on login and after any subject change
+var _origInitDashboard = initDashboard;
+initDashboard = function() {
+  _origInitDashboard();
+  setTimeout(rebuildNavSubjects, 200);
+};
 </script>
 
 

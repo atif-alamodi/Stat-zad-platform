@@ -10890,14 +10890,10 @@ function refreshAllTabsWithAILesson(lesson, subjectId) {
 
   showToast('✅ تم إنشاء الدرس! اضغط "عرض في الدروس"', 'success');
 
-  // Navigate to lessons tab - small delay to ensure save completes
+  // Navigate immediately to lessons tab
   if (subjectId && typeof showSubject === 'function') {
-    setTimeout(function() {
-      // Force re-inject before navigating
-      if (typeof restoreUserLessons === 'function') restoreUserLessons();
-      showSubject(subjectId, 'lessons');
-      refreshUserCurriculumSection();
-    }, 800);
+    showSubject(subjectId, 'lessons');
+    setTimeout(refreshUserCurriculumSection, 300);
   }
 
   // Clear output after 3 seconds
@@ -13505,45 +13501,30 @@ function buildLessonsTab(subject, subjectId) {
   // ── My uploaded lessons ──────────────────────────────────────
   var myUploads = ZAD_UPLOADS.getAll().filter(function(u) {
     var lid = u.lessonId || ('ai-' + u.id);
-    return u.subjectId === subjectId && u.lesson
-      && !isLessonDeleted(subjectId, lid);
+    return u.subjectId === subjectId && !isLessonDeleted(subjectId, lid);
   });
 
   var myLessonsHTML = '';
   if (myUploads.length) {
-    myLessonsHTML = '<div style="margin-bottom:16px;padding:14px 16px;background:rgba(108,99,255,0.08);'
-      + 'border:1.5px solid rgba(108,99,255,0.25);border-radius:16px">'
+    var cards = myUploads.map(function(u) {
+      var t   = (u.lesson && u.lesson.title) || u.title || u.fileName || 'درس مرفوع';
+      var def = ((u.lesson && u.lesson.content && u.lesson.content.definition) || '').slice(0,60);
+      var lid = u.lessonId || ('ai-' + u.id);
+      var ok  = !!(u.lesson && (u.lesson.content || u.lesson.quiz));
+      var badge = ok ? '<span style="font-size:0.65rem;padding:2px 7px;background:rgba(40,202,65,0.15);color:#28CA41;border-radius:10px">✅ جاهز</span>'
+                     : '<span style="font-size:0.65rem;padding:2px 7px;background:rgba(255,214,0,0.12);color:#FFD600;border-radius:10px">⏳</span>';
+      return buildUploadedLessonCard(subjectId, lid, u.id, t, def, badge);
+    }).join('');
+    myLessonsHTML = '<div style="margin-bottom:16px;padding:14px 16px;background:rgba(108,99,255,0.08);border:1.5px solid rgba(108,99,255,0.25);border-radius:16px">'
       + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">'
       + '<span style="font-size:1.1rem">✨</span>'
       + '<span style="font-weight:800;font-size:0.88rem">دروسي المرفوعة</span>'
-      + '<span style="margin-right:auto;font-size:0.72rem;padding:2px 8px;background:rgba(108,99,255,0.2);color:var(--primary);border-radius:10px">'
-      + myUploads.length+' درس</span>'
-      + '<span style="font-size:0.68rem;color:var(--text-muted)">اضغط مطولاً للحذف</span>'
+      + '<span style="margin-right:auto;font-size:0.72rem;padding:2px 8px;background:rgba(108,99,255,0.2);color:var(--primary);border-radius:10px">'+myUploads.length+' درس — اضغط مطولاً للحذف</span>'
       + '</div>'
-      + myUploads.map(function(u) {
-        var title     = (u.lesson && u.lesson.title) || u.title || u.fileName || '—';
-        var def       = ((u.lesson&&u.lesson.content&&u.lesson.content.definition)||'').slice(0,80);
-        var uploadRef = u.id;
-        var lessonId  = u.lessonId || ('ai-'+u.id);
-        var safeTitle = title.replace(/'/g,"&#39;").replace(/"/g,"&quot;");
-        return '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;'
-          + 'background:rgba(255,255,255,0.04);border-radius:12px;margin-bottom:6px;cursor:pointer;'
-          + 'border-right:3px solid var(--primary);user-select:none"'
-          + ' onclick="openLesson(\''+subjectId+'\',\''+lessonId+'\')"'
-          + ' oncontextmenu="event.preventDefault();showDeleteLessonConfirm(\''+subjectId+'\',\''+lessonId+'\',\''+safeTitle+'\',\''+uploadRef+'\');return false;"'
-          + ' ontouchstart="startLongPress(event,\''+lessonId+'\',\''+uploadRef+'\',\''+subjectId+'\',\''+safeTitle+'\')"'
-          + ' ontouchend="clearLongPress()" ontouchmove="clearLongPress()">'
-          + '<span style="font-size:1.2rem">📄</span>'
-          + '<div style="flex:1;min-width:0">'
-            + '<div style="font-weight:700;font-size:0.85rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+title+'</div>'
-            + (def ? '<div style="font-size:0.71rem;color:var(--text-muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+def+'...</div>' : '')
-          + '</div>'
-          + '</div>';
-      }).join('')
+      + cards
       + '</div>';
   }
 
-  // ── Curriculum chapters ──────────────────────────────────────
   var chaptersHTML = subject.chapters.map(function(ch, i) {
     // Skip permanently deleted chapters
     if (typeof isChapterDeleted === 'function' && isChapterDeleted(subjectId, ch.id)) return '';
@@ -20387,6 +20368,27 @@ initDashboard = function() {
   _origInitDashboard();
   setTimeout(rebuildNavSubjects, 200);
 };
+
+function buildUploadedLessonCard(subjectId, lessonId, uploadId, title, def, badge) {
+  var div = document.createElement('div');
+  div.style.cssText = 'display:flex;align-items:center;gap:10px;padding:12px 14px;background:rgba(255,255,255,0.04);border-radius:12px;margin-bottom:8px;cursor:pointer;border-right:3px solid var(--primary)';
+  div.innerHTML = '<span style="font-size:1.4rem;flex-shrink:0">📄</span>'
+    + '<div style="flex:1;min-width:0">'
+      + '<div style="font-weight:800;font-size:0.88rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + title + '</div>'
+      + '<div style="display:flex;align-items:center;gap:6px;margin-top:3px">' + badge
+        + (def ? '<span style="font-size:0.7rem;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">' + def + '</span>' : '')
+      + '</div>'
+    + '</div>'
+    + '<span style="font-size:0.72rem;color:var(--primary);font-weight:700;flex-shrink:0">فتح →</span>';
+  div.onclick = function() { openLesson(subjectId, lessonId); };
+  div.oncontextmenu = function(e) { e.preventDefault(); showDeleteLessonConfirm(subjectId, lessonId, title, uploadId); return false; };
+  div.addEventListener('touchstart', function(e) { startLongPress(e, lessonId, uploadId, subjectId, title); });
+  div.addEventListener('touchend',   function()  { clearLongPress(); });
+  div.addEventListener('touchmove',  function()  { clearLongPress(); });
+  div.addEventListener('mousedown',  function(e) { startLongPress(e, lessonId, uploadId, subjectId, title); });
+  div.addEventListener('mouseup',    function()  { clearLongPress(); });
+  return div.outerHTML;
+}
 </script>
 
 

@@ -7507,14 +7507,14 @@ function buildUploadTab(subjectId) {
       <div style="font-size:3rem;margin-bottom:12px">📄</div>
       <div style="font-size:1rem;font-weight:700;margin-bottom:6px">اسحب الملف هنا أو انقر للاختيار</div>
       <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">
-        يدعم: PDF, TXT, DOC — الحجم الأقصى 10MB
+        يدعم: PDF, Word, Excel, PowerPoint, TXT, صور، كود برمجي، وأي ملف نصي — الحجم الأقصى 100MB
       </div>
       <div style="display:inline-flex;align-items:center;gap:6px;padding:8px 18px;
         background:var(--primary);border-radius:10px;color:white;font-size:0.85rem;font-weight:700">
         📂 اختيار ملف
       </div>
     </div>
-    <input type="file" id="upload-file-input" accept=".pdf,.txt,.doc,.docx" 
+    <input type="file" id="upload-file-input" accept="*/*" 
       style="display:none" onchange="handleUploadFile(event,'${subjectId}')">
 
     <!-- أو لصق نص مباشرة -->
@@ -7583,15 +7583,16 @@ function handleUploadPaste(subjectId) {
 }
 
 async function processUploadedFile(file, subjectId) {
-  const maxSize = 25 * 1024 * 1024;
+  const maxSize = 100 * 1024 * 1024; // 100MB
   if (file.size > maxSize) {
-    showUploadStatus('error', 'حجم الملف أكبر من 25MB');
+    showUploadStatus('error', 'حجم الملف أكبر من 100MB');
     return;
   }
 
   const ext = file.name.split('.').pop().toLowerCase();
-  const imgExts = ['jpg','jpeg','png','gif','webp','bmp'];
-  const vidExts = ['mp4','mov','avi','mkv'];
+  const imgExts = ['jpg','jpeg','png','gif','webp','bmp','tiff','tif','heic','heif','avif','svg'];
+  const vidExts = ['mp4','mov','avi','mkv','webm','flv','wmv','m4v','3gp'];
+  const audioExts = ['mp3','wav','ogg','m4a','aac','flac','wma'];
 
   showUploadStatus('loading', `⏳ جاري قراءة "${file.name}"...`);
 
@@ -7601,37 +7602,91 @@ async function processUploadedFile(file, subjectId) {
     if (ext === 'pdf') {
       showUploadStatus('loading', '📕 استخراج نص PDF...');
       text = await extractPdfText(file);
-    } else if (['txt','md'].includes(ext)) {
-      text = await file.text();
-    } else if (['docx','doc'].includes(ext)) {
 
+    } else if (['txt','md','markdown','rst','log','csv','tsv'].includes(ext)) {
+      text = await file.text();
+
+    } else if (['docx','doc','odt','rtf'].includes(ext)) {
+      showUploadStatus('loading', '📝 قراءة ملف Word...');
       text = await extractDocxText(file);
-    } else if (['pptx','ppt'].includes(ext)) {
+
+    } else if (['pptx','ppt','odp'].includes(ext)) {
+      showUploadStatus('loading', '📊 قراءة ملف PowerPoint...');
       text = await extractDocxText(file);
-    } else if (['xlsx','xls','csv'].includes(ext)) {
+
+    } else if (['xlsx','xls','ods'].includes(ext)) {
+      showUploadStatus('loading', '📊 قراءة ملف Excel...');
       text = await extractSpreadsheetText(file);
+
     } else if (imgExts.includes(ext)) {
       showUploadStatus('loading', '🖼️ تحليل الصورة بالذكاء الاصطناعي...');
       await analyzeImageFile(file, subjectId);
       return;
+
+    } else if (['html','htm','xml'].includes(ext)) {
+      showUploadStatus('loading', '🌐 قراءة ملف HTML...');
+      const raw = await file.text();
+      const tmp = document.createElement('div');
+      tmp.innerHTML = raw;
+      text = tmp.innerText || tmp.textContent || '';
+
+    } else if (['json'].includes(ext)) {
+      showUploadStatus('loading', '📋 قراءة ملف JSON...');
+      const raw = await file.text();
+      try {
+        const obj = JSON.parse(raw);
+        text = JSON.stringify(obj, null, 2);
+      } catch(e) { text = raw; }
+
+    } else if (['py','js','ts','java','cpp','c','cs','go','rb','php','swift','kt','r','m','sql','sh','bash'].includes(ext)) {
+      showUploadStatus('loading', '💻 قراءة الكود البرمجي...');
+      text = await file.text();
+
     } else if (vidExts.includes(ext)) {
-      showUploadStatus('error', '🎥 ملفات الفيديو غير مدعومة حالياً — حوّل المحتوى لنص أو PDF');
+      showUploadStatus('error', '🎥 ملفات الفيديو لا يمكن قراءتها مباشرة — حوّل المحتوى لنص أو PDF');
       return;
+
+    } else if (audioExts.includes(ext)) {
+      showUploadStatus('error', '🎵 ملفات الصوت غير مدعومة — حوّل المحتوى لنص');
+      return;
+
     } else {
-
-      try { text = await file.text(); } catch(e) { text = ''; }
+      // Try to read as text for ANY other format
+      showUploadStatus('loading', `📄 محاولة قراءة "${ext}" كنص...`);
+      try {
+        text = await file.text();
+      } catch(e) {
+        // If can't read as text, try as binary and convert
+        const buffer = await file.arrayBuffer();
+        const bytes = new Uint8Array(buffer);
+        // Try UTF-8 decode
+        try {
+          text = new TextDecoder('utf-8').decode(bytes);
+        } catch(e2) {
+          try {
+            text = new TextDecoder('windows-1256').decode(bytes); // Arabic Windows encoding
+          } catch(e3) {
+            text = new TextDecoder('iso-8859-1').decode(bytes);
+          }
+        }
+      }
     }
 
-    if (!text || text.trim().length < 30) {
-      showUploadStatus('error', 'لم يُستخرج نص كافٍ من الملف — جرّب لصق النص مباشرة أدناه');
+    // Clean extracted text
+    text = (text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+    if (!text || text.trim().length < 20) {
+      showUploadStatus('error', `⚠️ لم يُستخرج نص من الملف "${file.name}"${ext === 'pdf' ? ' — تأكد أن PDF يحتوي نصاً وليس صوراً فقط' : ''} — جرّب لصق النص مباشرة`);
       return;
     }
 
-    showUploadStatus('info', `✅ قُرئ ${text.length} حرف — الذكاء الاصطناعي يحلّل المحتوى...`);
-    await analyzeAndGenerate(text, subjectId, file.name); // full text
+    showUploadStatus('info', `✅ قُرئ ${text.length.toLocaleString()} حرف من "${file.name}" — الذكاء الاصطناعي يحلّل...`);
+    await analyzeAndGenerate(text, subjectId, file.name);
+
   } catch(e) {
-        if (e.message === 'NO_API_KEY' || e.message === 'INVALID_API_KEY') return;
-    showUploadStatus('error', 'خطأ في قراءة الملف: ' + e.message + ' — جرّب لصق النص');
+    if (e.message === 'NO_API_KEY' || e.message === 'INVALID_API_KEY' || e.message === 'BACKEND_NOT_CONFIGURED') return;
+    showUploadStatus('error', `❌ خطأ في قراءة "${file.name}": ${e.message}`);
+    console.error('processUploadedFile:', e);
   }
 }
 

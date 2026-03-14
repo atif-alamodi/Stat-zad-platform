@@ -13776,7 +13776,53 @@ function toggleChapter(id) {
 
 function openLesson(subjectId, lessonId) {
   if (typeof trackUserActivity === 'function') trackUserActivity('درس: '+lessonId);
+
+  // ── Check ZAD_UPLOADS first (AI/uploaded lessons) ──────────
+  var uploads = ZAD_UPLOADS.getAll();
+  var uploadBundle = uploads.find(function(u) {
+    return u.lessonId === lessonId || ('ai-'+u.id) === lessonId || u.id === lessonId;
+  });
+
+  if (uploadBundle && uploadBundle.lesson) {
+    var ul = uploadBundle.lesson;
+    // Build a proper lesson object for display
+    var aiLesson = {
+      lessonTitle     : ul.title || uploadBundle.title || 'درس مرفوع',
+      definition      : (ul.content && ul.content.definition) || '',
+      whyLearn        : (ul.content && ul.content.whyLearn) || [],
+      keyTerms        : (ul.content && ul.content.keyTerms) || [],
+      examples        : (ul.content && ul.content.realExamples) || [],
+      steps           : (ul.content && ul.content.steps) || [],
+      properties      : (ul.content && ul.content.properties) || [],
+      mindMapBranches : ul.content && ul.content.mindMap ? ul.content.mindMap.branches : [],
+      quiz            : ul.quiz || [],
+      summary         : ul.summary || '',
+      types           : (ul.content && ul.content.types) || [],
+    };
+    // Store for quiz use
+    window._ZAD_AI_LESSON = { lesson: aiLesson, subjectId: subjectId };
+    window._ZAD_AI_QUIZ   = aiLesson.quiz;
+
+    // Navigate to lesson page and render
+    showSection('lesson');
+    showPage('page-app');
+    var lessonContent = document.getElementById('lesson-content');
+    if (lessonContent) {
+      lessonContent.innerHTML = '<div style="direction:rtl;padding:0">'
+        + '<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">'
+        + '<button class="back-btn" onclick="history.back()||showSection('subjects')">←</button>'
+        + '<div style="flex:1"><div style="font-size:1.2rem;font-weight:900">' + aiLesson.lessonTitle + '</div>'
+        + '<div style="font-size:0.78rem;color:var(--text-muted)">✨ درس مرفوع • ' + uploadBundle.fileName + '</div></div>'
+        + '</div>'
+        + renderAILesson(aiLesson)
+        + '</div>';
+    }
+    return;
+  }
+
+  // ── Standard CURRICULUM lesson ──────────────────────────────
   const subject = CURRICULUM[subjectId];
+  if (!subject) return;
   let lesson = null;
   let chapter = null;
 

@@ -19799,30 +19799,37 @@ function clearLongPress() {
   if (_lpTimer) { clearTimeout(_lpTimer); _lpTimer = null; }
 }
 
+
 // ══════════════════════════════════════════════════════════════
-// PER-STUDENT LESSON HIDING SYSTEM
-// Students can hide/delete any lesson — only affects their account
+// PER-STUDENT LESSON DELETION SYSTEM
+// Deletes lesson permanently from student's account only
+// Affects ALL views: lessons, cards, quizzes, search, etc.
 // ══════════════════════════════════════════════════════════════
 
-function _hiddenKey() {
+function _deletedKey() {
   var email = (APP.student.email||'guest').replace(/[^a-z0-9]/gi,'_');
-  return 'zad_hidden_lessons_' + email;
+  return 'zad_deleted_lessons_' + email;
 }
 
-function getHiddenLessons() {
-  try { return JSON.parse(localStorage.getItem(_hiddenKey()) || '[]'); }
+function getDeletedLessons() {
+  try { return JSON.parse(localStorage.getItem(_deletedKey()) || '[]'); }
   catch(e) { return []; }
 }
 
-function hideLessonForStudent(subjectId, lessonId) {
-  var hidden = getHiddenLessons();
+function markLessonDeleted(subjectId, lessonId) {
+  var deleted = getDeletedLessons();
   var key = subjectId + '__' + lessonId;
-  if (!hidden.includes(key)) hidden.push(key);
-  localStorage.setItem(_hiddenKey(), JSON.stringify(hidden));
+  if (!deleted.includes(key)) deleted.push(key);
+  localStorage.setItem(_deletedKey(), JSON.stringify(deleted));
 }
 
+function isLessonDeleted(subjectId, lessonId) {
+  return getDeletedLessons().includes(subjectId + '__' + lessonId);
+}
+
+// Replace old isLessonHidden with isLessonDeleted
 function isLessonHidden(subjectId, lessonId) {
-  return getHiddenLessons().includes(subjectId + '__' + lessonId);
+  return isLessonDeleted(subjectId, lessonId);
 }
 
 function showDeleteLessonConfirm(subjectId, lessonId, lessonTitle, uploadId) {
@@ -19831,20 +19838,19 @@ function showDeleteLessonConfirm(subjectId, lessonId, lessonTitle, uploadId) {
 
   var overlay = document.createElement('div');
   overlay.id = 'zad-del-lesson-overlay';
-  overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;padding:20px;direction:rtl';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;padding:20px;direction:rtl';
 
-  var isAI = !!uploadId;
-  overlay.innerHTML = '<div style="background:#1C1917;border:1.5px solid rgba(255,82,82,0.4);border-radius:20px;padding:24px;max-width:360px;width:100%;text-align:center">'
-    + '<div style="font-size:2rem;margin-bottom:10px">🗑️</div>'
-    + '<div style="font-weight:900;font-size:0.95rem;margin-bottom:8px">إخفاء الدرس؟</div>'
-    + '<div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:6px;font-weight:700;overflow:hidden;text-overflow:ellipsis">' + (lessonTitle||'الدرس') + '</div>'
-    + '<div style="font-size:0.78rem;color:#aaa;margin-bottom:20px;line-height:1.6">'
-    + 'سيُخفى من قائمتك فقط ولن يؤثر على حسابات الطلاب الآخرين<br>'
-    + '<span style="color:var(--primary);font-size:0.72rem">يمكنك إعادة إظهاره من الإعدادات</span>'
+  overlay.innerHTML = '<div style="background:#1C1917;border:1.5px solid rgba(255,82,82,0.5);border-radius:20px;padding:24px;max-width:360px;width:100%;text-align:center">'
+    + '<div style="font-size:2.5rem;margin-bottom:10px">🗑️</div>'
+    + '<div style="font-weight:900;font-size:1rem;margin-bottom:8px">حذف الدرس؟</div>'
+    + '<div style="font-size:0.82rem;font-weight:700;color:var(--text);margin-bottom:6px;overflow:hidden;text-overflow:ellipsis">' + (lessonTitle||'الدرس') + '</div>'
+    + '<div style="font-size:0.78rem;color:#aaa;margin-bottom:20px;line-height:1.7">'
+    + 'سيُحذف نهائياً من حسابك — من الدروس والبطاقات والاختبارات<br>'
+    + '<b style="color:#FF5252">لا يمكن التراجع</b> • لن يؤثر على حسابات الطلاب الآخرين'
     + '</div>'
     + '<div style="display:flex;gap:10px;justify-content:center">'
-    + '<button id="del-l-cancel" style="padding:10px 22px;border-radius:10px;border:1px solid #555;background:transparent;color:#aaa;font-family:var(--font);cursor:pointer">إلغاء</button>'
-    + '<button id="del-l-ok" style="padding:10px 22px;border-radius:10px;border:none;background:linear-gradient(135deg,#FF5252,#C62828);color:white;font-family:var(--font);font-weight:700;cursor:pointer">🗑️ إخفاء من حسابي</button>'
+    + '<button id="del-l-cancel" style="padding:11px 22px;border-radius:10px;border:1px solid #555;background:transparent;color:#aaa;font-family:var(--font);cursor:pointer;font-size:0.88rem">إلغاء</button>'
+    + '<button id="del-l-ok" style="padding:11px 22px;border-radius:10px;border:none;background:linear-gradient(135deg,#FF5252,#C62828);color:white;font-family:var(--font);font-weight:800;cursor:pointer;font-size:0.88rem">🗑️ حذف نهائياً</button>'
     + '</div></div>';
 
   document.body.appendChild(overlay);
@@ -19852,32 +19858,71 @@ function showDeleteLessonConfirm(subjectId, lessonId, lessonTitle, uploadId) {
   document.getElementById('del-l-cancel').onclick = function() { overlay.remove(); };
   document.getElementById('del-l-ok').onclick = function() {
     overlay.remove();
-    // 1. Hide for this student
-    hideLessonForStudent(subjectId, lessonId);
-    // 2. If AI lesson, also remove from uploads
-    if (isAI && uploadId) {
-      var uploads = ZAD_UPLOADS.getAll().filter(function(u){ return u.id !== uploadId && u.lessonId !== lessonId; });
+
+    // 1. Mark as permanently deleted for this student
+    markLessonDeleted(subjectId, lessonId);
+
+    // 2. Remove from CURRICULUM in memory (this student's session)
+    if (subjectId && CURRICULUM[subjectId]) {
+      CURRICULUM[subjectId].chapters.forEach(function(ch) {
+        ch.lessons = ch.lessons.filter(function(l) {
+          return l.id !== lessonId;
+        });
+      });
+    }
+
+    // 3. If AI lesson — remove from ZAD_UPLOADS too
+    if (uploadId) {
+      var uploads = ZAD_UPLOADS.getAll().filter(function(u) {
+        return u.id !== uploadId && u.lessonId !== lessonId;
+      });
       localStorage.setItem(ZAD_UPLOADS._key(), JSON.stringify(uploads));
     }
-    showToast('🗑️ تم إخفاء الدرس من حسابك', 'success');
-    // Refresh current subject view
+
+    // 4. Remove from quiz history for this student
+    try {
+      var qKey = 'zad_quiz_upload_' + (uploadId||lessonId);
+      localStorage.removeItem(qKey);
+    } catch(e) {}
+
+    showToast('🗑️ تم حذف الدرس من حسابك نهائياً', 'success');
+
+    // 5. Refresh all views
     if (APP.currentSubject) showSubject(APP.currentSubject, 'lessons');
+    if (typeof refreshUserCurriculumSection === 'function') refreshUserCurriculumSection();
   };
 }
 
-// Updated long-press for ALL lessons
+// Long-press handler
 var _lpTimer = null;
 function startLongPress(e, lessonId, uploadRef, subjectId, lessonTitle) {
   clearLongPress();
   _lpTimer = setTimeout(function() {
     _lpTimer = null;
     if (navigator.vibrate) navigator.vibrate(60);
-    showDeleteLessonConfirm(subjectId, lessonId, lessonTitle, uploadRef);
+    showDeleteLessonConfirm(subjectId, lessonId, lessonTitle||'', uploadRef||'');
   }, 600);
 }
 function clearLongPress() {
   if (_lpTimer) { clearTimeout(_lpTimer); _lpTimer = null; }
 }
+
+// Apply deleted filter when restoring lessons
+var _origRestoreUserLessons = restoreUserLessons;
+restoreUserLessons = function() {
+  _origRestoreUserLessons();
+  // Remove deleted lessons from CURRICULUM
+  var deleted = getDeletedLessons();
+  if (!deleted.length) return;
+  Object.keys(CURRICULUM).forEach(function(sid) {
+    CURRICULUM[sid].chapters.forEach(function(ch) {
+      ch.lessons = ch.lessons.filter(function(l) {
+        return !deleted.includes(sid + '__' + l.id);
+      });
+    });
+  });
+};
+
 </script>
 
 

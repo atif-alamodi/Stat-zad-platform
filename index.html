@@ -13246,7 +13246,7 @@ function showSection(name) {
   if (APP.student.email && !['subject-detail','lesson'].includes(name)) {
     saveLocation({ type: 'section', section: name });
   }
-  ['dashboard', 'subjects', 'progress', 'subject-detail', 'lesson', 'exam-generator', 'lab'].forEach(s => {
+  ['dashboard', 'subjects', 'progress', 'subject-detail', 'lesson', 'exam-generator', 'lab', 'planner', 'notes', 'bookmarks'].forEach(s => {
     const el = document.getElementById(`section-${s}`);
     if (el) el.style.display = 'none';
   });

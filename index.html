@@ -13509,7 +13509,44 @@ function showSubject(subjectId, activeTab) {
 }
 
 function buildLessonsTab(subject, subjectId) {
-  return `<div class="chapter-list">${subject.chapters.map((ch,i)=>{
+  // ── My uploaded lessons (always from localStorage, not CURRICULUM) ──
+  var myUploads = ZAD_UPLOADS.getAll().filter(function(u) {
+    return u.subjectId === subjectId && u.lesson;
+  });
+
+  var myLessonsHTML = '';
+  if (myUploads.length) {
+    myLessonsHTML = '<div style="margin-bottom:16px;padding:14px 16px;background:rgba(108,99,255,0.08);'
+      + 'border:1.5px solid rgba(108,99,255,0.25);border-radius:16px">'
+      + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">'
+      + '<span style="font-size:1.1rem">✨</span>'
+      + '<span style="font-weight:800;font-size:0.88rem">دروسي المرفوعة</span>'
+      + '<span style="margin-right:auto;font-size:0.72rem;padding:2px 8px;background:rgba(108,99,255,0.2);color:var(--primary);border-radius:10px">'+myUploads.length+' درس</span>'
+      + '</div>'
+      + myUploads.map(function(u) {
+        var title = (u.lesson && u.lesson.title) || u.title || u.fileName || '—';
+        var def   = (u.lesson && u.lesson.content && u.lesson.content.definition || '').slice(0,80);
+        var uploadRef = u.id;
+        var lessonId  = u.lessonId || ('ai-'+u.id);
+        return '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;'
+          + 'background:rgba(255,255,255,0.04);border-radius:12px;margin-bottom:6px;cursor:pointer;'
+          + 'border-right:3px solid var(--primary)"'
+          + ' onclick="openLesson(\''+subjectId+'\',\''+lessonId+'\')"'
+          + ' oncontextmenu="event.preventDefault();deleteAILesson(\''+lessonId+'\',\''+uploadRef+'\',\''+subjectId+'\');return false;"'
+          + ' ontouchstart="startLongPress(event,\''+lessonId+'\',\''+uploadRef+'\',\''+subjectId+'\')"'
+          + ' ontouchend="clearLongPress()" ontouchmove="clearLongPress()">'
+          + '<span style="font-size:1.3rem">📄</span>'
+          + '<div style="flex:1;min-width:0">'
+          + '<div style="font-weight:700;font-size:0.85rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+title+'</div>'
+          + (def ? '<div style="font-size:0.72rem;color:var(--text-muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+def+'...</div>' : '')
+          + '</div>'
+          + '<span style="font-size:0.65rem;color:var(--text-muted);flex-shrink:0;text-align:center">اضغط مطولاً<br>للحذف</span>'
+          + '</div>';
+      }).join('')
+      + '</div>';
+  }
+
+  return myLessonsHTML + `<div class="chapter-list">${subject.chapters.map((ch,i)=>{
     const chDone = ch.lessons.filter(l=>{ const d=getLessonCompletion(subjectId,l.id); return d && d.status==='completed';}).length;
     const chTotal = ch.lessons.length;
     const chPct = chTotal ? Math.round(chDone/chTotal*100) : 0;
@@ -13518,8 +13555,7 @@ function buildLessonsTab(subject, subjectId) {
       : chDone>0
         ? `<span style="font-size:0.75rem;background:rgba(255,214,0,0.12);color:#FFD600;padding:2px 8px;border-radius:20px;border:1px solid rgba(255,214,0,0.25)">${chDone}/${chTotal}</span>`
         : '';
-    const hasAI = ch.lessons.some(l => l.aiGenerated);
-    return `<div class="chapter-item${i===0||hasAI?' open':''}" id="ch-${ch.id}">
+    return `<div class="chapter-item${i===0?' open':''}" id="ch-${ch.id}">
       <div class="chapter-header" onclick="toggleChapter('${ch.id}')">
         <div class="chapter-num">${i+1}</div>
         <div class="chapter-info">
@@ -13528,7 +13564,7 @@ function buildLessonsTab(subject, subjectId) {
         </div>
         <i class="fas fa-chevron-left chapter-chevron"></i>
       </div>
-      <div class="lesson-list">${ch.lessons.map(l=>{
+      <div class="lesson-list">${ch.lessons.filter(l=>!l.aiGenerated).map(l=>{
         const comp = getLessonCompletion(subjectId, l.id);
         let badge = '';
         if (comp) {
@@ -13536,19 +13572,11 @@ function buildLessonsTab(subject, subjectId) {
           else if (comp.status==='partial') badge = `<span style="font-size:0.72rem;background:rgba(255,214,0,0.1);color:#FFD600;padding:2px 8px;border-radius:20px;margin-right:auto;white-space:nowrap">⚠️ ${comp.label||'غير مكتمل'}</span>`;
           else badge = `<span style="font-size:0.72rem;background:rgba(255,82,82,0.1);color:#FF5252;padding:2px 8px;border-radius:20px;margin-right:auto;white-space:nowrap">❌ ${comp.label||'لم يُتم'}</span>`;
         }
-        var uploadRef = l.sourceUploadId || l.id.replace('ai-','');
-        const delBtn = l.aiGenerated
-          ? `<button onclick="event.stopPropagation();deleteAILesson('${l.id}','${uploadRef}','${subjectId}')"
-              style="padding:5px 10px;border-radius:8px;border:1.5px solid rgba(255,82,82,0.4);
-              background:rgba(255,82,82,0.1);color:#FF5252;cursor:pointer;font-size:0.75rem;
-              flex-shrink:0;font-family:var(--font);font-weight:700">🗑️</button>`
-          : '';
-        return `<div class="lesson-item" style="display:flex;align-items:center;gap:8px" onclick="openLesson('${subjectId}','${l.id}')">
+        return `<div class="lesson-item" onclick="openLesson('${subjectId}','${l.id}')">
           <span class="lesson-icon">${getLessonTypeIcon(l.type)}</span>
           <span class="lesson-name" style="flex:1">${l.title}</span>
           ${badge}
           <span class="lesson-type type-${l.type||'concept'}">${getLessonTypeLabel(l.type)}</span>
-          ${delBtn}
         </div>`;
       }).join('')}
       </div>
@@ -19735,6 +19763,23 @@ document.addEventListener('visibilitychange', function() {
     }
   }
 });
+
+// ── Long-press to delete AI lesson ─────────────────────────────
+var _lpTimer = null;
+
+function startLongPress(e, lessonId, uploadRef, subjectId) {
+  clearLongPress();
+  _lpTimer = setTimeout(function() {
+    _lpTimer = null;
+    // Vibrate if supported
+    if (navigator.vibrate) navigator.vibrate(50);
+    deleteAILesson(lessonId, uploadRef, subjectId);
+  }, 600);
+}
+
+function clearLongPress() {
+  if (_lpTimer) { clearTimeout(_lpTimer); _lpTimer = null; }
+}
 </script>
 
 

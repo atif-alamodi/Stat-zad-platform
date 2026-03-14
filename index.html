@@ -7577,9 +7577,15 @@ function handleUploadDrop(event, subjectId) {
   if (file) processUploadedFile(file, subjectId);
 }
 
-function handleUploadFile(event, subjectId) {
+async function handleUploadFile(event, subjectId) {
   const file = event.target?.files?.[0];
-  if (file) processUploadedFile(file, subjectId);
+  if (!file) return;
+  showUploadStatus('loading', '⏳ جاري تحليل "' + file.name + '"...');
+  try {
+    await processUploadedFile(file, subjectId);
+  } catch(e) {
+    if (e && e.message !== 'NO_API_KEY') showUploadStatus('error', 'خطأ: ' + (e.message||''));
+  }
 }
 
 function handleUploadPaste(subjectId) {
@@ -10900,9 +10906,9 @@ function refreshAllTabsWithAILesson(lesson, subjectId) {
     btn.textContent = '📚 اضغط هنا لعرض الدرس';
     btn.style.cssText = 'width:100%;padding:14px;border-radius:12px;border:none;cursor:pointer;background:linear-gradient(135deg,#28CA41,#1ea832);color:white;font-family:var(--font);font-weight:900;font-size:1rem;';
     btn.onclick = function() {
-      var sid = window._ZAD_LAST_UPLOAD_SUBJECT || 'statistics';
+      var sid = window._ZAD_LAST_UPLOAD_SUBJECT || APP.currentSubject || 'statistics';
       showSubject(sid, 'lessons');
-      refreshUserCurriculumSection();
+      setTimeout(refreshUserCurriculumSection, 200);
     };
     div.appendChild(btn);
     out.innerHTML = '';

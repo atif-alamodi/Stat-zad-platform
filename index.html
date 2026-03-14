@@ -12953,11 +12953,7 @@ function enterApp() {
   showPage('page-app');
   setupAdminUI();
 
-  setTimeout(() => {
-    if (typeof initPyodide !== 'undefined' && !pyReady) {
-      initPyodide();
-    }
-  }, 1000);
+  // Pyodide: on-demand only
 
   const loc = loadLocation();
   if (loc) {
@@ -13066,8 +13062,9 @@ function showSection(name) {
   if (name === 'progress') renderProgress();
   if (name === 'dashboard') {
     if (typeof trackUserActivity === 'function') trackUserActivity('لوحة التحكم');
-    var cuSec = document.getElementById('user-curriculum-section');
-    if (cuSec && typeof buildUserCurriculumSection === 'function') cuSec.innerHTML = buildUserCurriculumSection();
+    if (typeof refreshUserCurriculumSection === 'function') {
+      refreshUserCurriculumSection();
+    }
   }
   if (name === 'subjects') renderAllSubjects();
 
@@ -17542,42 +17539,43 @@ function buildUserCurriculumSection() {
 }
 
 function triggerCurriculumUpload() {
-  var el=document.getElementById('curriculum-file-input');
-  if(el) el.click();
+  var el = document.getElementById('curriculum-file-input');
+  if (el) {
+    el.click();
+  } else {
+    // Fallback: create fresh input
+    var inp = document.createElement('input');
+    inp.type = 'file';
+    inp.accept = '*/*';
+    inp.style.display = 'none';
+    inp.onchange = function() { handleCurriculumUpload(inp); };
+    document.body.appendChild(inp);
+    inp.click();
+    setTimeout(function(){ document.body.removeChild(inp); }, 10000);
+  }
 }
-function handleCurriculumUpload(input) {
+async function handleCurriculumUpload(input) {
   if (!input || !input.files || !input.files[0]) return;
   var file = input.files[0];
+  input.value = '';
 
-  var subjects = {
-    '1': 'statistics', '2': 'python', '3': 'os',
-    '4': 'communication', '5': 'english'
+  var subjectMap = {
+    '1':'statistics','2':'python','3':'os','4':'communication','5':'english'
   };
   var choice = prompt(
-    'اختر المادة التي ينتمي لها هذا الملف:\n' +
-    '1 - الإحصاء وتحليل البيانات\n' +
-    '2 - برمجة Python\n' +
-    '3 - أنظمة التشغيل\n' +
-    '4 - مهارات التواصل\n' +
-    '5 - الإنجليزية التطبيقية\n' +
-    'أدخل الرقم:', '1'
+    'اختر رقم المادة:\n1-الإحصاء  2-Python  3-أنظمة التشغيل  4-التواصل  5-الإنجليزية',
+    '1'
   );
-  var subjectId = subjects[choice] || 'statistics';
+  var subjectId = subjectMap[choice] || 'statistics';
 
-  showToast('⏳ جاري تحليل الملف بالذكاء الاصطناعي...', 'success');
-
-  processUploadedFile(file, subjectId).then(function() {
-
-    setTimeout(function() {
-      var sec = document.getElementById('user-curriculum-section');
-      if (sec) sec.outerHTML = buildUserCurriculumSection();
-    }, 3000);
-  }).catch(function(e) {
-    if (e && (e.message === 'NO_API_KEY' || e.message === 'INVALID_API_KEY')) return;
-    showToast('خطأ: ' + (e ? e.message : ''), 'error');
-  });
-
-  input.value = '';
+  showToast('جاري تحليل الملف...', 'success');
+  try {
+    await processUploadedFile(file, subjectId);
+    setTimeout(refreshUserCurriculumSection, 2000);
+  } catch(err) {
+    if (err && (err.message==='NO_API_KEY'||err.message==='INVALID_API_KEY')) return;
+    showToast('خطأ في الرفع: ' + (err?err.message:''), 'error');
+  }
 }
 function handleCurriculumDrop(event) {
   event.preventDefault();
@@ -17595,8 +17593,14 @@ function deleteUserUpload(idx) {
   refreshUserCurriculumSection();
 }
 function refreshUserCurriculumSection() {
-  var sec=document.getElementById('user-curriculum-section');
-  if(sec) sec.outerHTML=buildUserCurriculumSection();
+  var sec = document.getElementById('user-curriculum-section');
+  if (!sec) return;
+  var parent = sec.parentNode;
+  if (!parent) return;
+  var tmp = document.createElement('div');
+  tmp.innerHTML = buildUserCurriculumSection();
+  var newSec = tmp.firstElementChild;
+  if (newSec) parent.replaceChild(newSec, sec);
 }
 
 const ZAD_API_KEY = 'zad_anthropic_key_v1';

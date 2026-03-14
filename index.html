@@ -14553,12 +14553,22 @@ function startQuizForSubject(subjectId) {
 }
 
 function changeQuizSubject() {
-  const sub = document.getElementById('quiz-subject-select').value;
-  APP.quiz.subject = sub;
-  APP.quiz.questions = generateQuiz(sub, 10);
-  APP.quiz.current = 0;
-  APP.quiz.answers = [];
-  renderQuizQuestion();
+  try {
+    var sel = document.getElementById('quiz-subject-select');
+    var sub = sel ? sel.value : (APP.quiz.subject || 'statistics');
+    APP.quiz.subject = sub;
+    APP.quiz.questions = generateQuiz(sub, 10);
+    APP.quiz.current = 0;
+    APP.quiz.answers = [];
+    renderQuizQuestion();
+  } catch(e) {
+    console.warn('changeQuizSubject error:', e);
+    APP.quiz.subject = APP.quiz.subject || 'statistics';
+    APP.quiz.questions = generateQuiz(APP.quiz.subject, 10);
+    APP.quiz.current = 0;
+    APP.quiz.answers = [];
+    renderQuizQuestion();
+  }
 }
 
 function renderQuizQuestion() {
@@ -14749,10 +14759,25 @@ function showQuizResults() {
 }
 
 function exitQuiz() {
-  showPage('page-app');
-  showSection('dashboard');
-  updateStats();
-  renderProgressChart();
+  try {
+    // Close any open overlays first
+    ['zad-delete-confirm','zad-subject-picker','zad-add-subject-modal','zad-search-overlay'].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) el.remove();
+    });
+    showPage('page-app');
+    showSection('dashboard');
+    if (typeof updateStats === 'function') updateStats();
+    if (typeof renderProgressChart === 'function') renderProgressChart();
+  } catch(e) {
+    // Force navigate to dashboard
+    showPage('page-app');
+    var sec = document.getElementById('section-dashboard');
+    if (sec) {
+      document.querySelectorAll('.page-section').forEach(function(s){ s.style.display='none'; });
+      sec.style.display = 'block';
+    }
+  }
 }
 
 function renderProgress() {

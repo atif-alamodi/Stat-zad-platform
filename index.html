@@ -13512,8 +13512,9 @@ function showSubject(subjectId, activeTab) {
 function buildLessonsTab(subject, subjectId) {
   // ── My uploaded lessons ──────────────────────────────────────
   var myUploads = ZAD_UPLOADS.getAll().filter(function(u) {
+    var lid = u.lessonId || ('ai-' + u.id);
     return u.subjectId === subjectId && u.lesson
-      && !isLessonHidden(subjectId, u.lessonId||('ai-'+u.id));
+      && !isLessonDeleted(subjectId, lid);
   });
 
   var myLessonsHTML = '';
@@ -19235,10 +19236,7 @@ function confirmAddSubject() {
 // Delete a subject (custom only)
 function deleteSubject(subjectId) {
   var isCustom = subjectId.startsWith('custom_');
-  if (!isCustom) {
-    showToast('لا يمكن حذف المواد الأساسية — فقط المواد المضافة', 'error');
-    return;
-  }
+  // All subjects can be deleted per-student
   var s = CURRICULUM[subjectId];
   var title = s ? s.title : subjectId;
 
@@ -19257,17 +19255,36 @@ function deleteSubject(subjectId) {
   document.getElementById('del-sub-cancel').onclick = function() { overlay.remove(); };
   document.getElementById('del-sub-ok').onclick = function() {
     overlay.remove();
-    // Remove from CURRICULUM
+
+    // 1. Mark all lessons in this subject as deleted (per-student)
+    var subj = CURRICULUM[subjectId];
+    if (subj) {
+      subj.chapters.forEach(function(ch) {
+        ch.lessons.forEach(function(l) { markLessonDeleted(subjectId, l.id); });
+      });
+    }
+
+    // 2. Remove from CURRICULUM in memory (this session)
     delete CURRICULUM[subjectId];
-    // Remove from custom subjects
-    var custom = getCustomSubjects().filter(function(s){ return s.id !== subjectId; });
-    saveCustomSubjects(custom);
-    // Remove all uploads for this subject
+
+    // 3. If custom subject, remove from custom list too
+    if (isCustom) {
+      var custom = getCustomSubjects().filter(function(s){ return s.id !== subjectId; });
+      saveCustomSubjects(custom);
+    } else {
+      // For built-in: save it to a "student-deleted subjects" list
+      var delKey = 'zad_del_subjects_' + (APP.student.email||'guest').replace(/[^a-z0-9]/gi,'_');
+      var delSubjs = [];
+      try { delSubjs = JSON.parse(localStorage.getItem(delKey)||'[]'); } catch(e) {}
+      if (!delSubjs.includes(subjectId)) delSubjs.push(subjectId);
+      localStorage.setItem(delKey, JSON.stringify(delSubjs));
+    }
+
+    // 4. Remove uploads for this subject from this student
     var uploads = ZAD_UPLOADS.getAll().filter(function(u){ return u.subjectId !== subjectId; });
-    var email = APP.student.email || 'guest';
     localStorage.setItem(ZAD_UPLOADS._key(), JSON.stringify(uploads));
 
-    showToast('🗑️ تم حذف "' + title + '"', 'success');
+    showToast('🗑️ تم حذف "' + title + '" من حسابك', 'success');
     renderSubjectCards('quick-subjects', 6);
     var grid = document.getElementById('all-subjects-grid');
     if (grid) renderSubjectCards('all-subjects-grid', 99);
@@ -19278,12 +19295,18 @@ function deleteSubject(subjectId) {
 
 // Restore custom subjects on login
 function restoreCustomSubjects() {
+  // 1. Add custom subjects
   var custom = getCustomSubjects();
   custom.forEach(function(s) {
-    if (!CURRICULUM[s.id]) {
-      CURRICULUM[s.id] = s;
-    }
+    if (!CURRICULUM[s.id]) CURRICULUM[s.id] = s;
   });
+
+  // 2. Remove student-deleted built-in subjects
+  try {
+    var delKey = 'zad_del_subjects_' + (APP.student.email||'guest').replace(/[^a-z0-9]/gi,'_');
+    var delSubjs = JSON.parse(localStorage.getItem(delKey)||'[]');
+    delSubjs.forEach(function(sid) { delete CURRICULUM[sid]; });
+  } catch(e) {}
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -19904,8 +19927,10 @@ function startLongPress(e, lessonId, uploadRef, subjectId, lessonTitle) {
   _lpTimer = setTimeout(function() {
     _lpTimer = null;
     if (navigator.vibrate) navigator.vibrate(60);
-    // Check if it's a chapter (id starts with __ch__)
-    if (lessonId && lessonId.startsWith('__ch__')) {
+    if (lessonId && lessonId.startsWith('__subj__')) {
+      var subjId = lessonId.replace('__subj__', '');
+      deleteSubject(subjId);
+    } else if (lessonId && lessonId.startsWith('__ch__')) {
       var chId = lessonId.replace('__ch__', '');
       showDeleteChapterConfirm(subjectId, chId, lessonTitle||'');
     } else {

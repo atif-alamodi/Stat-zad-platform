@@ -13374,7 +13374,19 @@ function showSubject(subjectId, activeTab) {
   if (activeTab === 'cards')    body = buildInfoCards(subject, subjectId);
   if (activeTab === 'mindmaps') body = buildAllMindMaps(subject, subjectId);
   if (activeTab === 'lab') {
-    if (subjectId === 'communication') body = buildCommLab();
+    var _labUploads = ZAD_UPLOADS.getAll().filter(function(u){ return u.subjectId === subjectId && u.lesson; });
+    if (_labUploads.length > 0) {
+      // If there are uploaded lessons, show content lab + original lab
+      var _origLab = '';
+      if (subjectId === 'communication') _origLab = buildCommLab();
+      else if (subjectId === 'english') _origLab = buildEnglishLab();
+      else if (subjectId === 'os') _origLab = buildOSLab();
+      else _origLab = buildEmbeddedLab(subjectId);
+      body = buildContentLab(subjectId)
+        + '<div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">'
+        + '<div style="font-weight:800;font-size:0.85rem;margin-bottom:12px;color:var(--text-muted)">🔬 المختبر التقني</div>'
+        + _origLab + '</div>';
+    } else if (subjectId === 'communication') body = buildCommLab();
     else if (subjectId === 'english') body = buildEnglishLab();
     else if (subjectId === 'os') body = buildOSLab();
     else body = buildEmbeddedLab(subjectId);
@@ -20249,6 +20261,106 @@ function buildAILessonFallback(lesson) {
   }
 
   return html + '</div>';
+}
+
+// ── AI-Powered Content Lab for uploaded lessons ─────────────
+function buildContentLab(subjectId) {
+  var uploads = ZAD_UPLOADS.getAll().filter(function(u){ return u.subjectId === subjectId && u.lesson; });
+  
+  if (!uploads.length) {
+    return '<div style="text-align:center;padding:40px;color:var(--text-muted)">'
+      + '<div style="font-size:2rem;margin-bottom:10px">🧪</div>'
+      + '<div>ارفع ملفاً أولاً لتفعيل المختبر التفاعلي</div>'
+      + '</div>';
+  }
+
+  // Build lesson selector + AI chat
+  var optionsHTML = uploads.map(function(u, i) {
+    var title = (u.lesson && u.lesson.title) || u.title || u.fileName || 'درس '+i;
+    return '<option value="'+i+'">'+title+'</option>';
+  }).join('');
+
+  return '<div style="direction:rtl;max-width:700px">'
+    + '<div style="background:rgba(108,99,255,0.08);border:1.5px solid rgba(108,99,255,0.25);border-radius:16px;padding:16px;margin-bottom:16px">'
+      + '<div style="font-weight:900;font-size:0.95rem;margin-bottom:12px">🧪 مختبر تفاعلي — اسأل عن محتوى دروسك</div>'
+      + '<select id="lab-lesson-select" style="width:100%;padding:9px 12px;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text);font-family:var(--font);font-size:0.85rem;margin-bottom:10px">'
+        + optionsHTML
+      + '</select>'
+    + '</div>'
+    + '<div id="lab-chat-history" style="min-height:180px;max-height:380px;overflow-y:auto;background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:12px;direction:rtl">'
+      + '<div style="color:var(--text-muted);font-size:0.82rem;text-align:center;padding:20px">اكتب سؤالاً عن الدرس المحدد ⬇️</div>'
+    + '</div>'
+    + '<div style="display:flex;gap:8px">'
+      + '<textarea id="lab-question-inp" placeholder="اسأل سؤالاً، اطلب شرحاً، أو تحدٍ تطبيقي..." rows="2"'
+        + ' style="flex:1;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text);font-family:var(--font);font-size:0.85rem;outline:none;resize:none;direction:rtl"></textarea>'
+      + '<button onclick="labAskQuestion(\''+subjectId+'\')" style="padding:10px 16px;border-radius:10px;border:none;background:var(--primary);color:white;font-family:var(--font);font-weight:800;cursor:pointer;align-self:flex-end">إرسال</button>'
+    + '</div>'
+    + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">'
+      + ['اشرح لي هذا الموضوع بأسلوب بسيط', 'أعطني مثالاً تطبيقياً', 'ما الفرق بين...', 'اختبرني في هذا الدرس'].map(function(q){
+          return '<button onclick="document.getElementById(\'lab-question-inp\').value=\''+q+'\'" '
+            + 'style="padding:5px 10px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.04);color:var(--text-muted);font-size:0.72rem;cursor:pointer">'+q+'</button>';
+        }).join('')
+    + '</div>'
+  + '</div>';
+}
+
+async function labAskQuestion(subjectId) {
+  var inp     = document.getElementById('lab-question-inp');
+  var history = document.getElementById('lab-chat-history');
+  var selIdx  = document.getElementById('lab-lesson-select');
+  if (!inp || !history) return;
+
+  var question = inp.value.trim();
+  if (!question) return;
+  inp.value = '';
+
+  // Get selected lesson
+  var uploads = ZAD_UPLOADS.getAll().filter(function(u){ return u.subjectId === subjectId && u.lesson; });
+  var idx = selIdx ? parseInt(selIdx.value) : 0;
+  var bundle = uploads[idx];
+  if (!bundle) return;
+
+  var lesson = bundle.lesson || {};
+  var context = [
+    'العنوان: ' + (lesson.title || ''),
+    'التعريف: ' + ((lesson.content && lesson.content.definition) || ''),
+    'المصطلحات: ' + ((lesson.content && lesson.content.keyTerms) || []).map(function(k){ return k.term+': '+k.def; }).join(', '),
+    'النقاط: ' + ((lesson.content && lesson.content.steps) || []).join(' | '),
+  ].join('\n');
+
+  // Add question to chat
+  history.innerHTML += '<div style="margin-bottom:12px;text-align:right">'
+    + '<div style="display:inline-block;background:rgba(108,99,255,0.15);border-radius:12px 12px 2px 12px;padding:8px 12px;font-size:0.85rem;max-width:85%">'+question+'</div>'
+    + '</div>';
+
+  // Add loading
+  history.innerHTML += '<div id="lab-loading" style="margin-bottom:12px">'
+    + '<div style="display:inline-block;background:rgba(255,255,255,0.04);border-radius:12px 12px 12px 2px;padding:8px 12px;font-size:0.82rem;color:var(--text-muted)">⏳ جاري التفكير...</div>'
+    + '</div>';
+  history.scrollTop = history.scrollHeight;
+
+  try {
+    var resp = await zadFetch({
+      model: 'llama-3.3-70b-versatile',
+      max_tokens: 1000,
+      system: 'أنت مدرس ذكي متخصص. استخدم المحتوى التعليمي المعطى للإجابة على سؤال الطالب. أجب بشكل واضح ومختصر باللغة المناسبة.',
+      messages: [{
+        role: 'user',
+        content: 'محتوى الدرس:\n' + context + '\n\nسؤال الطالب: ' + question
+      }]
+    });
+    var data = await resp.json();
+    var answer = (data.content && data.content[0] && data.content[0].text) || 'لم أتمكن من الإجابة';
+
+    var loadEl = document.getElementById('lab-loading');
+    if (loadEl) loadEl.outerHTML = '<div style="margin-bottom:12px">'
+      + '<div style="display:inline-block;background:rgba(0,191,165,0.1);border:1px solid rgba(0,191,165,0.2);border-radius:12px 12px 12px 2px;padding:10px 14px;font-size:0.83rem;line-height:1.6;max-width:90%;white-space:pre-wrap">'+answer+'</div>'
+      + '</div>';
+    history.scrollTop = history.scrollHeight;
+  } catch(err) {
+    var loadEl2 = document.getElementById('lab-loading');
+    if (loadEl2) loadEl2.outerHTML = '<div style="color:#FF5252;font-size:0.8rem;padding:8px">❌ '+err.message+'</div>';
+  }
 }
 </script>
 

@@ -10451,15 +10451,6 @@ function buildInfoCards(subject, subjectId) {
           <div class="zad-card-face zad-card-back" style="background:linear-gradient(135deg,${p.a}15,${p.bg});border:2px solid ${p.a}45;border-radius:18px;padding:16px;position:absolute;inset:0;display:flex;flex-direction:column">
             <div style="font-size:0.72rem;font-weight:800;color:${p.a};margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid ${p.a}22">${lesson.title}</div>
             <div style="flex:1;overflow-y:auto;font-size:0.82rem">${backContent}</div>
-            <!-- 3 Action Buttons -->
-            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-top:8px;padding-top:8px;border-top:1px solid ${p.a}18">
-              <button onclick="event.stopPropagation();openInteractiveAction('image',${JSON.stringify(lesson.title)},${JSON.stringify(cardData)},'${uid}','${topicKey}')"
-                style="padding:7px 2px;border-radius:8px;border:1px solid ${p.a}35;background:${p.a}12;color:${p.a};font-family:var(--font);font-size:0.72rem;font-weight:700;cursor:pointer">🖼️ صورة</button>
-              <button onclick="event.stopPropagation();openInteractiveAction('more',${JSON.stringify(lesson.title)},${JSON.stringify(cardData)},'${uid}','${topicKey}')"
-                style="padding:7px 2px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:var(--text);font-family:var(--font);font-size:0.72rem;font-weight:700;cursor:pointer">📖 شرح</button>
-              <button onclick="event.stopPropagation();openInteractiveAction('example',${JSON.stringify(lesson.title)},${JSON.stringify(cardData)},'${uid}','${topicKey}')"
-                style="padding:7px 2px;border-radius:8px;border:1px solid rgba(0,191,165,0.3);background:rgba(0,191,165,0.08);color:#00BFA5;font-family:var(--font);font-size:0.72rem;font-weight:700;cursor:pointer">💡 مثال</button>
-            </div>
             <button onclick="event.stopPropagation();openLesson('${subjectId}','${lesson.id}')"
               style="margin-top:6px;width:100%;padding:7px;background:${p.a};border:none;border-radius:9px;color:white;font-family:var(--font);font-weight:700;font-size:0.78rem;cursor:pointer">📖 افتح الدرس الكامل</button>
           </div>

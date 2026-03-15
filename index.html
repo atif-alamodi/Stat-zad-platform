@@ -13216,7 +13216,22 @@ function loginStudent() {
     errEl.style.display = 'block'; return;
   }
   const saved = loadStudentByEmail(email);
+
+  // ── Admin auto-login: if no local record, create one on-the-fly ──
   if (!saved) {
+    if (email === ADMIN_EMAIL.toLowerCase()) {
+      APP.student.name     = 'عاطف العمودي';
+      APP.student.email    = email;
+      APP.student.gender   = 'male';
+      APP.student.joinDate = new Date().toLocaleDateString('ar-SA');
+      APP.progress.lastDate = new Date().toDateString();
+      APP.progress.streak   = 1;
+      setActiveEmail(email);
+      saveCurrentStudent();
+      enterApp();
+      showToast('مرحباً يا عاطف! 👑 تم التعرف عليك تلقائياً', 'success');
+      return;
+    }
     errEl.textContent = '❌ البريد غير مسجّل — سجّل أولاً من تبويب "تسجيل جديد"';
     errEl.style.display = 'block'; return;
   }

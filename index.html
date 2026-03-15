@@ -13070,16 +13070,40 @@ function setActiveEmail(email) {
   catch(e) {}
 }
 
+// ── Cloud sync helpers (Cloudflare KV via Worker) ──────────────
+const ZAD_WORKER_BASE = 'https://zad-proxy.atif-alamodi.workers.dev';
+
+async function cloudSaveStudent() {
+  const email = APP.student.email;
+  if (!email) return;
+  try {
+    fetch(ZAD_WORKER_BASE + '/student/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, student: APP.student, progress: APP.progress })
+    }).catch(function(){});
+  } catch(e) {}
+}
+
+async function cloudLoadStudent(email) {
+  try {
+    const r = await fetch(ZAD_WORKER_BASE + '/student/load?email=' + encodeURIComponent(email));
+    if (!r.ok) return null;
+    const d = await r.json();
+    return d.found ? d : null;
+  } catch(e) { return null; }
+}
+// ───────────────────────────────────────────────────────────────
+
 function saveCurrentStudent() {
   const email = APP.student.email;
   if (!email) return;
+  // Save locally
   const db = getAllStudents();
-  db[email] = {
-    student: APP.student,
-    progress: APP.progress,
-    savedAt: new Date().toISOString()
-  };
+  db[email] = { student: APP.student, progress: APP.progress, savedAt: new Date().toISOString() };
   saveAllStudents(db);
+  // Sync to cloud (non-blocking)
+  cloudSaveStudent();
 }
 
 function loadStudentByEmail(email) {
@@ -13196,12 +13220,12 @@ function startJourney() {
   APP.progress.streak  = 1;
 
   setActiveEmail(email);
-  saveCurrentStudent();
+  saveCurrentStudent(); // saves local + cloud
   enterApp();
-  showToast(`مرحباً ${name}! 🎉 تم حفظ بياناتك تلقائياً`, 'success');
+  showToast(`مرحباً ${name}! 🎉 تم تسجيلك بنجاح ✅`, 'success');
 }
 
-function loginStudent() {
+async function loginStudent() {
   const email = (document.getElementById('login-email').value || '').trim().toLowerCase();
   const errEl = document.getElementById('login-err');
   errEl.style.display = 'none';
@@ -13215,23 +13239,29 @@ function loginStudent() {
     errEl.textContent = '🚫 هذا البريد الإلكتروني محظور من المنصة';
     errEl.style.display = 'block'; return;
   }
-  const saved = loadStudentByEmail(email);
 
-  // ── Admin auto-login: if no local record, create one on-the-fly ──
+  // Show loading indicator
+  const btn = document.querySelector('.start-btn') || document.querySelector('[onclick*="loginStudent"]');
+  if (btn) btn.textContent = '⏳ جارٍ التحقق...';
+
+  // 1) Check local first (fast)
+  let saved = loadStudentByEmail(email);
+
+  // 2) If not local, try cloud (any device)
   if (!saved) {
-    if (email === ADMIN_EMAIL.toLowerCase()) {
-      APP.student.name     = 'عاطف العمودي';
-      APP.student.email    = email;
-      APP.student.gender   = 'male';
-      APP.student.joinDate = new Date().toLocaleDateString('ar-SA');
-      APP.progress.lastDate = new Date().toDateString();
-      APP.progress.streak   = 1;
-      setActiveEmail(email);
-      saveCurrentStudent();
-      enterApp();
-      showToast('مرحباً يا عاطف! 👑 تم التعرف عليك تلقائياً', 'success');
-      return;
+    const cloud = await cloudLoadStudent(email);
+    if (cloud) {
+      saved = cloud;
+      // Cache locally for offline/fast access
+      const db = getAllStudents();
+      db[email] = { student: cloud.student, progress: cloud.progress, savedAt: cloud.savedAt };
+      saveAllStudents(db);
     }
+  }
+
+  if (btn) btn.textContent = '🔑 دخول';
+
+  if (!saved) {
     errEl.textContent = '❌ البريد غير مسجّل — سجّل أولاً من تبويب "تسجيل جديد"';
     errEl.style.display = 'block'; return;
   }
@@ -14600,9 +14630,42 @@ function addActivity(text) {
 
 function showToast(msg, type = 'info') {
   const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.className = `toast show ${type}`;
-  setTimeout(() => t.classList.remove('show'), 3000);
+  if (!t) return;
+
+  // Clear any existing timer
+  if (t._toastTimer) clearTimeout(t._toastTimer);
+  if (t._toastBar)  clearInterval(t._toastBar);
+
+  // Build message with progress bar
+  t.innerHTML = `
+    <span style="flex:1">${msg}</span>
+    <div id="toast-progress-bar" style="
+      position:absolute;bottom:0;right:0;height:3px;width:100%;
+      background:rgba(255,255,255,0.15);border-radius:0 0 14px 14px;overflow:hidden">
+      <div id="toast-progress-fill" style="
+        height:100%;width:100%;
+        background:rgba(255,255,255,0.6);
+        transition:width linear 100ms"></div>
+    </div>`;
+  t.style.display = 'flex';
+  t.style.alignItems = 'center';
+  t.style.position = 'relative';
+  t.className = \`toast show \${type}\`;
+
+  // Animate the bar over 5 seconds
+  const DURATION = 5000;
+  const TICK = 100;
+  let elapsed = 0;
+  t._toastBar = setInterval(() => {
+    elapsed += TICK;
+    const fill = document.getElementById('toast-progress-fill');
+    if (fill) fill.style.width = Math.max(0, 100 - (elapsed / DURATION) * 100) + '%';
+  }, TICK);
+
+  t._toastTimer = setTimeout(() => {
+    clearInterval(t._toastBar);
+    t.classList.remove('show');
+  }, DURATION);
 }
 
 function toggleTheme() {

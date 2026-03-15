@@ -7689,6 +7689,8 @@ async function processUploadedFile(file, subjectId) {
 
     // Clean extracted text
     text = (text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    // Normalize Arabic Presentation Forms (common in PDFs)
+    if (typeof normalizeArabicText === 'function') text = normalizeArabicText(text);
 
     if (!text || text.trim().length < 20) {
       showUploadStatus('error', `⚠️ لم يُستخرج نص من الملف "${file.name}"${ext === 'pdf' ? ' — تأكد أن PDF يحتوي نصاً وليس صوراً فقط' : ''} — جرّب لصق النص مباشرة`);
@@ -10558,6 +10560,29 @@ function loadPDFjs() {
   });
 }
 
+
+// ── Arabic text normalizer ─────────────────────────────────
+// Converts Arabic Presentation Forms (FE70-FEFF, FB50-FDFF)
+// to standard Unicode Arabic (0600-06FF) via NFKC normalization
+// This fixes garbled text from PDFs that use ligature forms
+function normalizeArabicText(text) {
+  if (!text) return '';
+  try {
+    var normalized = text.normalize('NFKC');
+    normalized = normalized
+      .replace(/Restricted\s*[-–]\s*\S+/gi, '')
+      .replace(/\x0C/g, '\n')
+      .replace(/\r\n/g, '\n')
+      .replace(/[ \t]{3,}/g, ' ')
+      .replace(/^\d+$/gm, '')
+      .replace(/^[-–—]+$/gm, '')
+      .trim();
+    return normalized;
+  } catch(e) {
+    return text;
+  }
+}
+
 async function extractPdfText(file) {
   try {
     const pdfjsLib = await loadPDFjs();
@@ -10567,20 +10592,28 @@ async function extractPdfText(file) {
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
 
     let fullText = '';
-    const totalPages = pdf.numPages; // No limit
+    const totalPages = pdf.numPages;
 
     for (let i = 1; i <= totalPages; i++) {
       const page = await pdf.getPage(i);
       const textContent = await page.getTextContent();
 
-      const pageText = textContent.items
+      // Sort items by vertical position then horizontal (handles RTL PDFs)
+      const items = textContent.items.slice().sort((a, b) => {
+        const yDiff = Math.round((b.transform[5] - a.transform[5]) / 3);
+        return yDiff !== 0 ? yDiff : a.transform[4] - b.transform[4];
+      });
+
+      const pageText = items
         .map(item => item.str)
         .filter(s => s.trim().length > 0)
         .join(' ');
 
-      fullText += `\n--- صفحة ${i} ---\n${pageText}`;
+      // Normalize Arabic Presentation Forms (FB50-FEFF) to standard Arabic
+      // PDF libraries often extract Arabic in visually-ordered ligature form
+      const normalized = normalizeArabicText(pageText);
 
-      // No page limit - read ALL pages
+      if (normalized.trim()) fullText += `\n${normalized}`;
     }
 
     return fullText.trim() || '';
@@ -10640,9 +10673,25 @@ async function analyzeAndGenerate(text, subjectId, fileName) {
   try {
     const subject  = CURRICULUM[subjectId];
     const subTitle = subject ? subject.title : (subjectId || 'المادة');
-    const clean    = text.replace(/[\u0000-\u001F]/g, ' ').trim();
+    // Deep-clean PDF text: remove watermarks, standalone numbers, artifacts
+    let clean = text.replace(/[\u0000-\u001F]/g, ' ');
+    // Remove "Restricted - ..." watermarks
+    clean = clean.replace(/Restricted\s*[-–]\s*\S*/gi, '');
+    // Remove "--- صفحة N ---" page markers we added during extraction
+    clean = clean.replace(/---\s*صفحة\s*\d+\s*---/g, '');
+    // Remove standalone numbers (page numbers)
+    clean = clean.replace(/^\s*\d{1,3}\s*$/gm, '');
+    // Remove "شكراً لكم" slides (empty end pages)
+    clean = clean.replace(/شكراً?\s*لكم/g, '');
+    // Collapse multiple blank lines
+    clean = clean.replace(/\n{3,}/g, '\n\n').trim();
     console.log('[ZAD] text length:', text.length, 'clean:', clean.length, 'subjectId:', subjectId);
-    const isEng    = subjectId === 'english';
+    // Detect language from the actual text content, not just subjectId
+    const _enSubjects = ['english', 'elg201', 'elg101', 'communication'];
+    const _arabicChars = (clean.match(/[\u0600-\u06FF]/g) || []).length;
+    const _latinChars  = (clean.match(/[a-zA-Z]/g) || []).length;
+    const _textIsEnglish = _latinChars > _arabicChars * 2;
+    const isEng = _enSubjects.indexOf(subjectId) > -1 || _textIsEnglish;
 
     upd('🔍', 'تحليل هيكل الملف واكتشاف الدروس...', 10);
 
@@ -10651,12 +10700,12 @@ async function analyzeAndGenerate(text, subjectId, fileName) {
     try {
       upd('🔍', 'تحليل هيكل الملف...', 12);
       const structResp = await zadFetch({
-        model: 'llama-3.1-8b-instant',
-        max_tokens: 800,
-        system: 'Respond with valid JSON only. No markdown.',
+        model: 'llama-3.3-70b-versatile',
+        max_tokens: 1200,
+        system: 'Respond with valid JSON only. No markdown. Base your analysis ONLY on the provided text.',
         messages: [{
           role: 'user',
-          content: 'Analyze this educational text and detect its structure.\nText (first 8000 chars):\n' + clean.slice(0, 8000) + '\n\nReturn ONLY valid JSON (no markdown):\n{"chapterTitle":"main title of the document","hasMultipleTopics":true/false,"topics":[{"title":"Lesson/Topic title","startHint":"first 5 words of this section"}]}\nRules: max 10 topics. If single topic set hasMultipleTopics:false and topics:[{"title":"auto","startHint":""}]. Extract real titles from text.'
+          content: 'Analyze this educational text and detect its structure. The text may be in Arabic or English.\nText (first 8000 chars):\n' + clean.slice(0, 8000) + '\n\nReturn ONLY valid JSON (no markdown):\n{"chapterTitle":"main title of the document","hasMultipleTopics":true/false,"topics":[{"title":"Lesson/Topic title","startHint":"first 5 words of this section"}]}\nRules: max 10 topics. If single topic set hasMultipleTopics:false and topics:[{"title":"auto","startHint":""}]. Extract REAL titles found in the text — do not invent. Respond in the same language as the document.'
         }]
       });
       const structData = await structResp.json();
@@ -10680,20 +10729,32 @@ async function analyzeAndGenerate(text, subjectId, fileName) {
     upd('📚', `اكتُشف ${totalLessons} درس/موضوع في الملف`, 20);
 
     const langNote = isEng
-      ? `You are an expert English language teacher for Arabic-speaking Saudi university students.
-CRITICAL RULES — MUST FOLLOW EXACTLY:
+      ? `You are an educational content extractor. Extract and simplify content FROM THE PROVIDED TEXT ONLY.
+
+ANTI-HALLUCINATION RULES (MANDATORY):
+1. Use ONLY information present in the given text — never add outside knowledge
+2. If a concept is not in the text, do not invent it — use what IS there
+3. Quiz questions and ALL answer options must be directly from the text
+4. Do NOT add examples, facts, or terms not mentioned in the source text
+5. Preserve all numbers, formulas, and technical terms exactly as written
+
+LANGUAGE RULES:
 1. lessonTitle: ENGLISH ONLY
-2. definition, whyLearn, steps, summary: Arabic only (simple, clear, beginner-friendly)
+2. definition, whyLearn, steps, summary: Arabic only (simple, beginner-friendly)
 3. keyTerms: term = ENGLISH, def = Arabic
-4. examples: title = ENGLISH, content = Arabic explanation
-5. mindMapBranches: ALL labels in ENGLISH
-6. quiz.q (question): ENGLISH ONLY — NEVER write in Arabic
-7. quiz.options (all 4 choices): ENGLISH ONLY — NEVER write in Arabic
-8. quiz.hint: ENGLISH ONLY
-9. quiz.explanation: Arabic only (explain why the answer is correct)
-VIOLATION: Writing Arabic in quiz.q or quiz.options is a critical error.`
-      : `أنت مدرس خبير في ${subTitle}. اشرح بشكل مبسط جداً ومفصل ودقيق كأنك تشرح لمبتدئ.
-التعريف: 4-6 جمل مفصلة. الأمثلة: تطبيقية من الواقع. الأسئلة: من المحتوى مع شرح وافٍ.`;
+4. quiz.q and quiz.options: ENGLISH ONLY — NEVER Arabic
+5. quiz.explanation: Arabic only
+6. NO emoji in quiz questions or answer options`
+      : `أنت مساعد تعليمي متخصص لطلاب الجامعة السعودية الإلكترونية.
+مهمتك الوحيدة: استخرج المحتوى من النص المُعطى وبسّطه — لا تضف شيئاً من خارجه.
+
+قواعد صارمة:
+1. اعتمد فقط على النص المُعطى — أي معلومة غير موجودة في النص ممنوعة تماماً
+2. المصطلحات: إذا كان النص يحتوي مصطلحات إنجليزية مع تعريفاتها العربية، احتفظ بالمصطلح الإنجليزي في حقل term
+3. الأسئلة: الإجابة الصحيحة وجميع الخيارات الخاطئة يجب أن تكون من النص مباشرة
+4. الأرقام والمعادلات: احتفظ بها بدقة تامة كما في النص
+5. لا تضع emoji في نصوص الأسئلة أو خيارات الإجابة
+6. التعريفات: يجب أن تعكس ما في النص، مع تبسيط اللغة للمبتدئ`;
 
     const jsonTemplateAR = "{\n  \"lessonTitle\": \"عنوان دقيق\",\n  \"definition\": \"تعريف مفصل وشامل (4-6 جمل مبسطة)\",\n  \"whyLearn\": [\"أهمية 1\", \"أهمية 2\", \"أهمية 3\"],\n  \"keyTerms\": [{\"term\":\"مصطلح\",\"def\":\"تعريف مفصل\"},{\"term\":\"م2\",\"def\":\"تعريف\"},{\"term\":\"م3\",\"def\":\"تعريف\"},{\"term\":\"م4\",\"def\":\"تعريف\"},{\"term\":\"م5\",\"def\":\"تعريف\"}],\n  \"examples\": [{\"icon\":\"💡\",\"title\":\"مثال 1\",\"content\":\"شرح مفصل\"},{\"icon\":\"📌\",\"title\":\"مثال 2\",\"content\":\"شرح\"},{\"icon\":\"🔍\",\"title\":\"مثال 3\",\"content\":\"شرح\"}],\n  \"steps\": [\"نقطة 1\",\"نقطة 2\",\"نقطة 3\",\"نقطة 4\",\"نقطة 5\"],\n  \"properties\": [\"خاصية 1\",\"خاصية 2\",\"خاصية 3\"],\n  \"types\": [\"نوع 1\",\"نوع 2\",\"نوع 3\"],\n  \"mindMapBranches\": [{\"label\":\"محور 1\",\"color\":\"#6C63FF\",\"children\":[\"فرع 1\",\"فرع 2\",\"فرع 3\"]},{\"label\":\"محور 2\",\"color\":\"#FF6584\",\"children\":[\"فرع 1\",\"فرع 2\",\"فرع 3\"]},{\"label\":\"محور 3\",\"color\":\"#00BFA5\",\"children\":[\"فرع 1\",\"فرع 2\"]},{\"label\":\"محور 4\",\"color\":\"#FFD600\",\"children\":[\"فرع 1\",\"فرع 2\"]}],\n  \"quiz\": [{\"q\":\"سؤال 1؟\",\"options\":[\"صحيح\",\"خطأ1\",\"خطأ2\",\"خطأ3\"],\"answer\":0,\"hint\":\"تلميح\",\"explanation\":\"شرح مفصل\"},{\"q\":\"سؤال 2؟\",\"options\":[\"صحيح\",\"خطأ1\",\"خطأ2\",\"خطأ3\"],\"answer\":0,\"hint\":\"تلميح\",\"explanation\":\"شرح\"},{\"q\":\"سؤال 3؟\",\"options\":[\"صحيح\",\"خطأ1\",\"خطأ2\",\"خطأ3\"],\"answer\":0,\"hint\":\"تلميح\",\"explanation\":\"شرح\"},{\"q\":\"سؤال 4؟\",\"options\":[\"صحيح\",\"خطأ1\",\"خطأ2\",\"خطأ3\"],\"answer\":0,\"hint\":\"تلميح\",\"explanation\":\"شرح\"},{\"q\":\"سؤال 5؟\",\"options\":[\"صحيح\",\"خطأ1\",\"خطأ2\",\"خطأ3\"],\"answer\":0,\"hint\":\"تلميح\",\"explanation\":\"شرح\"}],\n  \"summary\": \"ملخص شامل ومفصل\"\n}";
 
@@ -10725,19 +10786,19 @@ VIOLATION: Writing Arabic in quiz.q or quiz.options is a critical error.`
           : clean.length;
         const sectionText = clean.slice(sectionStart, Math.min(sectionEnd, sectionStart + CHUNK));
 
-        const topicPrompt = `${langNote}\n\nموضوع هذا الدرس: "${topic.title}"\nنص الدرس:\n${sectionText}\n\nأجب بـ JSON صالح فقط:\n${jsonTemplate}`;
+        const topicPrompt = `${langNote}\n\n⚠️ تعليمات مهمة: استخدم المحتوى من النص التالي فقط. لا تضف معلومات خارجية.\n\nموضوع هذا الدرس: "${topic.title}"\n\n=== النص المصدر (استخرج منه فقط) ===\n${sectionText}\n=== نهاية النص ===\n\nأجب بـ JSON صالح فقط:\n${jsonTemplate}`;
 
         let lesson = null;
         try {
           const resp = await zadFetch({
             model: 'llama-3.3-70b-versatile',
             max_tokens: 6000,
-            system: 'You are an educational assistant. Reply with valid JSON only. No markdown.',
+            system: 'You are an educational content extractor. CRITICAL: Extract information ONLY from the provided text. NEVER add facts, examples, or content not present in the source text. Reply with valid JSON only. No markdown. No hallucination.',
             messages: [{ role: 'user', content: topicPrompt }]
           });
           const data = await resp.json();
           const text = (data.content && data.content[0] && data.content[0].text) || '';
-          lesson = repairAndParseJSON(text.trim());
+          lesson = sanitizeLesson(repairAndParseJSON(text.trim()));
         } catch(topicErr) {
           console.warn('Topic', ti, 'failed:', topicErr.message);
         }
@@ -10752,7 +10813,7 @@ VIOLATION: Writing Arabic in quiz.q or quiz.options is a critical error.`
                 + topic.title + '\n\nReturn JSON:\n' + jsonTemplate}] });
             const fbD = await fbR.json();
             const fbT = (fbD.content&&fbD.content[0]&&fbD.content[0].text)||'';
-            lesson = repairAndParseJSON(fbT.trim());
+            lesson = sanitizeLesson(repairAndParseJSON(fbT.trim()));
           } catch(fb2) { console.warn('Fallback lesson failed'); }
           if (!lesson) continue;
         }
@@ -10790,10 +10851,10 @@ VIOLATION: Writing Arabic in quiz.q or quiz.options is a critical error.`
         const chunk = clean.slice(ci * chunkSize, (ci+1) * chunkSize);
         const isFirst = ci === 0;
         const prompt = isFirst
-          ? `${langNote}\n\nالنص:\n${chunk}\n\nأجب بـ JSON:\n${jsonTemplate}`
+          ? `${langNote}\n\n⚠️ استخرج المحتوى التالي فقط — لا تضف شيئاً من خارجه:\n\n=== النص المصدر ===\n${chunk}\n=== نهاية النص ===\n\nأجب بـ JSON:\n${jsonTemplate}`
           : isEng
-          ? `${langNote}\n\nAdditional text:\n${chunk}\n\nReturn JSON with extra content only:\n{"keyTerms":[{"term":"English term","def":"Arabic definition"}],"steps":["Arabic point"],"quiz":[{"q":"English question?","options":["Correct English","Wrong 1","Wrong 2","Wrong 3"],"answer":0,"hint":"English hint","explanation":"Arabic explanation"}]}`
-          : `${langNote}\n\nنص إضافي:\n${chunk}\n\nأجب بـ JSON مع مصطلحات وأسئلة إضافية فقط:\n{"keyTerms":[{"term":"...","def":"..."}],"steps":["..."],"quiz":[{"q":"...","options":["صحيح","خطأ1","خطأ2","خطأ3"],"answer":0,"explanation":"..."}]}`;
+          ? `${langNote}\n\nAdditional source text (extract from this only):\n${chunk}\n\nReturn JSON with extra content only — from this text only:\n{"keyTerms":[{"term":"English term","def":"Arabic definition"}],"steps":["Arabic point"],"quiz":[{"q":"English question?","options":["Correct English","Wrong 1","Wrong 2","Wrong 3"],"answer":0,"hint":"English hint","explanation":"Arabic explanation"}]}`
+          : `${langNote}\n\n⚠️ نص إضافي (استخرج منه فقط، لا تضف معلومات خارجه):\n${chunk}\n\nأجب بـ JSON مع مصطلحات وأسئلة مستخرجة من هذا النص فقط:\n{"keyTerms":[{"term":"...","def":"..."}],"steps":["..."],"quiz":[{"q":"...","options":["صحيح","خطأ1","خطأ2","خطأ3"],"answer":0,"explanation":"..."}]}`;
 
         let parsed = null;
         console.log('[ZAD] chunk', ci, 'sending prompt length:', prompt.length);
@@ -10801,13 +10862,13 @@ VIOLATION: Writing Arabic in quiz.q or quiz.options is a critical error.`
           const resp = await zadFetch({
             model: 'llama-3.3-70b-versatile',
             max_tokens: 6000,
-            system: 'You are an educational assistant. Reply with valid JSON only. No markdown, no extra text.',
+            system: 'You are an educational content extractor. Extract ONLY from the provided text. No hallucination. Reply with valid JSON only. No markdown.',
             messages: [{ role: 'user', content: prompt }]
           });
           const data = await resp.json();
           const text = (data.content && data.content[0] && data.content[0].text) || '';
           console.log('[ZAD] chunk', ci, 'got text length:', text.length, 'preview:', text.slice(0,100));
-          parsed = repairAndParseJSON(text.trim());
+          parsed = sanitizeLesson(repairAndParseJSON(text.trim()));
           console.log('[ZAD] chunk', ci, 'parsed:', !!parsed);
         } catch(fetchErr) {
           console.warn('Chunk', ci, 'failed:', fetchErr.message);
@@ -10834,7 +10895,7 @@ VIOLATION: Writing Arabic in quiz.q or quiz.options is a critical error.`
           });
           const fbData = await fbResp.json();
           const fbText = (fbData.content && fbData.content[0] && fbData.content[0].text) || '';
-          const fbParsed = repairAndParseJSON(fbText.trim());
+          const fbParsed = sanitizeLesson(repairAndParseJSON(fbText.trim()));
           if (fbParsed) allResults.push(fbParsed);
         } catch(fbErr) {
           console.error('Fallback also failed:', fbErr);
@@ -10979,6 +11040,29 @@ function repairAndParseJSON(raw) {
 
   if (lesson.lessonTitle || lesson.definition) return lesson;
   return null;
+}
+
+// ── Post-parse sanitizer: strip problematic emoji from quiz text ──
+function sanitizeLesson(lesson) {
+  if (!lesson) return lesson;
+  // Remove non-BMP emoji (>U+FFFF) from quiz questions and options
+  // These render as Asian characters on some mobile browsers
+  function stripBadEmoji(str) {
+    if (typeof str !== 'string') return str;
+    return str.replace(/[\u{1F000}-\u{1FFFF}]/gu, '').replace(/\s+/g, ' ').trim();
+  }
+  if (lesson.quiz) {
+    lesson.quiz = lesson.quiz.map(function(q) {
+      return {
+        q:           stripBadEmoji(q.q),
+        options:     (q.options||[]).map(stripBadEmoji),
+        answer:      q.answer,
+        hint:        stripBadEmoji(q.hint||''),
+        explanation: q.explanation || ''
+      };
+    }).filter(function(q){ return q.q && q.options && q.options.length === 4; });
+  }
+  return lesson;
 }
 
 
@@ -18075,7 +18159,7 @@ async function zadFetch(body) {
       model     : model,
       messages  : messages,
       max_tokens: body.max_tokens || 4000,
-      temperature: 0.3
+      temperature: 0.1
     })
   });
 

@@ -2957,49 +2957,53 @@ function oslabAnimateProcess() {
 function buildOSSchedPanel() {
 
   const compSVG = `
-    <svg viewBox="0 0 640 195" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block">
-      <text x="320" y="18" text-anchor="middle" font-family="Cairo" font-size="11"
+    <svg viewBox="0 0 580 235" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;min-width:320px">
+      <text x="290" y="16" text-anchor="middle" font-family="Cairo,sans-serif" font-size="11"
         fill="#a78bfa" font-weight="800">مقارنة خوارزميات الجدولة — نفس العمليات الثلاث</text>
 
       ${[
-        {label:'FCFS — أول الواصل أول المخدوم',col:'#a78bfa',y:30,
+        {label:'FCFS — أول الواصل أول المخدوم',col:'#a78bfa',
          blocks:[
            {p:'P1',w:120,c:'#a78bfa'},{p:'P2',w:80,c:'#34d399'},{p:'P3',w:40,c:'#fbbf24'}]},
-        {label:'SJF — الأقصر أولاً',col:'#34d399',y:90,
+        {label:'SJF — الأقصر أولاً',col:'#34d399',
          blocks:[
            {p:'P3',w:40,c:'#fbbf24'},{p:'P2',w:80,c:'#34d399'},{p:'P1',w:120,c:'#a78bfa'}]},
-        {label:'Round Robin (Q=2)',col:'#fbbf24',y:150,
+        {label:'Round Robin (Q=2)',col:'#fbbf24',
          blocks:[
            {p:'P1',w:20,c:'#a78bfa'},{p:'P2',w:20,c:'#34d399'},{p:'P3',w:20,c:'#fbbf24'},
            {p:'P1',w:20,c:'#a78bfa'},{p:'P2',w:20,c:'#34d399'},{p:'P1',w:20,c:'#a78bfa'},
            {p:'P2',w:20,c:'#34d399'},{p:'P1',w:20,c:'#a78bfa'},{p:'P2',w:20,c:'#34d399'},
            {p:'P1',w:20,c:'#a78bfa'},{p:'P1',w:20,c:'#a78bfa'},
          ]},
-      ].map(row => {
-        let x = 155;
+      ].map((row, ri) => {
+        const labelY  = 30 + ri * 65;   // label sits above the bar
+        const barY    = labelY + 14;     // bar directly below label
+        let x = 10;
         const bars = row.blocks.map(b => {
+          const bw = b.w - 2;
           const bar = `
-            <rect x="${x}" y="${row.y}" width="${b.w-2}" height="28" rx="5"
-              fill="${b.c}30" stroke="${b.c}" stroke-width="1.5"/>
-            <text x="${x+b.w/2-1}" y="${row.y+18}" text-anchor="middle"
-              font-family="monospace" font-size="${b.w>18?9:7}" fill="${b.c}">${b.p}</text>`;
+            <rect x="${x}" y="${barY}" width="${bw}" height="28" rx="4"
+              fill="${b.c}28" stroke="${b.c}" stroke-width="1.5"/>
+            <text x="${x + bw/2}" y="${barY+18}" text-anchor="middle"
+              font-family="monospace" font-size="${bw>=18?9:6}" fill="${b.c}" font-weight="700">${bw>=12?b.p:''}</text>`;
           x += b.w;
           return bar;
         }).join('');
+        const totalMs = Math.round((x - 10) / 10 * 2);
         return `
-          <text x="148" y="${row.y+18}" text-anchor="end" font-family="Cairo"
-            font-size="9" fill="${row.col}" font-weight="700">${row.label}</text>
-          ${bars}
-          <text x="${x+4}" y="${row.y+18}" font-family="monospace" font-size="8.5"
-            fill="${row.col}80">${Math.round((x-155)/10*2)} ms</text>`;
+          <text x="5" y="${labelY+10}" text-anchor="start" font-family="Cairo,sans-serif"
+            font-size="9.5" fill="${row.col}" font-weight="800">${row.label}</text>
+          <text x="${x+4}" y="${barY+18}" text-anchor="start" font-family="monospace"
+            font-size="8" fill="${row.col}99">${totalMs}ms</text>
+          ${bars}`;
       }).join('')}
 
       <!-- Time axis -->
-      <line x1="155" y1="185" x2="560" y2="185" stroke="#ffffff25" stroke-width="1"/>
+      <line x1="10" y1="222" x2="490" y2="222" stroke="#ffffff25" stroke-width="1"/>
       ${[0,2,4,6,8,10,12,14,16,18,20,22,24].map((t,i) => `
-        <line x1="${155+i*20}" y1="182" x2="${155+i*20}" y2="188" stroke="#ffffff30" stroke-width="1"/>
-        <text x="${155+i*20}" y="193" text-anchor="middle" font-family="monospace"
-          font-size="7.5" fill="#ffffff40">${t}</text>
+        <line x1="${10+i*20}" y1="219" x2="${10+i*20}" y2="225" stroke="#ffffff30" stroke-width="1"/>
+        <text x="${10+i*20}" y="233" text-anchor="middle" font-family="monospace"
+          font-size="7" fill="#ffffff50">${t}</text>
       `).join('')}
     </svg>`;
 
@@ -15247,7 +15251,7 @@ function showToast(msg, type = 'info') {
 
   // Build message with progress bar
   t.innerHTML = `
-    <span style="flex:1">${typeof escHTML==='function' ? escHTML(msg) : msg}</span>
+    <span style="flex:1">${msg}</span>
     <div id="toast-progress-bar" style="
       position:absolute;bottom:0;right:0;height:3px;width:100%;
       background:rgba(255,255,255,0.15);border-radius:0 0 14px 14px;overflow:hidden">
@@ -19095,7 +19099,7 @@ function showUploadStatus(type, msg) {
 
   el.innerHTML =
     iconHtml +
-    '<span style="flex:1;line-height:1.4">' + (typeof escHTML==='function' ? escHTML(msg) : msg) + '</span>' +
+    '<span style="flex:1;line-height:1.4">' + msg + '</span>' +
     '<button onclick="hideUploadStatus()" title="إغلاق" ' +
       'style="flex-shrink:0;background:transparent;border:none;color:' + c.text +
       ';opacity:0.7;cursor:pointer;font-size:1.1rem;line-height:1;padding:0 2px">' +
@@ -19487,7 +19491,7 @@ function setAdminPKStatus(type, msg) {
   el.style.background = colors[type]  || 'rgba(255,255,255,0.04)';
   el.style.borderColor= borders[type] || 'var(--border)';
   el.style.color      = textc[type]   || 'var(--text)';
-  el.innerHTML        = typeof escHTML==='function' ? escHTML(msg) : msg;
+  el.innerHTML        = msg;
 }
 
 function buildAdminPlatformKeySection() {
@@ -21168,7 +21172,7 @@ async function labAskQuestion(subjectId) {
     history.scrollTop = history.scrollHeight;
   } catch(err) {
     var loadEl2 = document.getElementById('lab-loading');
-    if (loadEl2) loadEl2.outerHTML = '<div style="color:#FF5252;font-size:0.8rem;padding:8px">❌ '+escHTML(err.message)+'</div>';
+    if (loadEl2) loadEl2.outerHTML = '<div style="color:#FF5252;font-size:0.8rem;padding:8px">❌ '+err.message+'</div>';
   }
 }
 
@@ -21369,21 +21373,12 @@ async function fetchDevLessons() {
 }
 
 async function pushDevLessons(lessons) {
-  if (typeof isAdmin === 'function' && !isAdmin()) {
-    throw new Error('غير مصرح — فقط المدير يستطيع تعديل الملخصات');
-  }
-  try {
-    var resp = await fetch(ZAD_WORKER_URL + '/summaries', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({secret: ZAD_WORKER_SECRET, summaries: lessons})
-    });
-    if (!resp.ok) throw new Error('فشل الحفظ: ' + resp.status);
-    return await resp.json();
-  } catch(e) {
-    console.error('[ZAD] pushDevLessons error:', e);
-    throw e;
-  }
+  var resp = await fetch(ZAD_WORKER_URL + '/summaries', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({secret: ZAD_WORKER_SECRET, summaries: lessons})
+  });
+  return await resp.json();
 }
 
 function getDevLessons() {
@@ -21514,7 +21509,7 @@ async function devProcessAndSave() {
     if (body) body.innerHTML = buildDevSummaryTab();
     showToast('✅ تم رفع "' + lesson.lessonTitle + '" لجميع الطلاب', 'success');
   } catch(err) {
-    if (st) st.innerHTML = '❌ ' + escHTML(err.message);
+    if (st) st.innerHTML = '❌ ' + err.message;
   }
 }
 
@@ -22107,15 +22102,22 @@ async function translateQuizItemsToEnglish(questions) {
     + 'Items:\n' + JSON.stringify(toTranslate);
 
   try {
-    var resp = await zadFetch({
-      model: 'llama-3.1-8b-instant',
-      max_tokens: 2000,
-      system: 'You are a translator. Return ONLY valid JSON array, no markdown.',
-      messages: [{ role: 'user', content: prompt }]
+    var resp = await fetch('https://zad-proxy.atif-alamodi.workers.dev', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'llama-3.1-8b-instant',
+        messages: [
+          { role: 'system', content: 'You are a translator. Return ONLY valid JSON array, no markdown.' },
+          { role: 'user', content: prompt }
+        ],
+        max_tokens: 2000, temperature: 0.1
+      })
     });
 
+    if (!resp.ok) return questions;
     var data = await resp.json();
-    var raw = (data.content && data.content[0] && data.content[0].text) || '[]';
+    var raw = (data.choices && data.choices[0].message.content) || '[]';
     raw = raw.replace(/```json|```/g, '').trim();
     var translated = JSON.parse(raw);
 

@@ -19739,60 +19739,85 @@ window.addEventListener('load', function() {
 // DEVELOPER SUMMARY SYSTEM — Full AI processing
 // Admin uploads summaries → AI builds lessons → students learn
 // ══════════════════════════════════════════════════════════════
-var ZAD_DEV_SUMMARIES_KEY = 'zad_dev_lessons_v2';
+
+
+// ══════════════════════════════════════════════════════════════
+// DEVELOPER SUMMARY SYSTEM v3 — Cloudflare KV (shared globally)
+// All students see summaries in real-time via Worker KV
+// ══════════════════════════════════════════════════════════════
+var _devLessonsCache = null;
+var ZAD_WORKER_URL = 'https://zad-proxy.atif-alamodi.workers.dev';
+var ZAD_WORKER_SECRET = 'zad-secure-2024';
+
+async function fetchDevLessons() {
+  try {
+    var resp = await fetch(ZAD_WORKER_URL + '/summaries');
+    var list = await resp.json();
+    _devLessonsCache = Array.isArray(list) ? list : [];
+    return _devLessonsCache;
+  } catch(e) { return []; }
+}
+
+async function pushDevLessons(lessons) {
+  var resp = await fetch(ZAD_WORKER_URL + '/summaries', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({secret: ZAD_WORKER_SECRET, summaries: lessons})
+  });
+  return await resp.json();
+}
 
 function getDevLessons() {
-  try { return JSON.parse(localStorage.getItem(ZAD_DEV_SUMMARIES_KEY) || '[]'); }
-  catch(e) { return []; }
-}
-function saveDevLessons(list) {
-  localStorage.setItem(ZAD_DEV_SUMMARIES_KEY, JSON.stringify(list));
+  return _devLessonsCache || [];
 }
 
-// ── Admin: Build the developer tab in admin panel ──────────────
+// ── Admin: Build the developer tab ────────────────────────────
 function buildDevSummaryTab() {
   var lessons = getDevLessons();
+  // Trigger async load
+  fetchDevLessons().then(function(list) {
+    var body = document.getElementById('admin-body');
+    if (body && body.querySelector('#dev-lessons-list')) {
+      _devLessonsCache = list;
+      body.innerHTML = buildDevSummaryTab();
+    }
+  });
 
   var listHTML = lessons.length
     ? lessons.map(function(l, i) {
-        var prog = l.keyTerms ? l.keyTerms.length + ' مصطلح' : '';
-        var qCount = l.quiz ? l.quiz.length + ' سؤال' : '';
         return '<div style="background:rgba(255,214,0,0.06);border:1.5px solid rgba(255,214,0,0.2);border-radius:14px;padding:14px 16px;margin-bottom:10px">'
           + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px">'
             + '<div style="flex:1"><div style="font-weight:800;font-size:0.88rem">📋 ' + (l.lessonTitle||l.title||'ملخص') + '</div>'
-            + '<div style="font-size:0.7rem;color:var(--text-muted);margin-top:2px">' + prog + (prog&&qCount?' • ':'') + qCount + '</div></div>'
-            + '<button onclick="devDownloadSummary(' + i + ')" style="padding:5px 10px;border-radius:8px;border:1px solid rgba(255,214,0,0.4);background:rgba(255,214,0,0.08);color:#FFD600;font-size:0.72rem;cursor:pointer;font-weight:700">⬇️ تنزيل</button>'
+            + '<div style="font-size:0.7rem;color:var(--text-muted);margin-top:2px">' + ((l.keyTerms||[]).length) + ' مصطلح • ' + ((l.quiz||[]).length) + ' سؤال</div></div>'
+            + '<button onclick="devDownloadSummary(' + i + ')" style="padding:5px 10px;border-radius:8px;border:1px solid rgba(255,214,0,0.4);background:rgba(255,214,0,0.08);color:#FFD600;font-size:0.72rem;cursor:pointer;font-weight:700">⬇️</button>'
             + '<button onclick="devDeleteLesson(' + i + ')" style="padding:5px 8px;border-radius:8px;border:none;background:rgba(255,82,82,0.1);color:#FF5252;cursor:pointer;font-size:0.72rem">🗑️</button>'
           + '</div>'
           + '<div style="font-size:0.78rem;color:var(--text-muted);line-height:1.5">' + ((l.definition||'').slice(0,120)) + (l.definition&&l.definition.length>120?'...':'') + '</div>'
-          + '</div>';
+        + '</div>';
       }).join('')
-    : '<div style="text-align:center;padding:30px;color:var(--text-muted)">لا توجد ملخصات بعد — ارفع ملفاً أو اكتب نصاً</div>';
+    : '<div style="text-align:center;padding:30px;color:var(--text-muted)">جاري التحميل...</div>';
 
   return '<div style="direction:rtl">'
     + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">'
-      + '<div style="font-weight:900;font-size:0.95rem">📋 ملخصات المطور (' + lessons.length + ')</div>'
-      + '<button onclick="devShowUploadArea()" style="padding:8px 14px;border-radius:10px;border:none;background:linear-gradient(135deg,#FFD600,#FF8C00);color:#1C1917;font-family:var(--font);font-weight:800;font-size:0.82rem;cursor:pointer">+ إضافة ملخص</button>'
+      + '<div style="font-weight:900;font-size:0.95rem">📋 ملخصات المطور</div>'
+      + '<button onclick="devShowUploadArea()" style="padding:8px 14px;border-radius:10px;border:none;background:linear-gradient(135deg,#FFD600,#FF8C00);color:#1C1917;font-family:var(--font);font-weight:800;font-size:0.82rem;cursor:pointer">+ إضافة</button>'
     + '</div>'
-
     + '<div id="dev-upload-area" style="display:none;background:rgba(255,214,0,0.05);border:1.5px dashed rgba(255,214,0,0.3);border-radius:16px;padding:16px;margin-bottom:16px">'
-      + '<div style="font-weight:800;font-size:0.85rem;margin-bottom:10px">📤 رفع ملخص جديد</div>'
       + '<input id="dev-sum-title" placeholder="عنوان الملخص..." style="width:100%;box-sizing:border-box;padding:9px 12px;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text);font-family:var(--font);font-size:0.85rem;outline:none;direction:rtl;margin-bottom:8px">'
       + '<textarea id="dev-sum-text" rows="5" placeholder="الصق النص هنا أو ارفع ملفاً..." style="width:100%;box-sizing:border-box;padding:9px 12px;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text);font-family:var(--font);font-size:0.83rem;outline:none;resize:vertical;direction:rtl;margin-bottom:8px"></textarea>'
-      + '<div id="dev-upload-status" style="font-size:0.78rem;margin-bottom:8px;color:var(--text-muted)"></div>'
+      + '<div id="dev-upload-status" style="font-size:0.78rem;margin-bottom:8px;min-height:18px;color:var(--text-muted)"></div>'
       + '<div style="display:flex;gap:8px;flex-wrap:wrap">'
-        + '<label style="flex:1;min-width:100px;padding:9px;border-radius:10px;border:1px dashed var(--border);background:rgba(255,255,255,0.03);color:var(--text-muted);cursor:pointer;text-align:center;font-size:0.8rem">📎 ارفع ملفاً<input type="file" accept="*/*" style="display:none" onchange="devLoadFile(this)"></label>'
-        + '<button onclick="devProcessAndSave()" style="flex:2;padding:9px;border-radius:10px;border:none;background:linear-gradient(135deg,#FFD600,#FF8C00);color:#1C1917;font-family:var(--font);font-weight:800;cursor:pointer;font-size:0.85rem">⚡ معالجة بالذكاء الاصطناعي وحفظ</button>'
+        + '<label style="flex:1;min-width:100px;padding:9px;border-radius:10px;border:1px dashed var(--border);background:rgba(255,255,255,0.03);color:var(--text-muted);cursor:pointer;text-align:center;font-size:0.8rem">📎 ملف<input type="file" accept="*/*" style="display:none" onchange="devLoadFile(this)"></label>'
+        + '<button onclick="devProcessAndSave()" style="flex:2;padding:9px;border-radius:10px;border:none;background:linear-gradient(135deg,#FFD600,#FF8C00);color:#1C1917;font-family:var(--font);font-weight:800;cursor:pointer">⚡ تحليل وحفظ للجميع</button>'
       + '</div>'
     + '</div>'
-
     + '<div id="dev-lessons-list">' + listHTML + '</div>'
   + '</div>';
 }
 
 function devShowUploadArea() {
   var a = document.getElementById('dev-upload-area');
-  if (a) a.style.display = a.style.display === 'none' ? 'block' : 'none';
+  if (a) a.style.display = a.style.display==='none'?'block':'none';
 }
 
 async function devLoadFile(input) {
@@ -19800,123 +19825,78 @@ async function devLoadFile(input) {
   if (!file) return;
   var t = document.getElementById('dev-sum-title');
   var tx = document.getElementById('dev-sum-text');
-  if (t && !t.value) t.value = file.name.replace(/\.[^/.]+$/, '');
   var st = document.getElementById('dev-upload-status');
-  if (st) st.innerHTML = '⏳ جاري قراءة الملف...';
+  if (t && !t.value) t.value = file.name.replace(/\.[^/.]+$/,'');
+  if (st) st.innerHTML = '⏳ قراءة الملف...';
   try {
-    var text = '';
-    var ext = file.name.split('.').pop().toLowerCase();
-    if (ext === 'pdf') {
-      text = await extractPdfText(file);
-    } else {
-      text = await file.text();
-    }
+    var text = file.name.split('.').pop().toLowerCase() === 'pdf' ? await extractPdfText(file) : await file.text();
     if (tx) tx.value = text;
-    if (st) st.innerHTML = '✅ قُرئ ' + text.length.toLocaleString() + ' حرف';
-  } catch(e) {
-    if (st) st.innerHTML = '❌ خطأ: ' + e.message;
-  }
+    if (st) st.innerHTML = '✅ ' + text.length.toLocaleString() + ' حرف';
+  } catch(e) { if (st) st.innerHTML = '❌ ' + e.message; }
 }
 
 async function devProcessAndSave() {
-  var title = (document.getElementById('dev-sum-title') || {}).value || '';
-  var text  = (document.getElementById('dev-sum-text')  || {}).value || '';
-  var st = document.getElementById('dev-upload-status');
-
-  if (!title.trim()) { if (st) st.innerHTML = '❌ أدخل العنوان'; return; }
-  if (text.trim().length < 20) { if (st) st.innerHTML = '❌ المحتوى قصير جداً'; return; }
-
-  if (st) st.innerHTML = '🤖 الذكاء الاصطناعي يحلل المحتوى...';
-
+  var title = (document.getElementById('dev-sum-title')||{}).value||'';
+  var text  = (document.getElementById('dev-sum-text') ||{}).value||'';
+  var st    = document.getElementById('dev-upload-status');
+  if (!title.trim()) { if(st) st.innerHTML='❌ أدخل العنوان'; return; }
+  if (text.trim().length < 20) { if(st) st.innerHTML='❌ المحتوى قصير جداً'; return; }
+  if (st) st.innerHTML = '🤖 الذكاء الاصطناعي يحلل...';
   try {
     var resp = await zadFetch({
-      model: 'llama-3.3-70b-versatile',
-      max_tokens: 6000,
-      system: 'أنت مساعد تعليمي. أجب بـ JSON صالح فقط بدون أي نص خارجه.',
-      messages: [{
-        role: 'user',
-        content: `أنت مدرس خبير. حلل هذا الملخص التعليمي وأنتج درساً شاملاً مفصلاً.
-عنوان الملخص: "${title}"
-المحتوى:
-${text.slice(0, 12000)}
-
-أجب بـ JSON:
-{
-  "lessonTitle": "${title}",
-  "definition": "شرح مفصل وشامل للموضوع (4-6 جمل واضحة)",
-  "whyLearn": ["أهمية 1", "أهمية 2", "أهمية 3"],
-  "keyTerms": [{"term":"مصطلح","def":"تعريف مفصل"},{"term":"م2","def":"تعريف"},{"term":"م3","def":"تعريف"},{"term":"م4","def":"تعريف"},{"term":"م5","def":"تعريف"}],
-  "examples": [{"icon":"💡","title":"مثال 1","content":"شرح مفصل"},{"icon":"📌","title":"مثال 2","content":"شرح"},{"icon":"🔍","title":"مثال 3","content":"شرح"}],
-  "steps": ["نقطة مفصلة 1","نقطة 2","نقطة 3","نقطة 4","نقطة 5"],
-  "mindMapBranches": [
-    {"label":"محور 1","color":"#6C63FF","children":["فرع 1","فرع 2","فرع 3"]},
-    {"label":"محور 2","color":"#FF6584","children":["فرع 1","فرع 2","فرع 3"]},
-    {"label":"محور 3","color":"#00BFA5","children":["فرع 1","فرع 2"]},
-    {"label":"محور 4","color":"#FFD600","children":["فرع 1","فرع 2"]}
-  ],
-  "quiz": [
-    {"q":"سؤال 1 من المحتوى","options":["صحيح","خطأ1","خطأ2","خطأ3"],"answer":0,"explanation":"شرح"},
-    {"q":"سؤال 2","options":["صحيح","خطأ1","خطأ2","خطأ3"],"answer":0,"explanation":"شرح"},
-    {"q":"سؤال 3","options":["صحيح","خطأ1","خطأ2","خطأ3"],"answer":0,"explanation":"شرح"},
-    {"q":"سؤال 4","options":["صحيح","خطأ1","خطأ2","خطأ3"],"answer":0,"explanation":"شرح"},
-    {"q":"سؤال 5","options":["صحيح","خطأ1","خطأ2","خطأ3"],"answer":0,"explanation":"شرح"}
-  ],
-  "summary": "ملخص شامل ومفصل للدرس",
-  "rawText": ""
-}`
-      }]
+      model: 'llama-3.3-70b-versatile', max_tokens: 6000,
+      system: 'أنت مساعد تعليمي. أجب بـ JSON صالح فقط.',
+      messages: [{role:'user', content: `أنت مدرس خبير. حلل هذا الملخص وأنتج درساً تعليمياً شاملاً ومفصلاً.\nالعنوان: "${title}"\nالمحتوى:\n${text.slice(0,12000)}\n\nأجب بـ JSON:\n{"lessonTitle":"${title}","definition":"شرح مفصل 4-6 جمل","whyLearn":["أهمية1","أهمية2","أهمية3"],"keyTerms":[{"term":"م1","def":"تعريف"},{"term":"م2","def":"تعريف"},{"term":"م3","def":"تعريف"},{"term":"م4","def":"تعريف"},{"term":"م5","def":"تعريف"}],"examples":[{"icon":"💡","title":"مثال1","content":"شرح"},{"icon":"📌","title":"مثال2","content":"شرح"}],"steps":["نقطة1","نقطة2","نقطة3","نقطة4"],"mindMapBranches":[{"label":"محور1","color":"#6C63FF","children":["فرع1","فرع2"]},{"label":"محور2","color":"#FF6584","children":["فرع1","فرع2"]},{"label":"محور3","color":"#00BFA5","children":["فرع1","فرع2"]}],"quiz":[{"q":"س1","options":["ص","خ1","خ2","خ3"],"answer":0,"explanation":"شرح"},{"q":"س2","options":["ص","خ1","خ2","خ3"],"answer":0,"explanation":"شرح"},{"q":"س3","options":["ص","خ1","خ2","خ3"],"answer":0,"explanation":"شرح"},{"q":"س4","options":["ص","خ1","خ2","خ3"],"answer":0,"explanation":"شرح"},{"q":"س5","options":["ص","خ1","خ2","خ3"],"answer":0,"explanation":"شرح"}],"summary":"ملخص شامل"}`}]
     });
-
     var data = await resp.json();
-    if (!data.content || !data.content[0]) throw new Error('رد فارغ');
+    if (!data.content||!data.content[0]) throw new Error('رد فارغ');
     var lesson = repairAndParseJSON((data.content[0].text||'').trim());
-    if (!lesson) throw new Error('فشل تحليل JSON');
-
-    lesson.lessonTitle = lesson.lessonTitle || title;
+    if (!lesson) throw new Error('فشل JSON');
+    lesson.lessonTitle = lesson.lessonTitle||title;
     lesson.rawText     = text;
     lesson.createdAt   = Date.now();
     lesson.id          = 'dev-' + Date.now();
 
-    var lessons = getDevLessons();
+    // Push to Worker KV (visible to ALL students)
+    if (st) st.innerHTML = '☁️ رفع للخادم المشترك...';
+    var lessons = getDevLessons().concat([]);
     lessons.unshift(lesson);
-    saveDevLessons(lessons);
+    var pushResult = await pushDevLessons(lessons);
+    if (pushResult.error) throw new Error(pushResult.error);
+    _devLessonsCache = lessons;
 
-    if (st) st.innerHTML = '✅ تم الحفظ! ' + (lesson.keyTerms||[]).length + ' مصطلح، ' + (lesson.quiz||[]).length + ' سؤال';
+    if (st) st.innerHTML = '✅ تم! ' + (lesson.keyTerms||[]).length + ' مصطلح، ' + (lesson.quiz||[]).length + ' سؤال — متاح لجميع الطلاب';
     document.getElementById('dev-sum-title').value = '';
     document.getElementById('dev-sum-text').value  = '';
-
-    // Refresh list
     var body = document.getElementById('admin-body');
     if (body) body.innerHTML = buildDevSummaryTab();
-
-    showToast('✅ تم حفظ "' + lesson.lessonTitle + '" وتحليله', 'success');
-
+    showToast('✅ تم رفع "' + lesson.lessonTitle + '" لجميع الطلاب', 'success');
   } catch(err) {
-    if (st) st.innerHTML = '❌ خطأ: ' + err.message;
+    if (st) st.innerHTML = '❌ ' + err.message;
   }
 }
 
-function devDeleteLesson(idx) {
+async function devDeleteLesson(idx) {
   var lessons = getDevLessons();
-  var title = lessons[idx] && (lessons[idx].lessonTitle || lessons[idx].title) || 'الملخص';
-  if (!confirm('هل أنت متأكد من حذف "' + title + '"؟')) return;
-  lessons.splice(idx, 1);
-  saveDevLessons(lessons);
+  var title = (lessons[idx]&&(lessons[idx].lessonTitle||lessons[idx].title))||'الملخص';
+  if (!confirm('حذف "' + title + '"؟ سيُزال من جميع الطلاب.')) return;
+  lessons.splice(idx,1);
+  await pushDevLessons(lessons);
+  _devLessonsCache = lessons;
   var body = document.getElementById('admin-body');
   if (body) body.innerHTML = buildDevSummaryTab();
-  showToast('🗑️ تم الحذف', 'success');
+  showToast('🗑️ تم الحذف من جميع الطلاب', 'success');
 }
 
 function devDownloadSummary(idx) {
   var l = getDevLessons()[idx];
   if (!l) return;
-  var content = '# ' + (l.lessonTitle||'ملخص') + '\n\n'
-    + '## التعريف\n' + (l.definition||'') + '\n\n'
-    + '## المصطلحات\n' + (l.keyTerms||[]).map(function(k){ return '- ' + k.term + ': ' + k.def; }).join('\n') + '\n\n'
-    + '## النقاط الرئيسية\n' + (l.steps||[]).map(function(s,i){ return (i+1)+'. '+s; }).join('\n') + '\n\n'
-    + '## الملخص\n' + (l.summary||'') + '\n\n'
-    + (l.rawText ? '## النص الأصلي\n' + l.rawText : '');
-  var blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+  var content = '# ' + (l.lessonTitle||'ملخص') + '\n\n## التعريف\n' + (l.definition||'')
+    + '\n\n## المصطلحات\n' + (l.keyTerms||[]).map(function(k){return '- '+k.term+': '+k.def;}).join('\n')
+    + '\n\n## النقاط الرئيسية\n' + (l.steps||[]).map(function(s,i){return (i+1)+'. '+s;}).join('\n')
+    + '\n\n## الملخص\n' + (l.summary||'')
+    + (l.rawText ? '\n\n## النص الأصلي\n'+l.rawText : '');
+  var blob = new Blob([content], {type:'text/plain;charset=utf-8'});
   var a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = (l.lessonTitle||'ملخص') + '.md';
@@ -19925,29 +19905,30 @@ function devDownloadSummary(idx) {
   showToast('⬇️ جاري التنزيل', 'success');
 }
 
-// ── Student: View developer summaries as real lessons ──────────
-function buildStudentDevSummaries() {
-  var lessons = getDevLessons();
-  if (!lessons.length) return '<div style="text-align:center;padding:40px;color:var(--text-muted)"><div style="font-size:2.5rem;margin-bottom:10px">📋</div><div>لا توجد ملخصات من المطور حتى الآن</div></div>';
-
-  return '<div style="direction:rtl">'
+// ── Student: View developer summaries ─────────────────────────
+async function buildStudentDevSummaries() {
+  var container = document.getElementById('daily-challenge-widget');
+  if (!container) return;
+  container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted)">⏳ جاري تحميل الملخصات...</div>';
+  var lessons = await fetchDevLessons();
+  if (!lessons.length) {
+    container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted)"><div style="font-size:2rem;margin-bottom:8px">📋</div><div>لا توجد ملخصات من المطور بعد</div></div>';
+    return;
+  }
+  container.innerHTML = '<div style="direction:rtl">'
     + '<div style="font-weight:900;font-size:0.95rem;margin-bottom:14px">📋 ملخصات المطور (' + lessons.length + ')</div>'
-    + lessons.map(function(l, i) {
-        var qCnt = (l.quiz||[]).length;
-        var tCnt = (l.keyTerms||[]).length;
+    + lessons.map(function(l,i) {
         return '<div style="background:rgba(255,214,0,0.06);border:1.5px solid rgba(255,214,0,0.2);border-radius:16px;padding:16px;margin-bottom:12px;cursor:pointer" onclick="openDevLesson(' + i + ')">'
           + '<div style="display:flex;align-items:center;gap:10px">'
             + '<div style="width:44px;height:44px;border-radius:12px;background:rgba(255,214,0,0.15);display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0">📋</div>'
-            + '<div style="flex:1">'
-              + '<div style="font-weight:800;font-size:0.9rem">' + (l.lessonTitle||l.title||'ملخص') + '</div>'
-              + '<div style="font-size:0.72rem;color:var(--text-muted);margin-top:2px">' + tCnt + ' مصطلح • ' + qCnt + ' سؤال • ' + new Date(l.createdAt||Date.now()).toLocaleDateString('ar') + '</div>'
-            + '</div>'
+            + '<div style="flex:1"><div style="font-weight:800;font-size:0.9rem">' + (l.lessonTitle||l.title||'ملخص') + '</div>'
+            + '<div style="font-size:0.72rem;color:var(--text-muted);margin-top:2px">' + (l.keyTerms||[]).length + ' مصطلح • ' + (l.quiz||[]).length + ' سؤال</div></div>'
             + '<button onclick="event.stopPropagation();devDownloadSummary(' + i + ')" style="padding:6px 10px;border-radius:8px;border:1px solid rgba(255,214,0,0.3);background:transparent;color:#FFD600;font-size:0.72rem;cursor:pointer">⬇️</button>'
           + '</div>'
-          + (l.definition ? '<div style="font-size:0.8rem;color:var(--text-muted);margin-top:8px;line-height:1.5">' + l.definition.slice(0,100) + (l.definition.length>100?'...':'') + '</div>' : '')
+          + (l.definition?'<div style="font-size:0.8rem;color:var(--text-muted);margin-top:8px;line-height:1.5">'+l.definition.slice(0,100)+(l.definition.length>100?'...':'')+'</div>':'')
         + '</div>';
       }).join('')
-    + '</div>';
+  + '</div>';
 }
 
 function openDevLesson(idx) {
@@ -19957,17 +19938,12 @@ function openDevLesson(idx) {
   var lc = document.getElementById('lesson-content');
   if (!lc) return;
   var aiLesson = {
-    lessonTitle:     l.lessonTitle || l.title || 'ملخص',
-    definition:      l.definition || '',
-    whyLearn:        l.whyLearn || [],
-    keyTerms:        l.keyTerms || [],
-    examples:        l.examples || [],
-    steps:           l.steps || [],
-    properties:      l.properties || [],
-    types:           l.types || [],
-    mindMapBranches: l.mindMapBranches || [],
-    quiz:            l.quiz || [],
-    summary:         l.summary || ''
+    lessonTitle: l.lessonTitle||l.title||'ملخص',
+    definition: l.definition||'', whyLearn: l.whyLearn||[],
+    keyTerms: l.keyTerms||[], examples: l.examples||[],
+    steps: l.steps||[], properties: l.properties||[],
+    types: l.types||[], mindMapBranches: l.mindMapBranches||[],
+    quiz: l.quiz||[], summary: l.summary||''
   };
   lc.innerHTML = '<div style="direction:rtl;padding:0">'
     + '<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">'
@@ -19975,18 +19951,16 @@ function openDevLesson(idx) {
       + '<div><div style="font-size:1.1rem;font-weight:900">' + aiLesson.lessonTitle + '</div>'
       + '<div style="font-size:0.75rem;color:var(--text-muted)">📋 ملخص المطور</div></div>'
     + '</div>'
-    + (renderAILesson(aiLesson) || buildAILessonFallback(aiLesson))
+    + (renderAILesson(aiLesson)||buildAILessonFallback(aiLesson))
     + '</div>';
 }
 
 function showDevSummariesPage() {
   showSection('dashboard');
   setTimeout(function() {
+    buildStudentDevSummaries();
     var dc = document.getElementById('daily-challenge-widget');
-    if (dc) {
-      dc.innerHTML = buildStudentDevSummaries();
-      dc.scrollIntoView({ behavior: 'smooth' });
-    }
+    if (dc) dc.scrollIntoView({behavior:'smooth'});
   }, 100);
 }
 </script>

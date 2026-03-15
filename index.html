@@ -10494,7 +10494,7 @@ async function extractPdfText(file) {
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
 
     let fullText = '';
-    const totalPages = Math.min(pdf.numPages, 30);
+    const totalPages = pdf.numPages; // No limit
 
     for (let i = 1; i <= totalPages; i++) {
       const page = await pdf.getPage(i);
@@ -10507,10 +10507,7 @@ async function extractPdfText(file) {
 
       fullText += `\n--- صفحة ${i} ---\n${pageText}`;
 
-      if (fullText.length > 15000) {
-        fullText += `\n\n[... ${pdf.numPages - i} صفحة إضافية لم تُقرأ ...]`;
-        break;
-      }
+      // No page limit - read ALL pages
     }
 
     return fullText.trim() || '';
@@ -10586,7 +10583,7 @@ async function analyzeAndGenerate(text, subjectId, fileName) {
         system: 'Respond with valid JSON only. No markdown.',
         messages: [{
           role: 'user',
-          content: 'Does this text have multiple chapters/topics?\nText (first 3000 chars):\n' + clean.slice(0, 3000) + '\n\nReturn JSON: {"hasMultipleTopics":true/false,"topics":[{"title":"Topic","startHint":"first words"}]}\nMax 6 topics. If one topic: {"hasMultipleTopics":false,"topics":[{"title":"auto","startHint":""}]}'
+          content: 'Does this text have multiple chapters/topics?\nText (first 6000 chars):\n' + clean.slice(0, 6000) + '\n\nReturn JSON: {"hasMultipleTopics":true/false,"topics":[{"title":"Topic","startHint":"first words"}]}\nMax 6 topics. If one topic: {"hasMultipleTopics":false,"topics":[{"title":"auto","startHint":""}]}'
         }]
       });
       const structData = await structResp.json();
@@ -10598,7 +10595,7 @@ async function analyzeAndGenerate(text, subjectId, fileName) {
     }
 
     const topics = (structure && structure.topics && structure.topics.length > 1 && structure.hasMultipleTopics)
-      ? structure.topics.slice(0, 8)
+      ? structure.topics
       : null;
 
     const totalLessons = topics ? topics.length : 1;
@@ -10628,7 +10625,7 @@ VIOLATION: Writing Arabic in quiz.q or quiz.options is a critical error.`
 
     // ── STEP 2: Process each topic/lesson ─────────────────────
     const savedLessons = [];
-    const CHUNK = 12000;
+    const CHUNK = 20000; // No limit
 
     if (topics) {
       // Split text into sections by topic hints
@@ -10703,8 +10700,8 @@ VIOLATION: Writing Arabic in quiz.q or quiz.options is a critical error.`
     } else {
       // Single lesson - process in chunks
       upd('📡', 'تحليل الملف...', 30);
-      const chunkSize = 12000;
-      const numChunks = Math.min(Math.ceil(clean.length / chunkSize), 8);
+      const chunkSize = 20000; // Large chunks, no limit
+      const numChunks = Math.ceil(clean.length / chunkSize); // No chunk limit
       console.log('[ZAD] numChunks:', numChunks, 'chunkSize:', chunkSize);
       const allResults = [];
 
@@ -10751,8 +10748,8 @@ VIOLATION: Writing Arabic in quiz.q or quiz.options is a critical error.`
               : 'مساعد تعليمي. أجب بـ JSON صالح فقط.',
             messages: [{ role: 'user', content:
               (isEng
-                ? 'Create an educational lesson about: ' + fileName + '\n\nText:\n' + clean.slice(0, 4000)
-                : 'أنشئ درساً تعليمياً عن: ' + fileName + '\n\nنص:\n' + clean.slice(0, 4000))
+                ? 'Create an educational lesson about: ' + fileName + '\n\nText:\n' + clean.slice(0, 20000)
+                : 'أنشئ درساً تعليمياً عن: ' + fileName + '\n\nنص:\n' + clean.slice(0, 20000))
               + '\n\nReturn JSON:\n' + jsonTemplate
             }]
           });

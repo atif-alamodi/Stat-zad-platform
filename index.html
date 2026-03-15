@@ -1,4 +1,3 @@
-<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
@@ -12,13 +11,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
 
 <script>
-
-// ── Utility: escape HTML to prevent XSS in user inputs ──
-function escHTML(s) {
-  var d = document.createElement('div');
-  d.appendChild(document.createTextNode(s));
-  return d.innerHTML;
-}
 
 const CURRICULUM = {
   statistics: {
@@ -6128,7 +6120,7 @@ async function engAICheck(text) {
   el.innerHTML = '<div style="padding:10px;color:var(--text-muted);font-size:0.82rem">🤖 يفحص النص...</div>';
   try {
     const r = await zadFetch({
-        model:'llama-3.3-70b-versatile', max_tokens:800,
+        model:'claude-sonnet-4-6', max_tokens:800,
         system:`أنت مصحّح قواعد لغة إنجليزية لطلاب جامعيين سعوديين.
 صحّح النص واشرح الأخطاء بالعربية بشكل مبسّط جداً.
 الأسلوب: مشجّع، واضح، مبسّط.
@@ -6155,7 +6147,7 @@ async function engExplainWord(word, arabic) {
   el.innerHTML = '<div style="color:var(--text-muted);font-size:0.8rem">🤖 يشرح الكلمة...</div>';
   try {
     const r = await zadFetch({
-        model:'llama-3.3-70b-versatile', max_tokens:600,
+        model:'claude-sonnet-4-6', max_tokens:600,
         system:`أنت معلم لغة إنجليزية لطلاب لديهم صعوبات تعلم.
 اشرح الكلمة الإنجليزية بطريقة ممتعة وسهلة جداً:
 ١. المعنى بالعربية (جملة واحدة واضحة)
@@ -7379,7 +7371,7 @@ async function engAskAI(question) {
   msgs.innerHTML += `<div style="display:flex;justify-content:flex-start;margin-bottom:10px">
     <div style="background:rgba(33,150,243,0.12);border:1px solid rgba(33,150,243,0.2);
       border-radius:12px 12px 4px 12px;padding:10px 14px;max-width:85%;font-size:0.85rem;direction:rtl">
-      ${escHTML(question)}
+      ${question}
     </div>
   </div>
   <div id="eng-ai-typing" style="padding:8px 14px;color:var(--text-muted);font-size:0.8rem">🤖 يفكر...</div>`;
@@ -7387,7 +7379,7 @@ async function engAskAI(question) {
   
   try {
     const r = await zadFetch({
-        model:'llama-3.3-70b-versatile', max_tokens:700,
+        model:'claude-sonnet-4-6', max_tokens:700,
         system:`أنت معلم لغة إنجليزية متخصص لطلاب جامعيين سعوديين لديهم صعوبات تعلم.
 أسلوبك: بسيط جداً، واضح، مشجّع، مع أمثلة من الحياة اليومية والبيئة السعودية.
 استخدم: ✅❌💡📌🔑 لتنظيم شرحك. اكتب بالعربية مع الإنجليزية بين قوسين.`,
@@ -8788,6 +8780,7 @@ function openMindMapModal(mmData, title, col) {
 
 const _origBuildAllMindMaps = typeof buildAllMindMaps === 'function' ? buildAllMindMaps : null;
 function buildAllMindMaps(subject, subjectId) {
+  var selectedLessonId = window._ZAD_SELECTED_LESSON || null;
   if (subjectId) subject = getSubjectWithUploads(subjectId) || subject;
 
   window._ZAD_MM = window._ZAD_MM || {};
@@ -8797,6 +8790,7 @@ function buildAllMindMaps(subject, subjectId) {
 
   subject.chapters.forEach(ch => {
     ch.lessons.forEach(lesson => {
+      if (selectedLessonId && lesson.id !== selectedLessonId) return;
       const mm = lesson.content && lesson.content.mindMap;
       if (!mm || !mm.branches || !mm.branches.length) return;
       found++;
@@ -10473,6 +10467,7 @@ function openTypeCardModal(jsonStr, col) {
 const _origBuildInfoCards = typeof buildInfoCards === 'function' ? buildInfoCards : null;
 function buildInfoCards(subject, subjectId) {
   if (subjectId) subject = getSubjectWithUploads(subjectId) || subject;
+  var selectedLessonId = window._ZAD_SELECTED_LESSON || null;
   const PAL = [
     {bg:'rgba(108,99,255,0.08)', b:'rgba(108,99,255,0.3)', a:'#6C63FF'},
     {bg:'rgba(0,191,165,0.08)',  b:'rgba(0,191,165,0.3)',  a:'#00BFA5'},
@@ -10484,11 +10479,35 @@ function buildInfoCards(subject, subjectId) {
     {bg:'rgba(139,195,74,0.08)', b:'rgba(139,195,74,0.3)', a:'#8BC34A'},
   ];
 
-  let cards = '';
+  let cards = lessonPickerHtml || '';
   let ci = 0;
+
+  // Build lesson picker header if multiple lessons
+  var allLessonsFlat = [];
+  (subject.chapters||[]).forEach(function(ch){ (ch.lessons||[]).forEach(function(l){ allLessonsFlat.push(l); }); });
+  var lessonPickerHtml = '';
+  if (allLessonsFlat.length > 1) {
+    lessonPickerHtml = '<div style="margin-bottom:14px;overflow-x:auto;display:flex;gap:6px;padding-bottom:4px;-webkit-overflow-scrolling:touch">'
+      + '<button onclick="window._ZAD_SELECTED_LESSON=null;showSubject(\'' + subjectId + '\',\'cards\')" '
+        + 'style="flex-shrink:0;padding:5px 12px;border-radius:20px;border:1.5px solid '+(selectedLessonId?'var(--border)':'var(--primary)')+';'
+        + 'background:'+(selectedLessonId?'rgba(255,255,255,0.04)':'rgba(108,99,255,0.15)')+';'
+        + 'color:'+(selectedLessonId?'var(--text-muted)':'var(--primary)')+';font-size:0.75rem;font-weight:700;cursor:pointer;white-space:nowrap">الكل</button>'
+      + allLessonsFlat.map(function(l, li) {
+          var active = l.id === selectedLessonId;
+          return '<button onclick="window._ZAD_SELECTED_LESSON=\''+l.id+'\';showSubject(\'' + subjectId + '\',\'cards\')" '
+            + 'style="flex-shrink:0;padding:5px 12px;border-radius:20px;border:1.5px solid '+(active?'var(--primary)':'var(--border)')+';'
+            + 'background:'+(active?'rgba(108,99,255,0.15)':'rgba(255,255,255,0.04)')+';'
+            + 'color:'+(active?'var(--primary)':'var(--text-muted)')+';font-size:0.73rem;font-weight:700;cursor:pointer;white-space:nowrap;max-width:150px;overflow:hidden;text-overflow:ellipsis">'
+            + 'د' + (li+1) + ': ' + (l.title||'').slice(0,20)
+            + '</button>';
+        }).join('')
+      + '</div>';
+  }
 
   subject.chapters.forEach(ch => {
     ch.lessons.forEach(lesson => {
+      // Filter to selected lesson if set
+      if (selectedLessonId && lesson.id !== selectedLessonId) return;
       const cnt = lesson.content || {};
       const p = PAL[ci++ % PAL.length];
       const uid = lesson.id.replace(/[^a-z0-9]/gi,'_') + '_' + ci;
@@ -13709,6 +13728,38 @@ function showSection(name) {
   }
 }
 
+// ── Arabic ordinal numbers ──────────────────────────────────
+function arabicOrdinal(n) {
+  var ords = ['الأول','الثاني','الثالث','الرابع','الخامس','السادس','السابع','الثامن','التاسع','العاشر',
+              'الحادي عشر','الثاني عشر','الثالث عشر','الرابع عشر','الخامس عشر',
+              'السادس عشر','السابع عشر','الثامن عشر','التاسع عشر','العشرون',
+              'الحادي والعشرون','الثاني والعشرون','الثالث والعشرون','الرابع والعشرون','الخامس والعشرون'];
+  return n >= 1 && n <= ords.length ? ords[n-1] : String(n);
+}
+
+// Parse chapter/lesson number from title if present
+// e.g. "Chapter 3: Algorithms" → 3, "الفصل الثاني" → 2
+function extractNumFromTitle(title) {
+  if (!title) return null;
+  // Match explicit numbers: "Chapter 3", "Unit 5", "Lecture 2", "الموضوع 4"
+  var m = title.match(/(?:chapter|unit|lecture|lesson|موضوع|فصل|درس|وحدة|محاضرة)\s*[:\-]?\s*(\d+)/i);
+  if (m) return parseInt(m[1]);
+  // Match ordinal words in Arabic: "الثاني", "الثالث"
+  var arOrdinals = ['الأول','الثاني','الثالث','الرابع','الخامس','السادس','السابع','الثامن','التاسع','العاشر',
+                    'الحادي عشر','الثاني عشر','الثالث عشر','الرابع عشر','الخامس عشر'];
+  for (var i = 0; i < arOrdinals.length; i++) {
+    if (title.includes(arOrdinals[i])) return i + 1;
+  }
+  return null;
+}
+
+// Open subject tab pre-filtered to a specific lesson
+function showSubjectWithLesson(subjectId, tab, lessonId) {
+  // Store the selected lesson so tab can filter to it
+  window._ZAD_SELECTED_LESSON = lessonId;
+  showSubject(subjectId, tab);
+}
+
 function buildLessonsTab(subject, subjectId) {
   var merged = getSubjectWithUploads(subjectId);
   if (!merged || !merged.chapters || !merged.chapters.length) {
@@ -13719,11 +13770,30 @@ function buildLessonsTab(subject, subjectId) {
   }
 
   var chapHtml = '';
+  // Determine chapter counter separately for uploaded vs built-in
+  var uploadChNum = 0;
+  var builtinChNum = 0;
+
   merged.chapters.forEach(function(ch, i) {
     var isUpload  = ch.id && ch.id.startsWith('up-ch-');
     var safeChId  = (ch.id||'').replace(/['"\\]/g,'');
     var safeChTitle = (ch.title||'').replace(/['"\\]/g,'');
     var lessCnt   = (ch.lessons||[]).length;
+
+    // Determine chapter display number
+    // 1. Try to extract from title
+    // 2. Fall back to sequential
+    var chNumFromTitle = extractNumFromTitle(ch.title);
+    var chSeq, chLabel;
+    if (isUpload) {
+      uploadChNum++;
+      chSeq = chNumFromTitle || uploadChNum;
+      chLabel = 'الفصل ' + arabicOrdinal(chSeq);
+    } else {
+      builtinChNum++;
+      chSeq = chNumFromTitle || builtinChNum;
+      chLabel = 'الفصل ' + arabicOrdinal(chSeq);
+    }
 
     var badge = '';
     if (isUpload) {
@@ -13739,27 +13809,43 @@ function buildLessonsTab(subject, subjectId) {
     }
 
     var lessonsHtml = '';
-    (ch.lessons||[]).forEach(function(l) {
+    (ch.lessons||[]).forEach(function(l, li) {
       var safeLId    = (l.id||'').replace(/['"\\]/g,'');
       var safeLTitle = (l.title||'').replace(/['"\\]/g,'');
       var safeUpRef  = (l.sourceUploadId||'').replace(/['"\\]/g,'');
       var comp = !isUpload && typeof getLessonCompletion==='function' ? getLessonCompletion(subjectId, l.id) : null;
+
+      var lNumFromTitle = extractNumFromTitle(l.title);
+      var lNum = lNumFromTitle || (li + 1);
+      var lLabel = 'الدرس ' + arabicOrdinal(lNum);
+
       var badge2 = '';
       if (comp) {
         if      (comp.status==='completed') badge2='<span style="font-size:0.72rem;background:rgba(40,202,65,0.12);color:#28CA41;padding:2px 8px;border-radius:20px;white-space:nowrap">✅</span>';
         else if (comp.status==='partial')   badge2='<span style="font-size:0.72rem;background:rgba(255,214,0,0.1);color:#FFD600;padding:2px 8px;border-radius:20px;white-space:nowrap">'+Math.round(comp.pct||0)+'%</span>';
       }
       var icon = isUpload ? '📄' : (typeof getLessonTypeIcon==='function' ? getLessonTypeIcon(l.type) : '💡');
+
       lessonsHtml += '<div class="lesson-item"'
-        + (isUpload ? ' style="border-right:3px solid rgba(108,99,255,0.6);background:rgba(108,99,255,0.03)"' : '')
+        + (isUpload ? ' style="border-right:3px solid rgba(108,99,255,0.6);background:rgba(108,99,255,0.03);align-items:flex-start"' : '')
         + ' onclick="openLesson(\'' + subjectId + '\',\'' + safeLId + '\')"'
         + ' oncontextmenu="event.preventDefault();showDeleteLessonConfirm(\'' + subjectId + '\',\'' + safeLId + '\',\'' + safeLTitle + '\',\'' + safeUpRef + '\')"'
         + ' ontouchstart="startLongPress(event,\'' + safeLId + '\',\'' + safeUpRef + '\',\'' + subjectId + '\',\'' + safeLTitle + '\')" ontouchend="clearLongPress()" ontouchmove="clearLongPress()">'
-        + '<span class="lesson-icon">' + icon + '</span>'
-        + '<span class="lesson-name" style="flex:1">' + (l.title||'درس') + '</span>'
+        + '<div style="min-width:26px;height:26px;border-radius:7px;background:rgba(255,255,255,0.07);display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:800;color:var(--text-muted);flex-shrink:0;margin-top:2px">'
+          + lNum
+        + '</div>'
+        + '<div style="flex:1;min-width:0">'
+          + '<div style="font-size:0.68rem;color:var(--text-muted);font-weight:600;margin-bottom:1px">' + lLabel + '</div>'
+          + '<div style="font-size:0.85rem;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)">' + (l.title||'درس') + '</div>'
+        + '</div>'
         + badge2
-        + (!isUpload && typeof getLessonTypeLabel==='function' ? '<span class="lesson-type type-'+(l.type||'concept')+'">' + getLessonTypeLabel(l.type) + '</span>' : '')
-        + (isUpload ? '<span style="font-size:0.65rem;color:var(--primary);opacity:0.8">◀ افتح</span>' : '')
+        + (isUpload
+          ? '<div style="display:flex;gap:3px;flex-shrink:0;flex-direction:column">'
+              + '<button onclick="event.stopPropagation();showSubjectWithLesson(\'' + subjectId + '\',\'cards\',\'' + safeLId + '\')" title="بطاقات" style="padding:3px 7px;border-radius:6px;border:1px solid rgba(108,99,255,0.3);background:rgba(108,99,255,0.1);cursor:pointer;font-size:0.75rem">🃏</button>'
+              + '<button onclick="event.stopPropagation();showSubjectWithLesson(\'' + subjectId + '\',\'quiz\',\'' + safeLId + '\')" title="اختبار" style="padding:3px 7px;border-radius:6px;border:1px solid rgba(108,99,255,0.3);background:rgba(108,99,255,0.1);cursor:pointer;font-size:0.75rem">❓</button>'
+              + '<button onclick="event.stopPropagation();showSubjectWithLesson(\'' + subjectId + '\',\'mindmaps\',\'' + safeLId + '\')" title="خريطة" style="padding:3px 7px;border-radius:6px;border:1px solid rgba(108,99,255,0.3);background:rgba(108,99,255,0.1);cursor:pointer;font-size:0.75rem">🧠</button>'
+            + '</div>'
+          : (typeof getLessonTypeLabel==='function' ? '<span class="lesson-type type-'+(l.type||'concept')+'">'+getLessonTypeLabel(l.type)+'</span>' : ''))
         + '</div>';
     });
 
@@ -13776,7 +13862,7 @@ function buildLessonsTab(subject, subjectId) {
           + 'color:var(--primary);border-radius:10px;border:1px solid rgba(108,99,255,0.3);font-weight:700">✨ مرفوع</span>'
           + '<span style="font-size:0.68rem;color:var(--text-muted)">' + lessCnt + ' درس</span>'
           + '</div>'
-      : '<div class="chapter-pages">📄 ' + (ch.pages||'') + '</div>';
+      : '<div class="chapter-pages">' + chLabel + (ch.pages ? ' — 📄 ' + ch.pages : '') + '</div>';
 
     var _chOpen  = isOpen ? ' open' : '';
     var _chStyle = chBorderStyle;
@@ -13800,12 +13886,6 @@ function buildLessonsTab(subject, subjectId) {
         '<div class="lesson-list">'+lessonsHtml+'</div>',
       '</div>'
     ].join('');
-    chapHtml += lessCntBadge;
-    chapHtml += '</div>';
-    chapHtml += '<i class="fas fa-chevron-left chapter-chevron"></i>';
-    chapHtml += '</div>';
-    chapHtml += '<div class="lesson-list">' + lessonsHtml + '</div>';
-    chapHtml += '</div>';
   });
 
   return '<div class="chapter-list">'+chapHtml+'</div>';
@@ -19200,20 +19280,12 @@ function clearSettingsApiKey() {
 function updateApiKeyStatusDisplay() {
   var el = document.getElementById('api-key-status-display');
   if (!el) return;
-  var personalKey = getApiKey ? getApiKey() : '';
-  var platformKey = window._ZAD_PLATFORM_KEY || '';
-  var backendActive = !!(window._ZAD_BACKEND_URL || 'https://zad-proxy.atif-alamodi.workers.dev');
-
-  if (personalKey) {
+  var key = getApiKey ? getApiKey() : '';
+  if (key) {
     el.style.background = 'rgba(102,187,106,0.1)';
     el.style.borderColor = 'rgba(102,187,106,0.3)';
     el.style.color = '#66BB6A';
-    el.innerHTML = '✅ مفعّل — مفتاحك الشخصي';
-  } else if (platformKey || backendActive) {
-    el.style.background = 'rgba(102,187,106,0.1)';
-    el.style.borderColor = 'rgba(102,187,106,0.3)';
-    el.style.color = '#66BB6A';
-    el.innerHTML = '✅ نشط — خادم المنصة يعمل تلقائياً';
+    el.innerHTML = '✅ مفعّل — ' + key.slice(0,16) + '...';
   } else {
     el.style.background = 'rgba(239,83,80,0.08)';
     el.style.borderColor = 'rgba(239,83,80,0.25)';
@@ -19256,7 +19328,14 @@ function updateApiBanner() {
   }
 }
 
-// ── Platform Key Loader (defined below after ZAD_CONFIG) ─────
+// ── Platform Key Loader ─────────────────────────────────────────
+window._ZAD_PLATFORM_KEY = '';
+
+/* [dup removed: loadPlatformKey] */
+
+loadPlatformKey();
+// Reload key every 10 minutes in case admin updates
+setInterval(loadPlatformKey, 600000);
 
 /* [dup removed: buildAdminPlatformKeySection] */
 
@@ -19303,17 +19382,8 @@ async function loadPlatformKey() {
     const r = await fetch(ZAD_CONFIG.rawURL + '?t=' + Date.now());
     if (!r.ok) return;
     const cfg = await r.json();
-    var key = '';
-    // v2 encoded format: {k: base64(reversed_key), v: 2}
-    if (cfg && cfg.v === 2 && cfg.k) {
-      try { key = atob(cfg.k).split('').reverse().join(''); } catch(e) {}
-    }
-    // v1 plain format: {platform_key: '...'}
-    else if (cfg && cfg.platform_key) {
-      key = cfg.platform_key;
-    }
-    if (key) {
-      window._ZAD_PLATFORM_KEY = key;
+    if (cfg && cfg.platform_key) {
+      window._ZAD_PLATFORM_KEY = cfg.platform_key;
       if (typeof updateApiBanner          === 'function') updateApiBanner();
       if (typeof updateApiKeyStatusDisplay === 'function') updateApiKeyStatusDisplay();
     }
@@ -21044,7 +21114,7 @@ async function labAskQuestion(subjectId) {
 
   // Add question to chat
   history.innerHTML += '<div style="margin-bottom:12px;text-align:right">'
-    + '<div style="display:inline-block;background:rgba(108,99,255,0.15);border-radius:12px 12px 2px 12px;padding:8px 12px;font-size:0.85rem;max-width:85%">'+escHTML(question)+'</div>'
+    + '<div style="display:inline-block;background:rgba(108,99,255,0.15);border-radius:12px 12px 2px 12px;padding:8px 12px;font-size:0.85rem;max-width:85%">'+question+'</div>'
     + '</div>';
 
   // Add loading
@@ -21068,7 +21138,7 @@ async function labAskQuestion(subjectId) {
 
     var loadEl = document.getElementById('lab-loading');
     if (loadEl) loadEl.outerHTML = '<div style="margin-bottom:12px">'
-      + '<div style="display:inline-block;background:rgba(0,191,165,0.1);border:1px solid rgba(0,191,165,0.2);border-radius:12px 12px 12px 2px;padding:10px 14px;font-size:0.83rem;line-height:1.6;max-width:90%;white-space:pre-wrap">'+escHTML(answer)+'</div>'
+      + '<div style="display:inline-block;background:rgba(0,191,165,0.1);border:1px solid rgba(0,191,165,0.2);border-radius:12px 12px 12px 2px;padding:10px 14px;font-size:0.83rem;line-height:1.6;max-width:90%;white-space:pre-wrap">'+answer+'</div>'
       + '</div>';
     history.scrollTop = history.scrollHeight;
   } catch(err) {
@@ -21705,7 +21775,7 @@ async function engLabAsk() {
   var bundle = uploads[idx];
   var context = bundle ? 'Lesson: ' + (bundle.lesson&&bundle.lesson.title||'') + '\nDefinition: ' + ((bundle.lesson&&bundle.lesson.content&&bundle.lesson.content.definition)||'') : 'English grammar lesson';
 
-  hist.innerHTML += '<div style="text-align:right;margin-bottom:8px"><span style="background:rgba(108,99,255,0.15);padding:6px 10px;border-radius:10px;display:inline-block;direction:rtl">'+escHTML(question)+'</span></div>';
+  hist.innerHTML += '<div style="text-align:right;margin-bottom:8px"><span style="background:rgba(108,99,255,0.15);padding:6px 10px;border-radius:10px;display:inline-block;direction:rtl">'+question+'</span></div>';
   hist.innerHTML += '<div id="eng-ans-loading" style="color:var(--text-muted);font-size:0.78rem">⏳ Thinking...</div>';
   hist.scrollTop = hist.scrollHeight;
 
@@ -21718,7 +21788,7 @@ async function engLabAsk() {
     var data = await resp.json();
     var answer = data.content&&data.content[0]&&data.content[0].text || 'Sorry, could not get an answer.';
     var loading = document.getElementById('eng-ans-loading');
-    if (loading) loading.outerHTML = '<div style="background:rgba(0,191,165,0.08);border-radius:10px;padding:8px 12px;margin-bottom:8px;font-size:0.82rem;line-height:1.6;direction:rtl">'+escHTML(answer)+'</div>';
+    if (loading) loading.outerHTML = '<div style="background:rgba(0,191,165,0.08);border-radius:10px;padding:8px 12px;margin-bottom:8px;font-size:0.82rem;line-height:1.6;direction:rtl">'+answer+'</div>';
     hist.scrollTop = hist.scrollHeight;
   } catch(err) {
     var l = document.getElementById('eng-ans-loading');
@@ -22018,9 +22088,7 @@ async function translateQuizItemsToEnglish(questions) {
 
     if (!resp.ok) return questions;
     var data = await resp.json();
-    var raw = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content)
-           || (data.content && data.content[0] && data.content[0].text)
-           || '[]';
+    var raw = (data.choices && data.choices[0].message.content) || '[]';
     raw = raw.replace(/```json|```/g, '').trim();
     var translated = JSON.parse(raw);
 

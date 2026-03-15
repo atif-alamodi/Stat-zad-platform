@@ -10888,7 +10888,7 @@ LANGUAGE RULES:
         }
 
         // Ensure required fields
-        lesson.lessonTitle     = lesson.lessonTitle     || topic.title;
+        lesson.lessonTitle = isValidTitle(lesson.lessonTitle) ? lesson.lessonTitle : topic.title;
         lesson.definition      = lesson.definition      || '';
         lesson.whyLearn        = lesson.whyLearn        || [];
         lesson.keyTerms        = lesson.keyTerms        || [];
@@ -11044,6 +11044,20 @@ LANGUAGE RULES:
       if (pw) { pw.style.opacity='0'; setTimeout(function(){ pw.style.display='none'; pw.style.opacity='1'; if(st2)st2.innerHTML=''; },400); }
     }, 4000);
   }
+}
+
+// Validate a title is not garbled (letter-soup from bad AI output)
+function isValidTitle(title) {
+  if (!title || typeof title !== 'string') return false;
+  title = title.trim();
+  if (title.length < 2 || title.length > 200) return false;
+  // Reject letter-soup: mostly single characters separated by spaces
+  const parts = title.split(/\s+/);
+  if (parts.length > 5) {
+    const singles = parts.filter(function(p){ return p.length === 1; });
+    if (singles.length / parts.length > 0.55) return false;
+  }
+  return true;
 }
 
 function repairAndParseJSON(raw) {

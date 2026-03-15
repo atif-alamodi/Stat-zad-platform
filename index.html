@@ -13225,16 +13225,16 @@ table { display: block; overflow-x: auto; max-width: 100%; }
               padding:6px 12px;border-radius:8px;font-family:var(--font);font-size:0.82rem;cursor:pointer;
             ">
               <option value="">📋 قوالب جاهزة...</option>
-              <option value="hello">مرحبا بالعالم</option>
-              <option value="mean">حساب المتوسط</option>
-              <option value="median">الوسيط والمنوال</option>
-              <option value="variance">التباين والانحراف</option>
-              <option value="zscore">القيمة المعيارية Z-Score</option>
-              <option value="scatter">مخطط التشتت</option>
-              <option value="histogram">المدرج التكراري</option>
-              <option value="correlation">معامل الارتباط</option>
-              <option value="regression">خط الانحدار</option>
-              <option value="countif">محاكاة COUNTIF</option>
+              <option value="hello">👋 مرحبا بالعالم</option>
+              <option value="variables">📦 المتغيرات</option>
+              <option value="arithmetic">➕ العمليات الحسابية</option>
+              <option value="constants">🔒 الاسماء الثابتة</option>
+              <option value="functions">⚙️ الدوال Functions</option>
+              <option value="loops">🔄 الحلقات Loops</option>
+              <option value="oop">🏗️ البرمجة الكائنية OOP</option>
+              <option value="len_lists">📋 len والقوائم</option>
+              <option value="errors">🐛 SyntaxError vs NameError</option>
+              <option value="builtins">📚 كل دوال Python</option>
             </select>
             <button onclick="clearPyEditor()" style="
               padding:6px 14px;border-radius:8px;border:1px solid var(--border);
@@ -16115,11 +16115,7 @@ function buildPythonOnlyLab() {
       + '</div>'
       + '<div style="display:flex;gap:6px;flex-wrap:wrap">'
         + '<select id="elab-py-tmpl" onchange="elabLoadPyTmpl()" style="padding:5px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-family:var(--font);font-size:0.78rem">'
-          + '<option value="">📋 قوالب...</option>'
-          + '<option value="hello">مرحبا</option><option value="mean">المتوسط</option>'
-          + '<option value="median">الوسيط</option><option value="variance">الانحراف</option>'
-          + '<option value="zscore">Z-Score</option><option value="histogram">مدرج تكراري</option>'
-          + '<option value="correlation">الارتباط</option>'
+          + '<option value="">📋 قوالب...</option>'+'<option value="hello">👋 مرحبا</option>'+'<option value="variables">📦 المتغيرات</option>'+'<option value="arithmetic">➕ عمليات</option>'+'<option value="constants">🔒 ثوابت</option>'+'<option value="functions">⚙️ الدوال</option>'+'<option value="loops">🔄 الحلقات</option>'+'<option value="oop">🏗️ OOP</option>'+'<option value="len_lists">📋 len والقوائم</option>'+'<option value="errors">🐛 الاخطاء</option>'+'<option value="builtins">📚 كل الدوال</option>'
         + '</select>'
         + '<button onclick="(function(){document.getElementById(\'elab-editor\').value=\'\';document.getElementById(\'elab-lnums\').innerHTML=\'1\'})()" style="padding:5px 12px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text-muted);font-family:var(--font);font-size:0.78rem;cursor:pointer">🗑️</button>'
         + '<button id="elab-run-btn" onclick="elabRunPy()" style="padding:6px 16px;border-radius:10px;border:none;background:linear-gradient(135deg,#3776AB,#1a4a7a);color:white;font-family:var(--font);font-weight:700;font-size:0.85rem;cursor:pointer">▶ تشغيل</button>'
@@ -16215,206 +16211,320 @@ _cap = _Cap()
 }
 
 const PY_TEMPLATES = {
-  hello: `# مرحباً بالعالم
-print("مرحباً يا عاطف! 👋")
-print("Python يعمل في المتصفح")
-x = 10
-y = 20
-print(f"مجموع {x} + {y} = {x+y}")`,
 
-  mean: `# حساب المتوسط الحسابي
-import statistics
+  variables: `# ======= المتغيرات في Python =======
+# المتغير: صندوق يحفظ قيمة ويمكن تغييرها
 
-درجات = [85, 90, 78, 92, 88, 76, 95, 82]
-print("درجات الطلاب:", درجات)
-print(f"عدد الطلاب: {len(درجات)}")
-print(f"المجموع: {sum(درجات)}")
-print(f"المتوسط (Mean): {statistics.mean(درجات):.2f}")
-print(f"أعلى درجة: {max(درجات)}")
-print(f"أدنى درجة: {min(درجات)}")`,
+اسم    = "عاطف"       # نص str
+عمر    = 25            # عدد صحيح int
+طول    = 1.75          # عدد عشري float
+طالب   = True          # منطقي bool
+فارغ   = None          # بدون قيمة
 
-  median: `# الوسيط والمنوال
-import statistics
+print(f"الاسم: {اسم}")
+print(f"العمر: {عمر}")
+print(f"الطول: {طول}")
+print(f"طالب؟ {طالب}")
+print(f"فارغ: {فارغ}")
 
-بيانات = [7, 3, 7, 9, 7, 12, 5, 7, 3, 9]
-print("البيانات:", بيانات)
-print("مرتبة:", sorted(بيانات))
-print(f"الوسيط (Median): {statistics.median(بيانات)}")
-print(f"المنوال (Mode): {statistics.mode(بيانات)}")
+# تغيير القيمة
+عمر = 26
+print(f"\nبعد التحديث: {عمر}")
 
-# تعدد المنوالات
-from collections import Counter
-counts = Counter(بيانات)
-print("تكرار كل قيمة:", dict(counts))`,
+# type() لمعرفة النوع
+print(f"\nنوع اسم : {type(اسم)}")
+print(f"نوع عمر : {type(عمر)}")
+print(f"نوع طول : {type(طول)}")`,
 
-  variance: `# التباين والانحراف المعياري
-import statistics
+  arithmetic: `# ======= العمليات الحسابية =======
 
-درجات = [96, 92, 90, 88, 85, 82, 78, 74]
-print("درجات 8 طلاب:", درجات)
-mean = statistics.mean(درجات)
-print(f"المتوسط (x̄): {mean:.2f}")
+x = 20
+y = 6
 
-# حساب الانحرافات يدوياً
-انحرافات = [x - mean for x in درجات]
-مربعات = [d**2 for d in انحرافات]
-print(f"الانحرافات: {[round(d,1) for d in انحرافات]}")
-print(f"مربعات الانحرافات: {[round(m,1) for m in مربعات]}")
+print(f"الجمع        {x} + {y}  = {x+y}")
+print(f"الطرح        {x} - {y}  = {x-y}")
+print(f"الضرب        {x} * {y}  = {x*y}")
+print(f"القسمة       {x} / {y}  = {x/y:.4f}")
+print(f"قسمة صحيحة  {x} // {y} = {x//y}")
+print(f"الباقي       {x} % {y}  = {x%y}")
+print(f"الاس         {x} ** 2   = {x**2}")
 
-تباين = statistics.variance(درجات)
-انحراف = statistics.stdev(درجات)
-print(f"التباين (S²): {تباين:.2f}")
-print(f"الانحراف المعياري (S): {انحراف:.2f}")
-print(f"المدى (Range): {max(درجات) - min(درجات)}")`,
+print("\n-- مقارنة --")
+print(f"{x} > {y}  = {x > y}")
+print(f"{x} == {y} = {x == y}")
+print(f"{x} != {y} = {x != y}")
 
-  zscore: `# القيمة المعيارية Z-Score
-import statistics
+print("\n-- منطقية --")
+print(f"True and False = {True and False}")
+print(f"True or  False = {True or False}")
+print(f"not True       = {not True}")`,
 
-درجات = [70, 75, 80, 85, 90, 95, 60, 88]
-mean = statistics.mean(درجات)
-std = statistics.stdev(درجات)
-print(f"المتوسط: {mean:.2f}")
-print(f"الانحراف المعياري: {std:.2f}")
+  constants: `# ======= الاسماء الثابتة Constants =======
+# الاتفاق في Python: اكتبها بحروف كبيرة كلها
+
+PI           = 3.14159265
+GRAVITY      = 9.8
+SPEED_LIGHT  = 299_792_458
+MAX_STUDENTS = 40
+APP_NAME     = "منصة زاد"
+
+print(f"PI           = {PI}")
+print(f"الجاذبية     = {GRAVITY} m/s2")
+print(f"سرعة الضوء   = {SPEED_LIGHT:,} m/s")
+print(f"أقصى طلاب    = {MAX_STUDENTS}")
+print(f"اسم التطبيق  = {APP_NAME}")
+
+# استخدام الثابت
+r = 5
+area = PI * r ** 2
+print(f"\nمساحة دائرة r={r} : {area:.2f}")`,
+
+  functions: `# ======= الدوال Functions =======
+# def اسم(المعاملات): ثم المحتوى بمسافة بادئة
+
+def مرحبا(اسم):
+    print(f"مرحبا {اسم}!")
+
+def جمع(أ, ب):
+    return أ + ب
+
+def مستطيل(طول, عرض=1):
+    # عرض له قيمة افتراضية = 1
+    مساحة = طول * عرض
+    محيط  = 2 * (طول + عرض)
+    return مساحة, محيط
+
+# استدعاء
+مرحبا("عاطف")
+مرحبا("زاد")
+
+print(f"\n10 + 25 = {جمع(10, 25)}")
+
+م, مح = مستطيل(8, 5)
+print(f"مستطيل 8x5 -> مساحة={م}, محيط={مح}")
+
+م2, مح2 = مستطيل(6)
+print(f"مستطيل 6x1 -> مساحة={م2}, محيط={مح2}")
+
+# دالة بدون return تعيد None
+def طباعة_مزدوجة(نص):
+    print(f">> {نص} <<")
+
+طباعة_مزدوجة("Python")`,
+
+  loops: `# ======= الحلقات Loops =======
+
+print("=== for loop ===")
+for i in range(1, 6):
+    print(f"  {i}: {'*' * i}")
+
+print("\n=== for على قائمة ===")
+مواد = ["Python", "احصاء", "انظمة تشغيل", "مهارات"]
+for مادة in مواد:
+    print(f"  📚 {مادة}")
+
+print("\n=== while loop ===")
+عداد = 0
+مجموع = 0
+while عداد < 5:
+    عداد += 1
+    مجموع += عداد
+    print(f"  عداد={عداد}, مجموع={مجموع}")
+
+print("\n=== break و continue ===")
+for رقم in range(1, 10):
+    if رقم == 4:
+        continue    # تجاوز 4
+    if رقم == 7:
+        break       # توقف عند 7
+    print(f"  {رقم}", end=" ")
 print()
-print("القيم المعيارية Z لكل طالب:")
-for i, d in enumerate(درجات):
-    z = (d - mean) / std
-    تفسير = ""
-    if abs(z) > 3: تفسير = "⚠️ شاذ بقوة"
-    elif abs(z) > 2: تفسير = "⚠️ متطرف"
-    elif z > 0: تفسير = "↑ فوق المتوسط"
-    else: تفسير = "↓ دون المتوسط"
-    print(f"  طالب {i+1}: درجة={d}, Z={z:.2f} {تفسير}")`,
 
-  scatter: `# مخطط التشتت
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-import numpy as np
+print("\n=== enumerate ===")
+for i, م in enumerate(مواد, 1):
+    print(f"  {i}. {م}")`,
 
-# بيانات: ساعات الدراسة والدرجات
-ساعات = [2, 4, 6, 8, 10, 3, 5, 7, 9, 1]
-درجات = [65, 75, 85, 90, 95, 70, 78, 88, 92, 60]
+  oop: `# ======= البرمجة الكائنية OOP =======
 
-plt.figure(figsize=(8, 5))
-plt.scatter(ساعات, درجات, color='#6C63FF', s=100, alpha=0.8, edgecolors='white')
-plt.xlabel('ساعات الدراسة', fontsize=12)
-plt.ylabel('الدرجة', fontsize=12)
-plt.title('العلاقة بين ساعات الدراسة والدرجات', fontsize=14)
-plt.grid(True, alpha=0.3)
+class طالب:
+    # class variable - مشترك بين كل الكائنات
+    المؤسسة = "الجامعة السعودية الالكترونية"
 
-# خط الاتجاه
-z = np.polyfit(ساعات, درجات, 1)
-p = np.poly1d(z)
-x_line = np.linspace(min(ساعات), max(ساعات), 100)
-plt.plot(x_line, p(x_line), 'r--', alpha=0.8, label='خط الاتجاه')
-plt.legend()
-plt.tight_layout()
-plt.savefig('/tmp/chart.png', dpi=100, bbox_inches='tight')
-plt.close()
-print("تم رسم مخطط التشتت!")
-print(f"عدد النقاط: {len(ساعات)}")`,
+    def __init__(self, اسم, رقم):
+        # instance variables - خاص بكل كائن
+        self.اسم    = اسم
+        self.رقم    = رقم
+        self.درجات  = []
 
-  histogram: `# المدرج التكراري
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-import numpy as np
+    def أضف_درجة(self, درجة):
+        self.درجات.append(درجة)
 
-درجات = [55, 60, 62, 65, 68, 70, 72, 75, 75, 78,
-         80, 82, 85, 85, 88, 90, 90, 92, 95, 98]
+    def متوسط(self):
+        if not self.درجات:
+            return 0
+        return sum(self.درجات) / len(self.درجات)
 
-plt.figure(figsize=(8, 5))
-plt.hist(درجات, bins=6, color='#6C63FF', edgecolor='white', alpha=0.85)
-plt.xlabel('الدرجة', fontsize=12)
-plt.ylabel('عدد الطلاب', fontsize=12)
-plt.title('توزيع درجات الطلاب (Histogram)', fontsize=14)
-plt.grid(axis='y', alpha=0.3)
-plt.tight_layout()
-plt.savefig('/tmp/chart.png', dpi=100, bbox_inches='tight')
-plt.close()
-print(f"عدد الطلاب: {len(درجات)}")
-print(f"المتوسط: {sum(درجات)/len(درجات):.1f}")
-print(f"أعلى: {max(درجات)} | أدنى: {min(درجات)}")`,
+    def __str__(self):
+        return f"الطالب {self.اسم} - {self.رقم}"
 
-  correlation: `# معامل ارتباط بيرسون
-import statistics, math
+# إنشاء كائنين
+ط1 = طالب("عاطف", "2024001")
+ط1.أضف_درجة(85)
+ط1.أضف_درجة(92)
+ط1.أضف_درجة(88)
 
-X = [2, 4, 6, 8, 10]  # ساعات الدراسة
-Y = [65, 75, 85, 90, 95]  # الدرجات
+ط2 = طالب("سارة", "2024002")
+ط2.أضف_درجة(95)
+ط2.أضف_درجة(90)
 
-x_mean = statistics.mean(X)
-y_mean = statistics.mean(Y)
+print(ط1)
+print(f"الدرجات: {ط1.درجات}")
+print(f"المتوسط: {ط1.متوسط():.1f}")
+print(f"\n{ط2}")
+print(f"المتوسط: {ط2.متوسط():.1f}")
+print(f"\nالمؤسسة: {طالب.المؤسسة}")`,
 
-بسط = sum((xi - x_mean)*(yi - y_mean) for xi,yi in zip(X,Y))
-مقام_x = sum((xi - x_mean)**2 for xi in X)
-مقام_y = sum((yi - y_mean)**2 for yi in Y)
+  len_lists: `# ======= len() والقوائم والمجموعات =======
 
-r = بسط / math.sqrt(مقام_x * مقام_y)
+أرقام = [5, 3, 8, 1, 9, 2, 7, 4, 6]
 
-print("بيانات الدراسة:")
-print(f"  X (ساعات): {X}")
-print(f"  Y (درجات): {Y}")
-print(f"  x̄ = {x_mean:.1f}, ȳ = {y_mean:.1f}")
-print(f"\nمعامل ارتباط بيرسون r = {r:.4f}")
-if r > 0.8: print("✅ ارتباط إيجابي قوي جداً")
-elif r > 0.6: print("✅ ارتباط إيجابي قوي")
-elif r > 0.4: print("⚠️ ارتباط إيجابي متوسط")
-else: print("❌ ارتباط ضعيف")`,
+print(f"القائمة:  {أرقام}")
+print(f"len():    {len(أرقام)}")
+print(f"أول عنصر: {أرقام[0]}")
+print(f"آخر عنصر: {أرقام[-1]}")
+print(f"[2:5]:    {أرقام[2:5]}")
 
-  regression: `# معادلة الانحدار الخطي Y = a + bX
-import statistics
+print("\n-- عمليات --")
+أرقام.append(10)
+print(f"append(10): {أرقام}")
 
-X = [2, 4, 6, 8, 10]
-Y = [65, 75, 85, 90, 95]
+أرقام.remove(1)
+print(f"remove(1):  {أرقام}")
 
-x_mean = statistics.mean(X)
-y_mean = statistics.mean(Y)
+print(f"max: {max(أرقام)}")
+print(f"min: {min(أرقام)}")
+print(f"sum: {sum(أرقام)}")
+print(f"sorted: {sorted(أرقام)}")
 
-b = sum((xi - x_mean)*(yi - y_mean) for xi,yi in zip(X,Y)) / \
-    sum((xi - x_mean)**2 for xi in X)
-a = y_mean - b * x_mean
+print("\n-- قاموس dict --")
+طالب = {"اسم": "عاطف", "عمر": 25, "مادة": "Python"}
+print(f"keys:   {list(طالب.keys())}")
+print(f"values: {list(طالب.values())}")
+print(f"الاسم:  {طالب['اسم']}")
 
-print(f"المتوسطات: x̄={x_mean:.1f}, ȳ={y_mean:.1f}")
-print(f"الميل b = {b:.4f}")
-print(f"الثابت a = {a:.4f}")
-print(f"\n📐 معادلة الانحدار: Y = {a:.2f} + {b:.2f}X")
+print("\n-- len() مع نصوص وقاموس --")
+نص = "مرحبا بالعالم"
+print(f"len('{نص}') = {len(نص)}")
+print(f"len(dict) = {len(طالب)}")`,
 
-print("\nالتنبؤات:")
-for h in [3, 5, 7, 11]:
-    y_pred = a + b * h
-    print(f"  {h} ساعات → درجة متوقعة = {y_pred:.1f}")`,
+  errors: `# ======= أنواع الأخطاء في Python =======
+# SyntaxError:  خطأ في كتابة الكود (قبل التشغيل)
+# NameError:    متغير لم يُعرَّف (أثناء التشغيل)
+# TypeError:    عملية على نوع خاطئ
+# ValueError:   قيمة غير صالحة
+# ZeroDivisionError: قسمة على صفر
+# IndexError:   فهرس خارج حدود القائمة
 
-  countif: `# محاكاة دوال Excel الشرطية
-# COUNTIF / SUMIF / AVERAGEIF
+# --- NameError ---
+try:
+    print(س)          # س لم تُعرَّف
+except NameError as e:
+    print(f"NameError: {e}")
+    print("الحل: عرّف المتغير اولا: س = 10\n")
 
-بيانات = [
-  {"اسم": "أحمد",  "قسم": "حاسب",   "درجة": 85, "جنس": "ذكر"},
-  {"اسم": "سارة",  "قسم": "إحصاء",  "درجة": 92, "جنس": "أنثى"},
-  {"اسم": "محمد",  "قسم": "حاسب",   "درجة": 78, "جنس": "ذكر"},
-  {"اسم": "نورة",  "قسم": "حاسب",   "درجة": 95, "جنس": "أنثى"},
-  {"اسم": "خالد",  "قسم": "إحصاء",  "درجة": 70, "جنس": "ذكر"},
-  {"اسم": "لمى",   "قسم": "إحصاء",  "درجة": 88, "جنس": "أنثى"},
-]
+# --- TypeError ---
+try:
+    print("عمر: " + 25)    # نص + رقم
+except TypeError as e:
+    print(f"TypeError: {e}")
+    print("الحل: str(25) او f-string\n")
 
-# COUNTIF: عدد طلاب الحاسب
-countif = sum(1 for r in بيانات if r["قسم"]=="حاسب")
-print(f"COUNTIF (قسم الحاسب): {countif}")
+# --- ValueError ---
+try:
+    print(int("مرحبا"))
+except ValueError as e:
+    print(f"ValueError: {e}")
+    print("الحل: int('25') فقط للأرقام\n")
 
-# SUMIF: مجموع درجات الذكور
-sumif = sum(r["درجة"] for r in بيانات if r["جنس"]=="ذكر")
-print(f"SUMIF (مجموع درجات الذكور): {sumif}")
+# --- ZeroDivisionError ---
+try:
+    print(10 / 0)
+except ZeroDivisionError:
+    print("ZeroDivisionError: لا قسمة على صفر!")
+    print("الحل: تحقق if y != 0 قبل القسمة\n")
 
-# AVERAGEIF: متوسط درجات الإناث
-إناث = [r["درجة"] for r in بيانات if r["جنس"]=="أنثى"]
-avgif = sum(إناث)/len(إناث)
-print(f"AVERAGEIF (متوسط درجات الإناث): {avgif:.2f}")
+# --- IndexError ---
+try:
+    lst = [1, 2, 3]
+    print(lst[10])
+except IndexError as e:
+    print(f"IndexError: {e}")
+    print("الحل: تحقق len(lst) قبل الوصول")`,
 
-# COUNTIFS: ذكور درجتهم > 75
-countifs = sum(1 for r in بيانات if r["جنس"]=="ذكر" and r["درجة"]>75)
-print(f"COUNTIFS (ذكور درجتهم >75): {countifs}")`,
+  builtins: `# ======= دوال Python المدمجة Built-in =======
+
+print("=== تحويل الأنواع ===")
+print(f"int('42')     = {int('42')}")
+print(f"float('3.14') = {float('3.14')}")
+print(f"str(100)      = '{str(100)}'")
+print(f"bool(0)       = {bool(0)}")
+print(f"bool(5)       = {bool(5)}")
+print(f"list((1,2,3)) = {list((1,2,3))}")
+print(f"tuple([1,2,3])= {tuple([1,2,3])}")
+
+print("\n=== الرياضيات ===")
+print(f"abs(-7)       = {abs(-7)}")
+print(f"round(3.7)    = {round(3.7)}")
+print(f"round(3.14159,2)={round(3.14159,2)}")
+print(f"pow(2,10)     = {pow(2,10)}")
+print(f"divmod(17,5)  = {divmod(17,5)}")
+
+print("\n=== القوائم ===")
+lst = [4, 8, 2, 15, 1, 7, 11]
+print(f"len:    {len(lst)}")
+print(f"max:    {max(lst)}")
+print(f"min:    {min(lst)}")
+print(f"sum:    {sum(lst)}")
+print(f"sorted: {sorted(lst)}")
+print(f"sorted(desc): {sorted(lst, reverse=True)}")
+
+print("\n=== enumerate / zip / map / filter ===")
+نصوص = ["apple","banana","cherry"]
+for i, v in enumerate(نصوص, 1):
+    print(f"  {i}: {v}")
+
+for a, b in zip([1,2,3], ['أ','ب','ج']):
+    print(f"  {a}-{b}", end="  ")
+print()
+
+doubles = list(map(lambda x: x*2, lst[:4]))
+print(f"map x2: {doubles}")
+
+big = list(filter(lambda x: x > 5, lst))
+print(f"filter >5: {big}")
+
+print("\n=== any / all / type / id ===")
+print(f"any([0,0,1]) = {any([0,0,1])}")
+print(f"all([1,1,1]) = {all([1,1,1])}")
+print(f"type(3.14)   = {type(3.14)}")
+print(f"isinstance(5, int) = {isinstance(5, int)}")`,
+
+  hello: `# مرحبا بالعالم - اول كود بايثون
+print("مرحبا بالعالم!")
+print("Python يعمل في المتصفح!")
+
+اسمي = input("ما اسمك؟ ")
+print(f"اهلا {اسمي}!")
+
+x = 10
+y = 3
+print(f"\n{x} + {y} = {x+y}")
+print(f"{x} * {y} = {x*y}")
+print(f"{x} ** {y} = {x**y}")`,
 };
 
+// Connect to embedded lab
+ELAB_PY_TEMPLATES = PY_TEMPLATES;
 // Connect to embedded lab
 ELAB_PY_TEMPLATES = PY_TEMPLATES;
 
@@ -22242,13 +22352,16 @@ function buildEmbeddedLab(subjectId) {
           <select id="elab-py-tmpl" onchange="elabLoadPyTmpl()"
             style="padding:5px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-family:var(--font);font-size:0.78rem">
             <option value="">📋 قوالب...</option>
-            <option value="hello">مرحبا</option>
-            <option value="mean">المتوسط</option>
-            <option value="median">الوسيط</option>
-            <option value="variance">الانحراف</option>
-            <option value="zscore">Z-Score</option>
-            <option value="histogram">مدرج تكراري</option>
-            <option value="correlation">الارتباط</option>
+            <option value="hello">👋 مرحبا</option>
+            <option value="variables">📦 المتغيرات</option>
+            <option value="arithmetic">➕ عمليات</option>
+            <option value="constants">🔒 ثوابت</option>
+            <option value="functions">⚙️ الدوال</option>
+            <option value="loops">🔄 الحلقات</option>
+            <option value="oop">🏗️ OOP</option>
+            <option value="len_lists">📋 len</option>
+            <option value="errors">🐛 الاخطاء</option>
+            <option value="builtins">📚 كل الدوال</option>
           </select>
           <button onclick="document.getElementById('elab-editor').value=''"
             style="padding:5px 12px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text-muted);font-family:var(--font);font-size:0.78rem;cursor:pointer">🗑️</button>

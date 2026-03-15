@@ -18507,7 +18507,7 @@ function showUploadStatus(type, msg) {
     'style="margin-right:auto;background:transparent;border:none;color:inherit;cursor:pointer;font-size:1rem">×</button>' : '');
   
   if (type === 'success') {
-    setTimeout(function(){ if(el) el.style.display='none'; }, 6000);
+    setTimeout(function(){ if(el) el.style.display='none'; }, 5000);
   }
 }
 
@@ -21245,30 +21245,55 @@ function downloadStudySchedule(subjectId) {
   var totalLessons = 0;
   ((subject.chapters||[])).forEach(function(ch){ totalLessons += (ch.lessons||[]).length; });
 
-  var content = '# جدول مذاكرة — ' + (subject.title||subjectId) + '\n\n';
-  content += '**عدد الدروس:** ' + totalLessons + ' درس\n\n';
-  content += '## الجدول الأسبوعي\n\n';
   var schedule = [
-    ['اليوم 1-2', '📚 مراجعة المفاهيم الأساسية', '30 دقيقة'],
+    ['اليوم 1-2', '📚 مراجعة المفاهيم الأساسية',        '30 دقيقة'],
     ['اليوم 3-4', '🃏 بطاقات المصطلحات + حفظ التعريفات', '25 دقيقة'],
-    ['اليوم 5',   '🧠 الخرائط الذهنية + ربط المفاهيم', '20 دقيقة'],
-    ['اليوم 6',   '❓ اختبار شامل بمستوى صعب', '30 دقيقة'],
+    ['اليوم 5',   '🧠 الخرائط الذهنية + ربط المفاهيم',   '20 دقيقة'],
+    ['اليوم 6',   '❓ اختبار شامل بمستوى صعب',            '30 دقيقة'],
     ['اليوم 7',   '🔁 مراجعة الأخطاء + تثبيت المعلومات', '20 دقيقة'],
   ];
-  schedule.forEach(function(row){ content += '| '+row[0]+' | '+row[1]+' | '+row[2]+' |\n'; });
-  content += '\n## تعليمات عامة\n\n';
-  content += '1. ابدأ بالقراءة قبل الاختبار\n';
-  content += '2. كرر كل درس 3 مرات: قراءة → بطاقات → اختبار\n';
-  content += '3. جلسات 25 دقيقة + 5 دقائق راحة\n';
-  content += '4. راجع أخطاءك قبل الانتقال للدرس التالي\n';
 
-  var blob = new Blob([content], {type:'text/plain;charset=utf-8'});
+  var rows = schedule.map(function(r){
+    return '<tr><td>'+r[0]+'</td><td>'+r[1]+'</td><td style="text-align:center">'+r[2]+'</td></tr>';
+  }).join('');
+
+  var html = '<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="UTF-8">'
+    + '<title>جدول المذاكرة</title>'
+    + '<style>'
+    + 'body{font-family:Cairo,Tajawal,Arial,sans-serif;direction:rtl;padding:40px;max-width:700px;margin:auto;color:#1a1a2e}'
+    + 'h1{color:#6C63FF;font-size:1.5rem;margin-bottom:4px}'
+    + '.sub{color:#888;font-size:0.9rem;margin-bottom:28px}'
+    + 'table{width:100%;border-collapse:collapse;margin-bottom:28px}'
+    + 'th{background:#6C63FF;color:white;padding:10px 14px;font-size:0.9rem}'
+    + 'td{padding:10px 14px;border-bottom:1px solid #e0e0e0;font-size:0.88rem}'
+    + 'tr:nth-child(even) td{background:#f7f5ff}'
+    + 'ol{padding-right:20px;line-height:2.1;color:#444;font-size:0.9rem}'
+    + 'h2{color:#6C63FF;font-size:1rem;margin-top:24px}'
+    + '@media print{body{padding:20px}}'
+    + '</style></head><body>'
+    + '<h1>📅 جدول المذاكرة المقترح</h1>'
+    + '<div class="sub">'+( subject.title||subjectId )+' &nbsp;•&nbsp; '+totalLessons+' درس</div>'
+    + '<table>'
+    + '<thead><tr><th>اليوم</th><th>النشاط</th><th>المدة</th></tr></thead>'
+    + '<tbody>'+rows+'</tbody>'
+    + '</table>'
+    + '<h2>📌 تعليمات عامة</h2>'
+    + '<ol>'
+    + '<li>ابدأ بالقراءة قبل الاختبار</li>'
+    + '<li>كرر كل درس 3 مرات: قراءة ← بطاقات ← اختبار</li>'
+    + '<li>جلسات 25 دقيقة + 5 دقائق راحة (تقنية Pomodoro)</li>'
+    + '<li>راجع أخطاءك قبل الانتقال للدرس التالي</li>'
+    + '</ol>'
+    + '<script>window.onload=function(){window.print();}<\/script>'
+    + '</body></html>';
+
+  var blob = new Blob([html], {type:'text/html;charset=utf-8'});
   var a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'جدول-مذاكرة-' + (subject.title||subjectId) + '.md';
+  a.download = 'جدول-مذاكرة-' + (subject.title||subjectId) + '.html';
   a.click();
   URL.revokeObjectURL(a.href);
-  showToast('⬇️ تم تحميل جدول المذاكرة', 'success');
+  showToast('⬇️ تم تحميل جدول المذاكرة — افتحه واضغط طباعة لحفظه PDF', 'success');
 }
 
 // ════════════════════════════════════════════════════════════════════

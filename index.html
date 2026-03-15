@@ -10549,7 +10549,6 @@ async function analyzeAndGenerate(text, subjectId, fileName) {
   const bar   = document.getElementById('ai-gen-bar');
   const steps = document.getElementById('ai-gen-steps');
   const out   = document.getElementById('ai-gen-output');
-
   const upd = function(icon, msg, pct) {
     if (bar)   bar.style.width = pct + '%';
     if (steps) steps.innerHTML = '<div style="font-size:0.82rem;color:var(--text-muted);padding:8px 12px;background:rgba(255,255,255,0.03);border-radius:8px;border-right:3px solid var(--primary)">' + icon + ' ' + msg + '</div>';
@@ -10562,99 +10561,99 @@ async function analyzeAndGenerate(text, subjectId, fileName) {
     const subject  = CURRICULUM[subjectId];
     const subTitle = subject ? subject.title : (subjectId || 'المادة');
     const cleanText = text.replace(/[\u0000-\u001F]/g, ' ').trim();
+    const isEnglish = subjectId === 'english';
 
-    // ── Split into chunks for full coverage ──────────────────
     const CHUNK = 50000;
     const chunks = [];
-    for (let i = 0; i < cleanText.length; i += CHUNK) {
-      chunks.push(cleanText.slice(i, i + CHUNK));
-    }
-    const totalChunks = Math.min(chunks.length, 20); // max 20 chunks = 1,000,000 chars
+    for (let i = 0; i < cleanText.length; i += CHUNK) chunks.push(cleanText.slice(i, i + CHUNK));
+    const totalChunks = Math.min(chunks.length, 20);
 
-    upd('📖', `قراءة الملف كاملاً (${cleanText.length} حرف في ${totalChunks} أجزاء)...`, 10);
+    upd('📖', `قراءة الملف (${cleanText.length.toLocaleString()} حرف / ${totalChunks} أجزاء)...`, 10);
 
-    // ── Process each chunk ────────────────────────────────────
     const allResults = [];
+
     for (let ci = 0; ci < totalChunks; ci++) {
       const pct = 15 + (ci / totalChunks) * 55;
-      upd('📡', `تحليل الجزء ${ci+1} من ${totalChunks}...`, pct);
+      upd('📡', `تحليل الجزء ${ci+1}/${totalChunks}...`, pct);
+
+      const langInstruction = isEnglish
+        ? `You are an expert English language teacher. Your student is Arabic-speaking.
+RULES:
+- lessonTitle: in English
+- definition: in ARABIC - simple, clear, detailed explanation (3-5 sentences)
+- whyLearn: in ARABIC - why is this topic important
+- keyTerms: term in ENGLISH, def in ARABIC (simple translation + explanation)
+- examples: title and content in ENGLISH (real language examples)
+- steps: in ARABIC - main points explained simply
+- mindMapBranches: ALL in ENGLISH (grammar terms, vocabulary)
+- quiz: questions and options in ENGLISH, explanation in ARABIC
+- summary: in ARABIC - simple detailed summary
+- IMPORTANT: Explanations must be DETAILED, SIMPLE, and ACCURATE`
+        : `أنت مدرس خبير متخصص في ${subTitle}. الطالب يريد فهماً عميقاً ومبسطاً.
+القواعد:
+- اشرح كل مفهوم بشكل مبسط جداً كأنك تشرح لطالب مبتدئ
+- التعريف: شامل ومفصل (4-6 جمل)
+- لماذا ندرسه: أهمية عملية وواقعية
+- المصطلحات: تعريف مفصل وسهل
+- الأمثلة: تطبيقية من الواقع
+- الخطوات: مفصلة وواضحة
+- الأسئلة: من محتوى النص بالضبط مع شرح وافٍ
+- الملخص: شامل ومفصل ودقيق`;
+
+      const jsonTemplate = `{
+  "lessonTitle": "عنوان دقيق يعبر عن المحتوى",
+  "definition": "تعريف مفصل وشامل (4-6 جمل)",
+  "whyLearn": ["سبب مهم 1", "سبب مهم 2", "سبب مهم 3", "سبب مهم 4"],
+  "keyTerms": [
+    {"term": "مصطلح", "def": "تعريف مفصل وواضح"},
+    {"term": "مصطلح2", "def": "تعريف مفصل"},
+    {"term": "مصطلح3", "def": "تعريف مفصل"},
+    {"term": "مصطلح4", "def": "تعريف مفصل"},
+    {"term": "مصطلح5", "def": "تعريف مفصل"}
+  ],
+  "examples": [
+    {"icon": "💡", "title": "مثال 1", "content": "شرح مفصل للمثال"},
+    {"icon": "📌", "title": "مثال 2", "content": "شرح مفصل"},
+    {"icon": "🔍", "title": "مثال 3", "content": "شرح مفصل"}
+  ],
+  "steps": ["نقطة رئيسية مفصلة 1", "نقطة 2", "نقطة 3", "نقطة 4", "نقطة 5"],
+  "properties": ["خاصية 1", "خاصية 2", "خاصية 3"],
+  "types": ["نوع 1 مع شرحه", "نوع 2 مع شرحه", "نوع 3 مع شرحه"],
+  "mindMapBranches": [
+    {"label": "محور 1", "color": "#6C63FF", "children": ["فرع 1", "فرع 2", "فرع 3"]},
+    {"label": "محور 2", "color": "#FF6584", "children": ["فرع 1", "فرع 2", "فرع 3"]},
+    {"label": "محور 3", "color": "#00BFA5", "children": ["فرع 1", "فرع 2"]},
+    {"label": "محور 4", "color": "#FFD600", "children": ["فرع 1", "فرع 2"]}
+  ],
+  "quiz": [
+    {"q": "سؤال من النص", "options": ["الإجابة الصحيحة", "خطأ1", "خطأ2", "خطأ3"], "answer": 0, "explanation": "شرح مفصل للإجابة"},
+    {"q": "سؤال 2", "options": ["الصحيح", "خطأ1", "خطأ2", "خطأ3"], "answer": 0, "explanation": "شرح"},
+    {"q": "سؤال 3", "options": ["الصحيح", "خطأ1", "خطأ2", "خطأ3"], "answer": 0, "explanation": "شرح"},
+    {"q": "سؤال 4", "options": ["الصحيح", "خطأ1", "خطأ2", "خطأ3"], "answer": 0, "explanation": "شرح"},
+    {"q": "سؤال 5", "options": ["الصحيح", "خطأ1", "خطأ2", "خطأ3"], "answer": 0, "explanation": "شرح"}
+  ],
+  "summary": "ملخص شامل ومفصل للدرس"
+}`;
 
       const isFirst = ci === 0;
-      const isEnglish = subjectId === 'english';
-      const langNote = isEnglish
-        ? `أنت مدرس لغة إنجليزية. الطالب عربي المتعلم. مهمتك:
-1. اقرأ النص الإنجليزي وافهمه جيداً.
-2. اشرح كل مفهوم وقاعدة بالعربية بشكل مبسط جداً وسهل الفهم.
-3. ترجم المصطلحات الإنجليزية وضعها في keyTerms (term بالإنجليزي، def بالعربي).
-4. الأمثلة تكون بالإنجليزي مع شرحها بالعربي.
-5. الخريطة الذهنية (mindMapBranches) تكون بالإنجليزي لأنها قواعد وكلمات.
-6. باقي الحقول (definition, whyLearn, steps, summary) باللغة العربية المبسطة.
-الهدف: يفهم الطالب العربي المحتوى الإنجليزي بسهولة.`
-        : 'مهم: يجب أن تكون جميع الحقول باللغة العربية.';
-      const prompt = isFirst
-        ? `${langNote}
-
-${isEnglish ? 'حلل هذا النص من مادة الإنجليزية التطبيقية واشرحه للطالب العربي بطريقة مبسطة جداً. الشرح والتعريف والأهمية باللغة العربية. المصطلحات الإنجليزية مع ترجمتها. الخريطة الذهنية بالإنجليزي (لأنها مفردات/قواعد).' : 'أنت مساعد تعليمي. حلل هذا النص من مادة "'+subTitle+'" وأنتج محتوى تعليمياً شاملاً.'}
-${isEnglish ? 'Text (Part '+String(ci+1)+'/'+String(totalChunks)+'):' : 'النص (الجزء '+(ci+1)+'/'+(totalChunks)+'):'}
-${chunks[ci]}
-
-أجب بـ JSON صالح فقط:
-{
-  "lessonTitle": "عنوان دقيق من النص",
-  "definition": "تعريف شامل للموضوع (3-5 جمل)",
-  "whyLearn": ["سبب 1", "سبب 2", "سبب 3"],
-  "keyTerms": [{"term":"مصطلح","def":"تعريفه"},{"term":"مصطلح2","def":"تعريفه"},{"term":"مصطلح3","def":"تعريفه"},{"term":"مصطلح4","def":"تعريفه"},{"term":"مصطلح5","def":"تعريفه"}],
-  "examples": [{"icon":"💡","title":"مثال 1","content":"شرح"},{"icon":"📌","title":"مثال 2","content":"شرح"},{"icon":"🔍","title":"مثال 3","content":"شرح"}],
-  "steps": ["نقطة رئيسية 1","نقطة 2","نقطة 3","نقطة 4","نقطة 5"],
-  "properties": ["خاصية 1","خاصية 2","خاصية 3"],
-  "types": ["نوع 1","نوع 2","نوع 3"],
-  "mindMapBranches": [
-    {"label":"محور 1","color":"#6C63FF","children":["فرع 1","فرع 2","فرع 3"]},
-    {"label":"محور 2","color":"#FF6584","children":["فرع 1","فرع 2","فرع 3"]},
-    {"label":"محور 3","color":"#00BFA5","children":["فرع 1","فرع 2"]},
-    {"label":"محور 4","color":"#FFD600","children":["فرع 1","فرع 2"]}
-  ],
-  "quiz": [
-    {"q":"سؤال 1 من النص","options":["صحيح","خطأ1","خطأ2","خطأ3"],"answer":0,"explanation":"شرح"},
-    {"q":"سؤال 2","options":["صحيح","خطأ1","خطأ2","خطأ3"],"answer":0,"explanation":"شرح"},
-    {"q":"سؤال 3","options":["صحيح","خطأ1","خطأ2","خطأ3"],"answer":0,"explanation":"شرح"},
-    {"q":"سؤال 4","options":["صحيح","خطأ1","خطأ2","خطأ3"],"answer":0,"explanation":"شرح"},
-    {"q":"سؤال 5","options":["صحيح","خطأ1","خطأ2","خطأ3"],"answer":0,"explanation":"شرح"}
-  ],
-  "summary": "ملخص الجزء"
-}`
-        : `أنت مساعد تعليمي. استكمل تحليل هذا النص الإضافي من مادة "${subTitle}".
-النص (الجزء ${ci+1}/${totalChunks}):
-${chunks[ci]}
-
-أجب بـ JSON يحتوي فقط على مصطلحات وأسئلة إضافية:
-{
-  "keyTerms": [{"term":"مصطلح جديد","def":"تعريفه"},{"term":"مصطلح2","def":"تعريفه"},{"term":"مصطلح3","def":"تعريفه"}],
-  "steps": ["نقطة إضافية 1","نقطة 2","نقطة 3"],
-  "quiz": [
-    {"q":"سؤال إضافي 1","options":["صحيح","خطأ1","خطأ2","خطأ3"],"answer":0,"explanation":"شرح"},
-    {"q":"سؤال إضافي 2","options":["صحيح","خطأ1","خطأ2","خطأ3"],"answer":0,"explanation":"شرح"},
-    {"q":"سؤال إضافي 3","options":["صحيح","خطأ1","خطأ2","خطأ3"],"answer":0,"explanation":"شرح"}
-  ]
-}`;
+      const chunkPrompt = isFirst
+        ? `${langInstruction}\n\nالنص (الجزء ${ci+1}/${totalChunks}):\n${chunks[ci]}\n\nأجب بـ JSON صالح فقط بهذا الشكل:\n${jsonTemplate}`
+        : `${langInstruction}\n\nنص إضافي (الجزء ${ci+1}/${totalChunks}):\n${chunks[ci]}\n\nأجب بـ JSON يحتوي مصطلحات وأسئلة إضافية فقط:\n{"keyTerms": [{"term":"...","def":"..."}], "steps": ["..."], "quiz": [{"q":"...","options":["الصحيح","خطأ1","خطأ2","خطأ3"],"answer":0,"explanation":"..."}]}`;
 
       const resp = await zadFetch({
         model: 'llama-3.3-70b-versatile',
         max_tokens: 8000,
         system: 'أنت مساعد تعليمي. أجب بـ JSON صالح فقط بدون أي نص خارجه.',
-        messages: [{ role: 'user', content: prompt }]
+        messages: [{ role: 'user', content: chunkPrompt }]
       });
-
       const data = await resp.json();
       if (!data.content || !data.content[0]) continue;
-      const raw = (data.content[0].text || '').trim();
-      const parsed = repairAndParseJSON(raw);
+      const parsed = repairAndParseJSON((data.content[0].text||'').trim());
       if (parsed) allResults.push(parsed);
     }
 
     if (!allResults.length) throw new Error('لم يُنتج الذكاء الاصطناعي أي محتوى');
 
-    // ── Merge all results ─────────────────────────────────────
     upd('🔗', 'دمج المحتوى...', 75);
     const main = allResults[0];
     const lesson = {
@@ -10670,39 +10669,26 @@ ${chunks[ci]}
       quiz:            [],
       summary:         main.summary         || ''
     };
-
-    // Merge keyTerms, steps, quiz from all chunks (deduplicated)
-    const seenTerms = new Set();
-    const seenQs    = new Set();
+    const seenT = new Set(), seenQ = new Set();
     allResults.forEach(function(r) {
-      (r.keyTerms||[]).forEach(function(k) {
-        if (k.term && !seenTerms.has(k.term)) { seenTerms.add(k.term); lesson.keyTerms.push(k); }
-      });
-      (r.steps||[]).forEach(function(s) {
-        if (s && !lesson.steps.includes(s)) lesson.steps.push(s);
-      });
-      (r.quiz||[]).forEach(function(q) {
-        if (q.q && !seenQs.has(q.q)) { seenQs.add(q.q); lesson.quiz.push(q); }
-      });
+      (r.keyTerms||[]).forEach(function(k){ if(k.term&&!seenT.has(k.term)){seenT.add(k.term);lesson.keyTerms.push(k);} });
+      (r.steps||[]).forEach(function(s){ if(s&&!lesson.steps.includes(s))lesson.steps.push(s); });
+      (r.quiz||[]).forEach(function(q){ if(q.q&&!seenQ.has(q.q)){seenQ.add(q.q);lesson.quiz.push(q);} });
     });
 
-    upd('💾', `حفظ الدرس (${lesson.keyTerms.length} مصطلح، ${lesson.quiz.length} سؤال)...`, 88);
-
-    if (typeof saveAILessonForUser === 'function') {
-      saveAILessonForUser(lesson, subjectId, uploadId, fileName);
-    }
+    upd('💾', `حفظ (${lesson.keyTerms.length} مصطلح، ${lesson.quiz.length} سؤال)...`, 88);
+    if (typeof saveAILessonForUser === 'function') saveAILessonForUser(lesson, subjectId, uploadId, fileName);
     window._ZAD_AI_LESSON = { lesson, subjectId, uploadId, fileName };
     window._ZAD_LAST_UPLOAD_SUBJECT = subjectId;
-
-    upd('✅', `تم! ${lesson.keyTerms.length} مصطلح، ${lesson.quiz.length} سؤال، ${totalChunks} أجزاء محللة`, 100);
+    upd('✅', `تم! ${lesson.keyTerms.length} مصطلح، ${lesson.quiz.length} سؤال`, 100);
     refreshAllTabsWithAILesson(lesson, subjectId);
 
   } catch(err) {
     if (err.message === 'NO_API_KEY' || err.message === 'INVALID_API_KEY' || err.message === 'BACKEND_NOT_CONFIGURED') return;
-    var errMsg = String(err.message || err);
+    var em = String(err.message||err);
     if (document.getElementById('ai-gen-steps'))
-      document.getElementById('ai-gen-steps').innerHTML = '<div style="color:#FF5252;padding:10px;border-radius:8px;background:rgba(239,83,80,0.1)">❌ ' + errMsg + '</div>';
-    showUploadStatus('error', '❌ ' + errMsg.slice(0, 200));
+      document.getElementById('ai-gen-steps').innerHTML = '<div style="color:#FF5252;padding:10px;border-radius:8px;background:rgba(239,83,80,0.1)">❌ '+em+'</div>';
+    showUploadStatus('error', '❌ '+em.slice(0,200));
     console.error('analyzeAndGenerate:', err);
   }
 }
@@ -12407,6 +12393,10 @@ body {
     </div>
     <div id="nav-subjects-list"></div>
     
+    <div class="nav-section-title">ملخصات المطور</div>
+    <div class="nav-item" onclick="showDevSummariesPage();closeSidebar()">
+      <span class="nav-icon">📋</span> ملخصات المطور
+    </div>
     <div class="nav-section-title">الأدوات</div>
     <div class="nav-item" onclick="showSearchSection()">
       <span class="nav-icon">🔍</span> البحث الشامل
@@ -13371,7 +13361,7 @@ function showSubject(subjectId, activeTab) {
   </div>`;
 
   let body = '';
-  if (activeTab === 'lessons')  body = buildLessonsTab(subject, subjectId);
+  if (activeTab === 'lessons')  try { body = buildLessonsTab(subject, subjectId); } catch(e) { console.error('buildLessonsTab:', e); body = '<div style="padding:20px;color:var(--text-muted)">خطأ في عرض الدروس: '+e.message+'</div>'; }
   if (activeTab === 'cards')    body = buildInfoCards(subject, subjectId);
   if (activeTab === 'mindmaps') body = buildAllMindMaps(subject, subjectId);
   if (activeTab === 'lab') {
@@ -13657,6 +13647,8 @@ function openLesson(subjectId, lessonId) {
   if (subjectId && lessonId && typeof trackLessonOpened === 'function') {
     trackLessonOpened(subjectId, lessonId);
   }
+  // Push to history for back button
+  try { history.pushState({ zad: 'lesson', subjectId: subjectId, lessonId: lessonId }, '', '#lesson-'+lessonId); } catch(ex) {}
 
   // 1. Check ZAD_UPLOADS first
   var uploads = ZAD_UPLOADS.getAll();
@@ -17123,6 +17115,7 @@ function adminTab(tab) {
   else if (tab === 'roles')        { body.innerHTML = buildAdminRoles(); }
   else if (tab === 'bans')         { body.innerHTML = buildAdminBans(); }
   else if (tab === 'curriculum')   { body.innerHTML = buildAdminCurriculum(); }
+  else if (tab === 'devsummary')  { body.innerHTML = buildDevSummaryTab(); }
 }
 
 async function buildAdminActivityAsync(container) {
@@ -20520,23 +20513,154 @@ document.addEventListener('DOMContentLoaded', function() {
   // Handle back button
   window.addEventListener('popstate', function(e) {
     var state = e.state;
-    if (state && state.zad) {
-      // Don't navigate again (already done by popstate)
+    if (!state || !state.zad) {
+      // Back to dashboard
+      try { showSection('dashboard'); } catch(ex) {}
       return;
     }
-    // No state = user went back to start = go to dashboard
-    var page = document.getElementById('page-app');
-    if (page && page.classList.contains('active')) {
-      if (typeof showSection === 'function') {
-        history.pushState({ zad: 'section', name: 'dashboard' }, '', '#dashboard');
-        showSection('dashboard');
-      }
+    if (state.zad === 'subject') {
+      try { showSubject(state.sid, state.tab || 'lessons'); } catch(ex) {}
+    } else if (state.zad === 'lesson') {
+      try { openLesson(state.subjectId, state.lessonId); } catch(ex) {}
+    } else if (state.zad === 'section') {
+      try { if (_origShowSection) _origShowSection(state.name); } catch(ex) {}
     }
   });
 
   // Initial state
   try { history.replaceState({ zad: 'section', name: 'dashboard' }, '', '#dashboard'); } catch(e) {}
 })();
+
+// ══════════════════════════════════════════════════════════════
+// DEVELOPER SUMMARY TAB (Admin only)
+// ══════════════════════════════════════════════════════════════
+var ZAD_DEV_SUMMARIES_KEY = 'zad_dev_summaries_v1';
+
+function getDevSummaries() {
+  try { return JSON.parse(localStorage.getItem(ZAD_DEV_SUMMARIES_KEY) || '[]'); }
+  catch(e) { return []; }
+}
+function saveDevSummaries(list) {
+  localStorage.setItem(ZAD_DEV_SUMMARIES_KEY, JSON.stringify(list));
+}
+
+function buildDevSummaryTab() {
+  if (!isAdmin()) return '<div style="padding:40px;text-align:center;color:var(--text-muted)">🔒 متاح للمطور فقط</div>';
+
+  var summaries = getDevSummaries();
+  var listHTML = summaries.length
+    ? summaries.map(function(s, i) {
+        return '<div style="background:rgba(255,214,0,0.06);border:1.5px solid rgba(255,214,0,0.2);border-radius:14px;padding:14px 16px;margin-bottom:10px">'
+          + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">'
+            + '<div style="flex:1"><div style="font-weight:800;font-size:0.9rem">'+s.title+'</div>'
+            + '<div style="font-size:0.72rem;color:var(--text-muted)">'+new Date(s.createdAt).toLocaleDateString('ar')+'</div></div>'
+            + '<button onclick="downloadDevSummary('+i+')" style="padding:5px 10px;border-radius:8px;border:1px solid rgba(255,214,0,0.4);background:rgba(255,214,0,0.08);color:#FFD600;font-size:0.75rem;cursor:pointer">⬇️ تنزيل</button>'
+            + '<button onclick="deleteDevSummary('+i+')" style="padding:5px 8px;border-radius:8px;border:none;background:rgba(255,82,82,0.1);color:#FF5252;cursor:pointer;font-size:0.75rem">🗑️</button>'
+          + '</div>'
+          + '<div style="font-size:0.82rem;line-height:1.6;color:var(--text-muted)">'+s.content.slice(0,150)+'...</div>'
+          + '</div>';
+      }).join('')
+    : '<div style="text-align:center;padding:30px;color:var(--text-muted)">لا توجد ملخصات بعد</div>';
+
+  return '<div style="direction:rtl">'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">'
+      + '<div style="font-weight:900;font-size:0.95rem">📋 ملخصات المطور</div>'
+      + '<button onclick="showDevSummaryUpload()" style="padding:8px 14px;border-radius:10px;border:none;background:linear-gradient(135deg,#FFD600,#FF8C00);color:#1C1917;font-family:var(--font);font-weight:800;font-size:0.82rem;cursor:pointer">+ رفع ملخص</button>'
+    + '</div>'
+    + '<div id="dev-summary-upload-area" style="display:none;background:rgba(255,214,0,0.06);border:1.5px dashed rgba(255,214,0,0.3);border-radius:16px;padding:16px;margin-bottom:16px">'
+      + '<input id="dev-sum-title" placeholder="عنوان الملخص..." style="width:100%;box-sizing:border-box;padding:9px 12px;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text);font-family:var(--font);font-size:0.85rem;outline:none;direction:rtl;margin-bottom:8px">'
+      + '<textarea id="dev-sum-content" rows="6" placeholder="محتوى الملخص..." style="width:100%;box-sizing:border-box;padding:9px 12px;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text);font-family:var(--font);font-size:0.85rem;outline:none;resize:vertical;direction:rtl;margin-bottom:8px"></textarea>'
+      + '<div style="display:flex;gap:8px">'
+        + '<label style="flex:1;padding:9px;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,0.04);color:var(--text-muted);cursor:pointer;text-align:center;font-size:0.82rem">📎 رفع ملف<input type="file" accept="*/*" style="display:none" onchange="devSummaryFromFile(this)"></label>'
+        + '<button onclick="saveDevSummary()" style="flex:2;padding:9px;border-radius:10px;border:none;background:#FFD600;color:#1C1917;font-family:var(--font);font-weight:800;cursor:pointer">💾 حفظ</button>'
+      + '</div>'
+    + '</div>'
+    + '<div id="dev-summaries-list">' + listHTML + '</div>'
+    + '</div>';
+}
+
+function showDevSummaryUpload() {
+  var area = document.getElementById('dev-summary-upload-area');
+  if (area) area.style.display = area.style.display === 'none' ? 'block' : 'none';
+}
+
+async function devSummaryFromFile(input) {
+  var file = input.files[0];
+  if (!file) return;
+  var titleInp = document.getElementById('dev-sum-title');
+  if (titleInp && !titleInp.value) titleInp.value = file.name.replace(/\.[^/.]+$/,'');
+  var contentArea = document.getElementById('dev-sum-content');
+  if (!contentArea) return;
+  try {
+    var text = await file.text();
+    contentArea.value = text;
+  } catch(e) {}
+}
+
+function saveDevSummary() {
+  var title   = (document.getElementById('dev-sum-title') || {}).value || '';
+  var content = (document.getElementById('dev-sum-content') || {}).value || '';
+  if (!title.trim() || !content.trim()) { showToast('أدخل العنوان والمحتوى', 'error'); return; }
+  var summaries = getDevSummaries();
+  summaries.unshift({ id: 'dev-' + Date.now(), title: title.trim(), content: content.trim(), createdAt: Date.now() });
+  saveDevSummaries(summaries);
+  document.getElementById('dev-sum-title').value = '';
+  document.getElementById('dev-sum-content').value = '';
+  document.getElementById('dev-summary-upload-area').style.display = 'none';
+  showToast('✅ تم حفظ الملخص', 'success');
+  // Refresh
+  var body = document.getElementById('admin-body');
+  if (body) body.innerHTML = buildDevSummaryTab();
+}
+
+function deleteDevSummary(idx) {
+  var summaries = getDevSummaries();
+  summaries.splice(idx, 1);
+  saveDevSummaries(summaries);
+  var body = document.getElementById('admin-body');
+  if (body) body.innerHTML = buildDevSummaryTab();
+}
+
+function downloadDevSummary(idx) {
+  var s = getDevSummaries()[idx];
+  if (!s) return;
+  var blob = new Blob([s.content], { type: 'text/plain;charset=utf-8' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = s.title + '.txt';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  showToast('⬇️ جاري التنزيل', 'success');
+}
+
+// Make dev summaries accessible to students (read-only + download)
+function buildStudentDevSummaries() {
+  var summaries = getDevSummaries();
+  if (!summaries.length) return '<div style="text-align:center;padding:40px;color:var(--text-muted)">لا توجد ملخصات من المطور بعد</div>';
+  return '<div style="direction:rtl">'
+    + '<div style="font-weight:900;font-size:0.95rem;margin-bottom:14px">📋 ملخصات المطور</div>'
+    + summaries.map(function(s, i) {
+        return '<div style="background:rgba(255,214,0,0.06);border:1.5px solid rgba(255,214,0,0.2);border-radius:14px;padding:14px 16px;margin-bottom:10px">'
+          + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">'
+            + '<div style="flex:1"><div style="font-weight:800;font-size:0.9rem">'+s.title+'</div>'
+            + '<div style="font-size:0.72rem;color:var(--text-muted)">'+new Date(s.createdAt).toLocaleDateString('ar')+'</div></div>'
+            + '<button onclick="downloadDevSummary('+i+')" style="padding:6px 12px;border-radius:8px;border:1px solid rgba(255,214,0,0.4);background:rgba(255,214,0,0.08);color:#FFD600;font-size:0.78rem;cursor:pointer;font-weight:700">⬇️ تنزيل</button>'
+          + '</div>'
+          + '<div style="font-size:0.83rem;line-height:1.7">'+s.content.slice(0,300)+(s.content.length>300?'...':'')+'</div>'
+          + '</div>';
+      }).join('')
+    + '</div>';
+}
+
+function showDevSummariesPage() {
+  showSection('dashboard');
+  var dc = document.getElementById('daily-challenge-widget');
+  if (dc) dc.innerHTML = '<div style="background:rgba(255,214,0,0.08);border:1.5px solid rgba(255,214,0,0.25);border-radius:16px;padding:16px;margin-bottom:14px">'
+    + '<div style="font-weight:900;font-size:0.92rem;margin-bottom:12px">📋 ملخصات المطور</div>'
+    + buildStudentDevSummaries()
+    + '</div>';
+  dc && dc.scrollIntoView({behavior:'smooth'});
+}
 </script>
 
 
@@ -21295,6 +21419,7 @@ class="settings-section" style="border-color:rgba(255,82,82,0.2)">
       <button class="admin-tab" id="atab-roles" onclick="adminTab('roles')">🔑 الأدوار</button>
       <button class="admin-tab" id="atab-bans" onclick="adminTab('bans')">🚫 القائمة السوداء</button>
       <button class="admin-tab" id="atab-curriculum" onclick="adminTab('curriculum')">📚 المناهج</button>
+      <button class="admin-tab" id="atab-devsummary" onclick="adminTab('devsummary')">📋 ملخصاتي</button>
     </div>
 
     <!-- Body -->

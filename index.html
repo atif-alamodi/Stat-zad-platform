@@ -2100,7 +2100,7 @@ async function elabRunPy() {
   }
 
   try {
-    _elabPyodide.runPython(`_cap.d=[]\nimport sys\nsys.stdout=_cap\nsys.stderr=_cap\nimport os\ntry: os.remove('/tmp/elab_chart.png')\nexcept: pass`);
+    _elabPyodide.runPython(`_cap.d=[]\nsys.stdout=_cap\nsys.stderr=_cap\nimport os\ntry: os.remove('/tmp/elab_chart.png')\nexcept: pass`);
     const patched = code.replace(/plt\.savefig\(['"]['"].*?['"]['"]]/g, "plt.savefig('/tmp/elab_chart.png'");
     await _elabPyodide.runPythonAsync(patched);
     const result = _elabPyodide.runPython(`_cap.getvalue()`);
@@ -2118,8 +2118,9 @@ async function elabRunPy() {
     } catch(e) {}
   } catch(e) {
     out.innerHTML = buildPyError(e.message, code);
+  } finally {
+    if (btn) { btn.textContent = '▶ تشغيل'; btn.disabled = false; }
   }
-  if (btn) { btn.textContent = '▶ تشغيل'; btn.disabled = false; }
 }
 
 function buildPyOutput(rawHtml, code) {
@@ -13690,6 +13691,13 @@ async function enterApp() {
   // Render activity feed from persisted log
   if (typeof renderActivityFeed === 'function') setTimeout(renderActivityFeed, 200);
 
+  // Pre-load Pyodide in background so Python lab is ready immediately
+  setTimeout(function() {
+    if (typeof initPyodide !== 'undefined' && !pyReady && !_pyodideLoading) {
+      initPyodide();
+    }
+  }, 3000); // delay 3s to let page settle first
+
   const loc = loadLocation();
   if (loc) {
     if (loc.type === 'lesson' && loc.subjectId && loc.lessonId) {
@@ -16160,59 +16168,55 @@ function buildPythonOnlyLab() {
 let pyodide = null;
 let pyReady = false;
 
-async function initPyodide() {
-  if (pyReady || typeof loadPyodide === 'undefined' && document.querySelector('script[src*="pyodide"]')) return;
-  const dot = document.getElementById('py-status-dot');
-  const txt = document.getElementById('py-status-text');
+let _pyodideLoading = false;
 
-  dot.style.background = '#FFD600';
-  txt.textContent = 'جاري تحميل محرك Python (Pyodide)...';
+async function initPyodide() {
+  if (pyReady || _pyodideLoading) return;
+  if (typeof loadPyodide === 'undefined') return; // script not loaded yet
+
+  _pyodideLoading = true;
+
+  // Safe status update — elements may not exist on all pages
+  function setStatus(color, msg) {
+    ['py-status-dot','elab-py-dot'].forEach(id => { var el=document.getElementById(id); if(el) el.style.background=color; });
+    ['py-status-text','elab-py-status'].forEach(id => { var el=document.getElementById(id); if(el) el.textContent=msg; });
+  }
+
+  setStatus('#FFD600', 'جاري تحميل Python...');
 
   try {
     pyodide = await loadPyodide({ indexURL: "https://cdn.jsdelivr.net/pyodide/v0.25.1/full/" });
+    setStatus('#FFD600', 'تحميل المكتبات...');
+
     await pyodide.loadPackage(['numpy', 'micropip']);
-    await pyodide.runPythonAsync(`
-import micropip
-await micropip.install('matplotlib')
-    `);
+    try {
+      await pyodide.runPythonAsync('import micropip\nawait micropip.install("matplotlib")');
+    } catch(e) {} // matplotlib optional
 
-    pyodide.runPython(`
-import sys, io
-class OutputCapture:
-    def __init__(self): self.data = []
-    def write(self, s): self.data.append(s)
-    def flush(self): pass
-    def getvalue(self): return ''.join(self.data)
-_capture = OutputCapture()
-sys.stdout = _capture
-sys.stderr = _capture
-    `);
+    // Setup output capture (_cap) — used by both lab and elab
+    pyodide.runPython([
+      'import sys, io',
+      'class _Cap:',
+      '  def __init__(self): self.d = []',
+      '  def write(self, s): self.d.append(str(s))',
+      '  def flush(self): pass',
+      '  def getvalue(self): v="".join(self.d); self.d=[]; return v',
+      '_cap = _Cap()',
+      'sys.stdout = _cap',
+      'sys.stderr = _cap',
+    ].join('\n'));
+
     pyReady = true;
+    _pyodideLoading = false;
+    _elabPyodide = pyodide;
+    _elabPyReady = true;
 
-    pyodide.runPython(`
-import sys
-class _Cap:
-  def __init__(self): self.d = []
-  def write(self, s): self.d.append(s)
-  def flush(self): pass
-  def getvalue(self): return ''.join(self.d)
-_cap = _Cap()
-`);
-
-    _elabPyodide = pyodide; _elabPyReady = true;
-
-    if (dot) dot.style.background = '#28CA41';
-    if (txt) txt.textContent = 'Python جاهز ✓';
-
-    const elDot = document.getElementById('elab-py-dot');
-    const elTxt = document.getElementById('elab-py-status');
-    if (elDot) elDot.style.background = '#28CA41';
-    if (elTxt) elTxt.textContent = 'Python جاهز ✓';
-    setTimeout(() => { txt.textContent = 'Python جاهز ✓'; }, 2000);
+    setStatus('#28CA41', 'Python جاهز ✓');
   } catch (e) {
-    dot.style.background = '#FF5252';
-    txt.textContent = 'تعذّر تحميل Pyodide — جاري استخدام المحاكي';
+    _pyodideLoading = false;
     pyReady = false;
+    setStatus('#FF5252', 'تعذّر تحميل Python');
+    console.warn('Pyodide load failed:', e.message);
   }
 }
 
@@ -16682,8 +16686,9 @@ data
     out.innerHTML = buildPyError(e.message, code);
   }
 
-  btn.textContent = '▶ تشغيل';
-  btn.disabled = false;
+  } finally {
+    if (btn) { btn.textContent = '▶ تشغيل'; btn.disabled = false; }
+  }
 }
 
 function colorizeOutput(text) {

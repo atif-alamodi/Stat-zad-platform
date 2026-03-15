@@ -17888,11 +17888,12 @@ async function zadFetch(body) {
   var groqData = await resp.json();
   if (groqData.error) throw new Error('Groq: ' + (groqData.error.message || JSON.stringify(groqData.error)));
 
-  // Handle both Groq native format AND Worker's Anthropic-like format
-  var text = groqData.choices?.[0]?.message?.content
-          || (groqData.content && groqData.content[0] && groqData.content[0].text)
+  // Support both response formats:
+  // • Anthropic format  → groqData.content[0].text   (used by this Worker)
+  // • OpenAI/Groq format → groqData.choices[0].message.content
+  var text = (groqData.content && groqData.content[0] && groqData.content[0].text)
+          || groqData.choices?.[0]?.message?.content
           || '';
-  console.log('[ZAD] zadFetch got text length:', text.length, 'format:', groqData.choices ? 'groq' : 'worker');
   return {
     status: 200,
     json: async function() { return { content: [{ type:'text', text: text }] }; }
@@ -21243,9 +21244,7 @@ async function translateQuizItemsToEnglish(questions) {
 
     if (!resp.ok) return questions;
     var data = await resp.json();
-    var raw = (data.choices && data.choices[0].message.content)
-           || (data.content && data.content[0] && data.content[0].text)
-           || '[]';
+    var raw = (data.choices && data.choices[0].message.content) || '[]';
     raw = raw.replace(/```json|```/g, '').trim();
     var translated = JSON.parse(raw);
 
@@ -21983,8 +21982,6 @@ body.light-mode .theme-btn-light {
       </button>
     </div>
 
-    <!-- ─── حذف الحساب ─── -->
-    <div 
     <!-- ─── مفتاح الذكاء الاصطناعي ─── -->
     <div class="settings-section" style="border-color:rgba(108,99,255,0.3)">
       <div class="settings-label" style="color:var(--primary)">🔑 مفتاح Groq API (شخصي)</div>
@@ -22029,7 +22026,8 @@ body.light-mode .theme-btn-light {
       </div>
     </div>
 
-class="settings-section" style="border-color:rgba(255,82,82,0.2)">
+    <!-- ─── حذف الحساب ─── -->
+    <div class="settings-section" style="border-color:rgba(255,82,82,0.2)">
       <div class="settings-label" style="color:#FF5252">⚠️ منطقة الخطر</div>
       <div style="background:rgba(255,82,82,0.07);border:1px solid rgba(255,82,82,0.2);border-radius:12px;padding:14px;font-size:0.83rem;color:var(--text-muted);line-height:1.7;margin-bottom:12px">
         حذف الحساب سيؤدي إلى <strong style="color:#FF5252">زوال جميع بياناتك نهائياً</strong>: الدروس المكتملة، الملفات المرفوعة، نقاط التقدم، والإنجازات — <strong>ولا يمكن التراجع!</strong>

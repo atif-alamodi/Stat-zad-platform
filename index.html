@@ -7857,7 +7857,7 @@ async function generateLessonWithAI(text, subjectId, title, subject) {
         system: systemPrompt,
         messages: [{
           role: 'user',
-          content: `المادة الدراسية:\n\n${text.slice(0,5000)}\n\nالعنوان المقترح: ${title}\n\nولّد درساً تفاعلياً متكاملاً من هذا المحتوى.`
+          content: `المادة الدراسية:\n\n${text}\n\nالعنوان المقترح: ${title}\n\nولّد درساً تفاعلياً متكاملاً من هذا المحتوى.`
         }]
       });
 
@@ -9109,7 +9109,7 @@ const ZAD_UPLOADS = (() => {
       await this._idbPut(bundle);
       // Also keep small localStorage copy (ids only) for quick check
       try {
-        const ids = _cache.slice(0,50).map(u=>u.id);
+        const ids = _cache.map(u=>u.id); // no limit
         localStorage.setItem('zad_upl_ids_'+_emailKey(), JSON.stringify(ids));
       } catch(e) {}
     },
@@ -9157,7 +9157,7 @@ const ZAD_UPLOADS = (() => {
       }
       // Update ids cache
       try {
-        var ids2 = (_cache||[]).slice(0,50).map(function(u){ return u.id; });
+        var ids2 = (_cache||[]).map(function(u){ return u.id; }); // no limit
         localStorage.setItem('zad_upl_ids_'+_emailKey(), JSON.stringify(ids2));
       } catch(e) {}
     },
@@ -10697,8 +10697,8 @@ async function analyzeAndGenerate(text, subjectId, fileName) {
 
     // ── STEP 1: Multi-pass structure detection across FULL document ──
     // Scan in 8000-char windows with overlap to catch all topics
-    const SCAN_CHUNK  = 8000;
-    const SCAN_OVERLAP = 500;
+    const SCAN_CHUNK  = 12000;  // larger window = fewer API calls for detection
+    const SCAN_OVERLAP = 1000; // overlap to catch titles near boundaries
     const allTopics   = [];
     let detectedChapterTitle = fileName.replace(/\.[^.]+$/, '');
     const seenTitles  = new Set();
@@ -10818,7 +10818,7 @@ LANGUAGE RULES:
             sectionEnd = Math.floor(((ti+1) / topics.length) * clean.length);
           }
         }
-        const sectionText = clean.slice(sectionStart, Math.min(sectionEnd, sectionStart + 12000));
+        const sectionText = clean.slice(sectionStart, sectionEnd); // no cap — full section
 
         const topicPrompt = `${langNote}\n\n⚠️ تعليمات مهمة: استخدم المحتوى من النص التالي فقط. لا تضف معلومات خارجية.\n\nموضوع هذا الدرس: "${topic.title}"\n\n=== النص المصدر (استخرج منه فقط) ===\n${sectionText}\n=== نهاية النص ===\n\nأجب بـ JSON صالح فقط:\n${jsonTemplate}`;
 
@@ -10826,7 +10826,7 @@ LANGUAGE RULES:
         try {
           const resp = await zadFetch({
             model: 'llama-3.3-70b-versatile',
-            max_tokens: 6000,
+            max_tokens: 8000,
             system: 'You are an educational content extractor. CRITICAL: Extract information ONLY from the provided text. NEVER add facts, examples, or content not present in the source text. Reply with valid JSON only. No markdown. No hallucination.',
             messages: [{ role: 'user', content: topicPrompt }]
           });
@@ -10874,7 +10874,7 @@ LANGUAGE RULES:
     } else {
       // Single lesson - process in chunks
       upd('📡', 'تحليل الملف...', 30);
-      const chunkSize = 15000; // balanced size for thorough coverage
+      const chunkSize = 20000; // large chunks — full coverage
       const numChunks = Math.ceil(clean.length / chunkSize);
       console.log('[ZAD] numChunks:', numChunks, 'chunkSize:', chunkSize);
       const allResults = [];
@@ -10895,7 +10895,7 @@ LANGUAGE RULES:
         try {
           const resp = await zadFetch({
             model: 'llama-3.3-70b-versatile',
-            max_tokens: 6000,
+            max_tokens: 8000,
             system: 'You are an educational content extractor. Extract ONLY from the provided text. No hallucination. Reply with valid JSON only. No markdown.',
             messages: [{ role: 'user', content: prompt }]
           });
@@ -10922,8 +10922,8 @@ LANGUAGE RULES:
               : 'مساعد تعليمي. أجب بـ JSON صالح فقط.',
             messages: [{ role: 'user', content:
               (isEng
-                ? 'Create an educational lesson about: ' + fileName + '\n\nText:\n' + clean.slice(0, 20000)
-                : 'أنشئ درساً تعليمياً عن: ' + fileName + '\n\nنص:\n' + clean.slice(0, 20000))
+                ? 'Create an educational lesson about: ' + fileName + '\n\nText:\n' + clean
+                : 'أنشئ درساً تعليمياً عن: ' + fileName + '\n\nنص:\n' + clean)
               + '\n\nReturn JSON:\n' + jsonTemplate
             }]
           });

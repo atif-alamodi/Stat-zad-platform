@@ -13892,30 +13892,28 @@ function buildLessonsTab(subject, subjectId) {
 
     var _chOpen  = isOpen ? ' open' : '';
     var _chStyle = chBorderStyle;
-    chapHtml += [
-      '<div class="chapter-item'+_chOpen+'" id="ch-'+safeChId+'"'+_chStyle+'>',
-        '<div class="chapter-header"',
-          ' onclick="toggleChapter(\\''+safeChId+'\\')"',
-          ' oncontextmenu="event.preventDefault();showDeleteChapterConfirm(\\''+subjectId+'\\',\\''+safeChId+'\\',\\''+safeChTitle+'\\')"',
-          ' ontouchstart="startLongPress(event,\\'__ch__'+safeChId+'\\',\\'\\',\\''+subjectId+'\\',\\''+safeChTitle+'\\')" ontouchend="clearLongPress()" ontouchmove="clearLongPress()"',
-        '>',
-          // Subject icon badge with ordinal number below it
-          '<div class="chapter-num" style="background:linear-gradient(135deg,'+subjColor+','+subjColor+'99);flex-direction:column;gap:0;padding:4px 6px;font-size:0.7rem;width:44px;height:44px">',
-            '<span style="font-size:1.1rem;line-height:1.2">'+subjIcon+'</span>',
-            '<span style="font-size:0.7rem;font-weight:900;line-height:1">'+chSeq+'</span>',
-          '</div>',
-          '<div class="chapter-info">',
-            '<div class="chapter-title" style="font-size:'+(isUpload?'0.92':'0.88')+'rem;font-weight:700">',
-              (ch.title||'')+(isUpload?'':' '+badge),
-            '</div>',
-            '<div style="font-size:0.68rem;color:var(--text-muted);font-weight:700;margin-top:1px">'+chLabel+'</div>',
-            lessCntBadge,
-          '</div>',
-          '<i class="fas fa-chevron-left chapter-chevron"></i>',
-        '</div>',
-        '<div class="lesson-list">'+lessonsHtml+'</div>',
-      '</div>'
-    ].join('');
+    chapHtml += '<div class="chapter-item'+_chOpen+'" id="ch-'+safeChId+'"'+_chStyle+'>'
+      + '<div class="chapter-header"'
+        + ' onclick="toggleChapter(\'' + safeChId + '\')"'
+        + ' oncontextmenu="event.preventDefault();showDeleteChapterConfirm(\'' + subjectId + '\',\'' + safeChId + '\',\'' + safeChTitle + '\')"'
+        + ' ontouchstart="startLongPress(event,\'__ch__' + safeChId + '\',\'\',\'' + subjectId + '\',\'' + safeChTitle + '\')" ontouchend="clearLongPress()" ontouchmove="clearLongPress()"'
+      + '>'
+        + '<div class="chapter-num" style="background:linear-gradient(135deg,' + subjColor + ',' + subjColor + '88);flex-direction:column;gap:0;padding:4px 6px;width:44px;height:44px">'
+          + '<span style="font-size:1.1rem;line-height:1.2">' + subjIcon + '</span>'
+          + '<span style="font-size:0.7rem;font-weight:900;line-height:1">' + chSeq + '</span>'
+        + '</div>'
+        + '<div class="chapter-info">'
+          + '<div class="chapter-title" style="font-size:' + (isUpload ? '0.92' : '0.88') + 'rem;font-weight:700">'
+            + (ch.title || '') + (isUpload ? '' : ' ' + badge)
+          + '</div>'
+          + '<div style="font-size:0.68rem;color:var(--text-muted);font-weight:700;margin-top:1px">' + chLabel + '</div>'
+          + lessCntBadge
+        + '</div>'
+        + '<i class="fas fa-chevron-left chapter-chevron"></i>'
+      + '</div>'
+      + '<div class="lesson-list">' + lessonsHtml + '</div>'
+    + '</div>';
+
   });
 
   return '<div class="chapter-list">'+chapHtml+'</div>';
@@ -21087,63 +21085,72 @@ function buildAILessonFallback(lesson) {
 // ── AI-Powered Content Lab for uploaded lessons ─────────────
 function buildContentLab(subjectId) {
   var uploads = ZAD_UPLOADS.getAll().filter(function(u){ return u.subjectId === subjectId && u.lesson; });
-  
+  var subj    = CURRICULUM[subjectId] || {};
+  var subColor= subj.color || '#6C63FF';
+  var subIcon = subj.icon  || '📚';
+
   if (!uploads.length) {
     return '<div style="text-align:center;padding:40px;color:var(--text-muted)">'
       + '<div style="font-size:2rem;margin-bottom:10px">🧪</div>'
-      + '<div>ارفع ملفاً أولاً لتفعيل المختبر التفاعلي</div>'
-      + '</div>';
+      + '<div>ارفع ملفاً أولاً لتفعيل المختبر التفاعلي</div></div>';
   }
 
-  // Build grouped options by chapter (chapterTitle = file name)
-  // Group uploads by their chapterTitle (each file = one chapter)
-  var chapGroups = {};
-  var chapOrder  = [];
-  uploads.forEach(function(u, i) {
-    var chKey = u.chapterTitle || u.fileName || 'فصل';
-    if (!chapGroups[chKey]) { chapGroups[chKey] = []; chapOrder.push(chKey); }
-    chapGroups[chKey].push({ u: u, i: i });
+  // Group by chapter (chapterTitle or fileName)
+  var chapGroups = {}, chapOrder = [];
+  uploads.forEach(function(u, gi) {
+    var ck = u.chapterTitle || u.fileName || 'فصل';
+    if (!chapGroups[ck]) { chapGroups[ck] = []; chapOrder.push(ck); }
+    chapGroups[ck].push(u);
   });
 
-  // Build structured option groups: optgroup per chapter, options per lesson
-  var optionsHTML = chapOrder.map(function(chKey, ci) {
-    var lessons = chapGroups[chKey];
-    var groupLabel = 'الفصل ' + arabicOrdinal(ci+1) + ' — ' + chKey;
-    if (lessons.length === 1) {
-      var title = (lessons[0].u.lesson && lessons[0].u.lesson.title) || lessons[0].u.title || lessons[0].u.fileName || 'درس';
-      return '<option value="'+lessons[0].i+'">'+arabicOrdinal(ci+1)+'. '+title+'</option>';
-    }
-    return '<optgroup label="'+groupLabel+'">'
-      + lessons.map(function(item, li) {
-          var title = (item.u.lesson && item.u.lesson.title) || item.u.title || item.u.fileName || 'درس';
-          return '<option value="'+item.i+'">الدرس '+arabicOrdinal(li+1)+': '+title+'</option>';
-        }).join('')
-      + '</optgroup>';
-  }).join('');
+  // Flat options with optgroup headers
+  var flatIdx = 0, optionsHTML = '';
+  chapOrder.forEach(function(ck, ci) {
+    var chName = ck.replace(/\.[^.]+$/, '');
+    optionsHTML += '<optgroup label="' + arabicOrdinal(ci+1) + ': ' + chName + '">';
+    chapGroups[ck].forEach(function(u, li) {
+      var t = (u.lesson && u.lesson.title && typeof isValidTitle==='function' && isValidTitle(u.lesson.title))
+        ? u.lesson.title : (u.title || u.fileName || 'درس '+(li+1));
+      optionsHTML += '<option value="'+flatIdx+'">' + arabicOrdinal(li+1) + ': ' + t + '</option>';
+      flatIdx++;
+    });
+    optionsHTML += '</optgroup>';
+  });
 
-  return '<div style="direction:rtl;max-width:700px">'
-    + '<div style="background:rgba(108,99,255,0.08);border:1.5px solid rgba(108,99,255,0.25);border-radius:16px;padding:16px;margin-bottom:16px">'
-      + '<div style="font-weight:900;font-size:0.95rem;margin-bottom:12px">🧪 مختبر تفاعلي — اسأل عن أي درس</div>'
-      + '<select id="lab-lesson-select" style="width:100%;padding:9px 12px;border-radius:10px;border:1px solid var(--border);background:rgba(30,30,40,0.95);color:var(--text);font-family:var(--font);font-size:0.85rem;margin-bottom:10px">'
+  // Chapter pills (only if >1 chapter)
+  var flatStart = 0;
+  var chipsHTML = chapOrder.length > 1 ? chapOrder.map(function(ck, ci) {
+    var chName = ck.replace(/\.[^.]+$/, '').slice(0,22);
+    var idx = flatStart; flatStart += chapGroups[ck].length;
+    return '<button onclick="document.getElementById(\'lab-lesson-select\').value=\''+idx+'\';" '
+      + 'style="padding:5px 12px;border-radius:20px;border:1.5px solid '+subColor+'44;'
+      + 'background:'+subColor+'11;color:'+subColor+';font-size:0.7rem;font-weight:700;cursor:pointer;flex-shrink:0">'
+      + subIcon+' '+arabicOrdinal(ci+1)+': '+chName+'</button>';
+  }).join('') : '';
+
+  return '<div style="direction:rtl">'
+    + '<div style="background:rgba(108,99,255,0.07);border:1.5px solid rgba(108,99,255,0.22);border-radius:16px;padding:14px;margin-bottom:14px">'
+      + '<div style="font-weight:900;font-size:0.9rem;margin-bottom:8px">🧪 مختبر تفاعلي — اسأل عن فصولك ودروسك</div>'
+      + (chipsHTML ? '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;overflow-x:auto">'+chipsHTML+'</div>' : '')
+      + '<select id="lab-lesson-select" style="width:100%;padding:9px 12px;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text);font-family:var(--font);font-size:0.85rem">'
         + optionsHTML
       + '</select>'
     + '</div>'
     + '<div id="lab-chat-history" style="min-height:180px;max-height:380px;overflow-y:auto;background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:12px;direction:rtl">'
-      + '<div style="color:var(--text-muted);font-size:0.82rem;text-align:center;padding:20px">اكتب سؤالاً عن الدرس المحدد ⬇️</div>'
+      + '<div style="color:var(--text-muted);font-size:0.82rem;text-align:center;padding:20px">اختر فصلاً/درساً ثم اكتب سؤالك ⬇️</div>'
     + '</div>'
     + '<div style="display:flex;gap:8px">'
-      + '<textarea id="lab-question-inp" placeholder="اسأل سؤالاً، اطلب شرحاً، أو تحدٍ تطبيقي..." rows="2"'
-        + ' style="flex:1;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text);font-family:var(--font);font-size:0.85rem;outline:none;resize:none;direction:rtl"></textarea>'
+      + '<textarea id="lab-question-inp" placeholder="اسأل، اشرح، قارن، أو اختبرني..." rows="2" style="flex:1;padding:10px 12px;border-radius:10px;border:1.5px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text);font-family:var(--font);font-size:0.85rem;outline:none;resize:none;direction:rtl"></textarea>'
       + '<button onclick="labAskQuestion(\''+subjectId+'\')" style="padding:10px 16px;border-radius:10px;border:none;background:var(--primary);color:white;font-family:var(--font);font-weight:800;cursor:pointer;align-self:flex-end">إرسال</button>'
     + '</div>'
     + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">'
-      + ['اشرح لي هذا الموضوع بأسلوب بسيط', 'أعطني مثالاً تطبيقياً', 'ما الفرق بين...', 'اختبرني في هذا الدرس'].map(function(q){
+      + ['اشرح ببساطة','مثال تطبيقي','ما الفرق؟','اختبرني','لخص النقاط'].map(function(q){
           return '<button onclick="document.getElementById(\'lab-question-inp\').value=\''+q+'\'" '
             + 'style="padding:5px 10px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.04);color:var(--text-muted);font-size:0.72rem;cursor:pointer">'+q+'</button>';
         }).join('')
-    + '</div>'
-  + '</div>';
+    + '</div></div>';
 }
+
 
 async function labAskQuestion(subjectId) {
   var inp     = document.getElementById('lab-question-inp');

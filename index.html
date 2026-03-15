@@ -10598,12 +10598,12 @@ If the text is all one topic, return: {"hasMultipleTopics": false, "topics": [{"
 Identify REAL chapter/topic boundaries, not artificial ones. Max 8 topics.`
       }]
     });
-    const structData = await structResp.json();
     let structure = null;
     try {
+      const structData = await structResp.json();
       const sText = (structData.content && structData.content[0] && structData.content[0].text) || '';
       structure = repairAndParseJSON(sText);
-    } catch(e) {}
+    } catch(e) { console.warn('Structure detection failed:', e.message); }
 
     const topics = (structure && structure.topics && structure.topics.length > 1 && structure.hasMultipleTopics)
       ? structure.topics.slice(0, 8)
@@ -10660,15 +10660,20 @@ VIOLATION: Writing Arabic in quiz.q or quiz.options is a critical error.`
 
         const topicPrompt = `${langNote}\n\nموضوع هذا الدرس: "${topic.title}"\nنص الدرس:\n${sectionText}\n\nأجب بـ JSON صالح فقط:\n${jsonTemplate}`;
 
-        const resp = await zadFetch({
-          model: 'llama-3.3-70b-versatile',
-          max_tokens: 6000,
-          system: 'أنت مساعد تعليمي. أجب بـ JSON صالح فقط.',
-          messages: [{ role: 'user', content: topicPrompt }]
-        });
-        const data = await resp.json();
-        if (!data.content || !data.content[0]) continue;
-        const lesson = repairAndParseJSON((data.content[0].text||'').trim());
+        let lesson = null;
+        try {
+          const resp = await zadFetch({
+            model: 'llama-3.3-70b-versatile',
+            max_tokens: 4000,
+            system: 'You are an educational assistant. Reply with valid JSON only. No markdown.',
+            messages: [{ role: 'user', content: topicPrompt }]
+          });
+          const data = await resp.json();
+          const text = (data.content && data.content[0] && data.content[0].text) || '';
+          lesson = repairAndParseJSON(text.trim());
+        } catch(topicErr) {
+          console.warn('Topic', ti, 'failed:', topicErr.message);
+        }
         if (!lesson) continue;
 
         // Ensure required fields
@@ -10703,17 +10708,24 @@ VIOLATION: Writing Arabic in quiz.q or quiz.options is a critical error.`
         const isFirst = ci === 0;
         const prompt = isFirst
           ? `${langNote}\n\nالنص:\n${chunk}\n\nأجب بـ JSON:\n${jsonTemplate}`
+          : isEng
+          ? `${langNote}\n\nAdditional text:\n${chunk}\n\nReturn JSON with extra content only:\n{"keyTerms":[{"term":"English term","def":"Arabic definition"}],"steps":["Arabic point"],"quiz":[{"q":"English question?","options":["Correct English","Wrong 1","Wrong 2","Wrong 3"],"answer":0,"hint":"English hint","explanation":"Arabic explanation"}]}`
           : `${langNote}\n\nنص إضافي:\n${chunk}\n\nأجب بـ JSON مع مصطلحات وأسئلة إضافية فقط:\n{"keyTerms":[{"term":"...","def":"..."}],"steps":["..."],"quiz":[{"q":"...","options":["صحيح","خطأ1","خطأ2","خطأ3"],"answer":0,"explanation":"..."}]}`;
 
-        const resp = await zadFetch({
-          model: 'llama-3.3-70b-versatile',
-          max_tokens: 6000,
-          system: 'أنت مساعد تعليمي. أجب بـ JSON صالح فقط.',
-          messages: [{ role: 'user', content: prompt }]
-        });
-        const data = await resp.json();
-        if (!data.content || !data.content[0]) continue;
-        const parsed = repairAndParseJSON((data.content[0].text||'').trim());
+        let parsed = null;
+        try {
+          const resp = await zadFetch({
+            model: 'llama-3.3-70b-versatile',
+            max_tokens: 4000,
+            system: 'You are an educational assistant. Reply with valid JSON only. No markdown, no extra text.',
+            messages: [{ role: 'user', content: prompt }]
+          });
+          const data = await resp.json();
+          const text = (data.content && data.content[0] && data.content[0].text) || '';
+          parsed = repairAndParseJSON(text.trim());
+        } catch(fetchErr) {
+          console.warn('Chunk', ci, 'failed:', fetchErr.message);
+        }
         if (parsed) allResults.push(parsed);
       }
 

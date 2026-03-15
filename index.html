@@ -9133,6 +9133,34 @@ const ZAD_UPLOADS = (() => {
 
     resetCache() { _cache = null; },
 
+    // Delete multiple uploads silently (no toast per item)
+    async deleteAll(ids, subjectId) {
+      for (var i = 0; i < ids.length; i++) {
+        var uid = ids[i];
+        if (_cache) _cache = _cache.filter(function(u){ return u.id !== uid; });
+        try {
+          var db = await _openDB();
+          var tx = db.transaction('uploads', 'readwrite');
+          tx.objectStore('uploads').delete(uid);
+        } catch(e) {}
+        // Remove from CURRICULUM memory
+        if (typeof CURRICULUM !== 'undefined' && subjectId && CURRICULUM[subjectId]) {
+          var lid = 'ai-' + uid;
+          CURRICULUM[subjectId].chapters.forEach(function(c) {
+            c.lessons = (c.lessons||[]).filter(function(l){ return l.id !== lid && l.sourceUploadId !== uid; });
+          });
+        }
+        // Cleanup localStorage quiz/card keys
+        try { localStorage.removeItem('zad_quiz_upload_' + uid); } catch(e) {}
+        try { localStorage.removeItem('zad_cards_upload_' + uid); } catch(e) {}
+      }
+      // Update ids cache
+      try {
+        var ids2 = (_cache||[]).slice(0,50).map(function(u){ return u.id; });
+        localStorage.setItem('zad_upl_ids_'+_emailKey(), JSON.stringify(ids2));
+      } catch(e) {}
+    },
+
     getCardExamples(cardId) {
       try { return JSON.parse(localStorage.getItem('zad_card_ex_' + cardId) || '[]'); }
       catch(e) { return []; }
@@ -20088,27 +20116,41 @@ function showDeleteChapterConfirm(subjectId, chapterId, chapterTitle) {
   document.getElementById('del-ch-ok').onclick = function() {
     overlay.remove();
 
-    // Mark chapter as deleted
-    markChapterDeleted(subjectId, chapterId);
-
     if (isUpload) {
-      // Delete upload from ZAD_UPLOADS
-      var uploadId = chapterId.replace('up-ch-', '');
-      ZAD_UPLOADS.getAll()
-        .filter(function(u){ return u.id === uploadId || u.id.startsWith(uploadId); })
-        .forEach(function(u){ ZAD_UPLOADS.delete(u.id, subjectId); });
+      // ── Delete uploaded chapter: remove ALL its lessons from IDB ──
+      var baseId = chapterId.replace('up-ch-', '');
+      var toDelete = ZAD_UPLOADS.getAll().filter(function(u) {
+        return u.subjectId === subjectId
+          && (u.id === baseId || u.id.startsWith(baseId + '_'));
+      });
+      var deleteIds = toDelete.map(function(u){ return u.id; });
+
+      // Remove chapter from CURRICULUM memory
+      if (CURRICULUM[subjectId]) {
+        CURRICULUM[subjectId].chapters = (CURRICULUM[subjectId].chapters||[]).filter(function(c) {
+          return c.id !== chapterId;
+        });
+      }
+
+      // Delete all lessons from IDB silently
+      ZAD_UPLOADS.deleteAll(deleteIds, subjectId);
+
+      showToast('🗑️ تم حذف الفصل و' + deleteIds.length + ' درس نهائياً', 'success');
+
     } else {
-      // Mark all lessons as deleted
+      // ── Delete built-in chapter: mark all lessons as deleted ──
+      markChapterDeleted(subjectId, chapterId);
       if (ch) (ch.lessons||[]).forEach(function(l) { markLessonDeleted(subjectId, l.id); });
-      // Remove from CURRICULUM in memory
       if (CURRICULUM[subjectId]) {
         CURRICULUM[subjectId].chapters = (CURRICULUM[subjectId].chapters||[]).filter(function(c){ return c.id !== chapterId; });
       }
+      showToast('🗑️ تم حذف الفصل من حسابك', 'success');
     }
 
-    showToast('🗑️ تم حذف القسم من حسابك', 'success');
-    showSubject(subjectId, 'lessons');
-    if (typeof refreshUserCurriculumSection === 'function') refreshUserCurriculumSection();
+    setTimeout(function() {
+      showSubject(subjectId, 'lessons');
+      if (typeof refreshUserCurriculumSection === 'function') refreshUserCurriculumSection();
+    }, 300);
   };
 }
 

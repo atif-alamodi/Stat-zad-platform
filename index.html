@@ -17945,60 +17945,46 @@ function buildAIQuizUI(subject, subjectId) {
 function renderAIQuizQuestion() {
   var state = window._ZAD_AI_QUIZ_STATE;
   if (!state) return '';
-  var isEng = state.subjectId === 'english';
-  var L = {
-    easy:    isEng ? 'Easy'   : 'سهل',
-    medium:  isEng ? 'Medium' : 'متوسط',
-    hard:    isEng ? 'Hard'   : 'صعب',
-    qOf:     isEng ? 'Question' : 'سؤال',
-    of:      isEng ? 'of'     : 'من',
-    hint:    isEng ? '💡 Hint' : L.hint,
-    lesson:  isEng ? '📖 Lesson:' : '📖 ',
-    chapter: isEng ? '📂 Chapter:' : '📂 ',
-    page:    isEng ? '📄 Page' : L.page,
-    letters: isEng ? ['A','B','C','D'] : ['أ','ب','ج','د'],
-    confirm: isEng ? 'Check Answer →' : 'تأكيد الإجابة ←',
-  };
   if (state.current >= state.questions.length) return buildAIQuizResult();
   var q = state.questions[state.current];
   if (!q) return buildAIQuizResult();
 
+  var isEng = state.subjectId === 'english';
   var pct = Math.round((state.current / state.questions.length) * 100);
   var diffColor = q.difficulty==='easy' ? '#66BB6A' : q.difficulty==='hard' ? '#EF5350' : '#FFA726';
-  var diffLabel = q.difficulty==='easy' ? L.easy : q.difficulty==='hard' ? L.hard : L.medium;
+  var diffLabel = q.difficulty==='easy'  ? (isEng?'Easy':'سهل')
+                : q.difficulty==='hard'  ? (isEng?'Hard':'صعب')
+                : (isEng?'Medium':'متوسط');
+  var letters = isEng ? ['A','B','C','D'] : ['أ','ب','ج','د'];
+  var qLabel  = isEng ? 'Question' : 'سؤال';
+  var pageLabel = isEng ? '📄 pg.' : '📄 ص';
 
   var opts = (q.options||[]).map(function(opt, i) {
     return '<div onclick="selectAIQuizOption('+i+')" id="aiqopt-'+i+'"'
       + ' style="padding:12px 16px;border-radius:12px;border:1.5px solid rgba(255,255,255,0.1);'
       + 'background:rgba(255,255,255,0.04);cursor:pointer;transition:all 0.2s;'
-      + 'font-size:0.85rem;margin-bottom:8px;direction:rtl;display:flex;align-items:center;gap:10px">'
+      + 'font-size:0.85rem;margin-bottom:8px;direction:'+(isEng?'ltr':'rtl')+';display:flex;align-items:center;gap:10px">'
       + '<span style="width:26px;height:26px;border-radius:50%;background:rgba(108,99,255,0.15);'
       + 'display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:800;'
-      + 'color:var(--primary);flex-shrink:0">'+L.letters[i]+'</span>'
+      + 'color:var(--primary);flex-shrink:0">'+letters[i]+'</span>'
       + '<span>'+opt+'</span>'
       + '</div>';
   }).join('');
 
   return '<div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:16px;margin-bottom:12px">'
-    // Progress bar
     + '<div style="background:rgba(255,255,255,0.06);border-radius:99px;height:4px;margin-bottom:14px">'
       + '<div style="height:4px;background:linear-gradient(90deg,var(--primary),#a78bfa);width:'+pct+'%;border-radius:99px"></div>'
     + '</div>'
-    // Meta row: question number + difficulty + lesson info
     + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">'
-      + '<span style="font-size:0.7rem;color:var(--text-muted);font-weight:700">سؤال '+(state.current+1)+' / '+state.questions.length+'</span>'
+      + '<span style="font-size:0.7rem;color:var(--text-muted);font-weight:700">'+qLabel+' '+(state.current+1)+' / '+state.questions.length+'</span>'
       + '<span style="font-size:0.68rem;padding:2px 8px;border-radius:20px;background:'+diffColor+'18;color:'+diffColor+';border:1px solid '+diffColor+'40">'+diffLabel+'</span>'
       + (q.lesson ? '<span style="font-size:0.68rem;color:var(--text-muted);margin-right:auto">📖 '+q.lesson+'</span>' : '')
-      + (q.page ? '<span style="font-size:0.68rem;padding:2px 8px;border-radius:20px;background:rgba(255,255,255,0.06);color:var(--text-muted)">📄 ص '+q.page+'</span>' : '')
+      + (q.page ? '<span style="font-size:0.68rem;padding:2px 8px;border-radius:20px;background:rgba(255,255,255,0.06);color:var(--text-muted)">'+pageLabel+' '+q.page+'</span>' : '')
     + '</div>'
-    // Question text
-    + '<div style="font-weight:800;font-size:0.92rem;margin-bottom:16px;line-height:1.7;direction:rtl">'+q.q+'</div>'
-    // Options
+    + '<div style="font-weight:800;font-size:0.92rem;margin-bottom:16px;line-height:1.7;direction:'+(isEng?'ltr':'rtl')+'">'+q.q+'</div>'
     + opts
-    // Hint button (hidden by default)
-    + (q.hint ? '<button onclick="document.getElementById(\'quiz-hint-box\').style.display=\'block\';this.style.display=\'none\'" style="margin-top:8px;padding:6px 14px;border-radius:8px;border:1px solid rgba(255,214,0,0.3);background:rgba(255,214,0,0.06);color:#FFD600;font-size:0.78rem;cursor:pointer;font-family:var(--font)">💡 تلميح</button>' : '')
-    + (q.hint ? '<div id="quiz-hint-box" style="display:none;margin-top:8px;padding:10px;border-radius:10px;background:rgba(255,214,0,0.06);border:1px solid rgba(255,214,0,0.2);font-size:0.8rem;color:#FFD600;direction:rtl">💡 '+q.hint+'</div>' : '')
-    // Feedback area
+    + (q.hint ? '<button onclick="document.getElementById(\'quiz-hint-box\').style.display=\'block\';this.style.display=\'none\'" style="margin-top:8px;padding:6px 14px;border-radius:8px;border:1px solid rgba(255,214,0,0.3);background:rgba(255,214,0,0.06);color:#FFD600;font-size:0.78rem;cursor:pointer;font-family:var(--font)">'+(isEng?'💡 Hint':'💡 تلميح')+'</button>' : '')
+    + (q.hint ? '<div id="quiz-hint-box" style="display:none;margin-top:8px;padding:10px;border-radius:10px;background:rgba(255,214,0,0.06);border:1px solid rgba(255,214,0,0.2);font-size:0.8rem;color:#FFD600;direction:'+(isEng?'ltr':'rtl')+'">💡 '+q.hint+'</div>' : '')
     + '<div id="ai-quiz-feedback" style="display:none;margin-top:12px;padding:12px;border-radius:12px;font-size:0.83rem;line-height:1.6"></div>'
   + '</div>';
 }
@@ -18007,31 +17993,18 @@ window._ZAD_AI_QUIZ_SELECTED = -1;
 
 function selectAIQuizOption(i) {
   var state = window._ZAD_AI_QUIZ_STATE;
-  var isEng = state && state.subjectId === 'english';
-  var FL = {
-    correct: isEng ? '✅ Correct answer!' : '✅ إجابة صحيحة!',
-    wrong:   isEng ? '❌ Wrong answer' : '❌ إجابة خاطئة',
-    rightAns: isEng ? '✔️ Correct answer:' : '✔️ الصحيح:',
-    hint_lbl: isEng ? '💡 Hint:' : '💡 التلميح:',
-    expl_lbl: isEng ? '📝 Explanation:' : '📝 الشرح:',
-    lesson_lbl: isEng ? '📖 Lesson:' : '📖',
-    chap_lbl: isEng ? '📂 Chapter:' : '📂',
-    page_lbl: isEng ? '📄 Page' : '📄 ص',
-  };
   if (!state) return;
   var q = state.questions[state.current];
   var correct = i === q.answer;
   if (correct) state.score++;
   state.answers.push(i);
+  var isEng = state.subjectId === 'english';
 
-  // Color all options
   document.querySelectorAll('[id^="aiqopt-"]').forEach(function(el, idx) {
-    el.onclick = null;
-    el.style.cursor = 'default';
+    el.onclick = null; el.style.cursor = 'default';
     if (idx === q.answer) {
       el.style.background = 'rgba(102,187,106,0.2)';
       el.style.borderColor = '#66BB6A';
-      el.querySelector && el.querySelector('span') && (el.querySelectorAll('span')[0].style.background = '#66BB6A', el.querySelectorAll('span')[0].style.color = 'white');
     } else if (idx === i && !correct) {
       el.style.background = 'rgba(239,83,80,0.15)';
       el.style.borderColor = '#EF5350';
@@ -18040,38 +18013,32 @@ function selectAIQuizOption(i) {
     }
   });
 
-  // Show rich feedback
   var fb = document.getElementById('ai-quiz-feedback');
   if (fb) {
     fb.style.display = 'block';
     fb.style.background = correct ? 'rgba(102,187,106,0.1)' : 'rgba(239,83,80,0.08)';
-    fb.style.border = '1.5px solid ' + (correct ? 'rgba(102,187,106,0.35)' : 'rgba(239,83,80,0.3)');
-    var fbHTML = '<div style="font-weight:800;font-size:0.88rem;margin-bottom:6px;color:'+(correct?'#66BB6A':'#EF5350')+'">'
-      + (correct ? FL.correct : FL.wrong) + '</div>';
-    if (!correct) {
-      fbHTML += '<div style="font-size:0.83rem;margin-bottom:6px">✔️ الصحيح: <strong style="color:#66BB6A">'+(q.options[q.answer]||'')+'</strong></div>';
+    fb.style.border = '1.5px solid '+(correct?'rgba(102,187,106,0.35)':'rgba(239,83,80,0.3)');
+    fb.style.direction = isEng ? 'ltr' : 'rtl';
+    var h = '<div style="font-weight:800;font-size:0.88rem;margin-bottom:6px;color:'+(correct?'#66BB6A':'#EF5350')+'">'
+      + (correct ? (isEng?'✅ Correct!':'✅ إجابة صحيحة!') : (isEng?'❌ Wrong answer':'❌ إجابة خاطئة'))
+      + '</div>';
+    if (!correct) h += '<div style="font-size:0.83rem;margin-bottom:6px">'+(isEng?'✔️ Correct answer:':'✔️ الصحيح:')+' <strong style="color:#66BB6A">'+(q.options[q.answer]||'')+'</strong></div>';
+    if (q.hint) h += '<div style="font-size:0.8rem;color:#FFD600;margin-bottom:5px">💡 '+q.hint+'</div>';
+    if (q.explanation) h += '<div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:5px;line-height:1.6">'+(isEng?'📝 ':'📝 الشرح: ')+q.explanation+'</div>';
+    if (q.lesson||q.page) {
+      h += '<div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.07);display:flex;flex-wrap:wrap;gap:10px">';
+      if (q.lesson) h += '<span>📖 '+q.lesson+'</span>';
+      if (q.page)   h += '<span>'+(isEng?'📄 pg.':'📄 ص')+' '+q.page+'</span>';
+      h += '</div>';
     }
-    if (q.hint)        fbHTML += '<div style="font-size:0.8rem;color:#FFD600;margin-bottom:5px">💡 '+q.hint+'</div>';
-    if (q.explanation) fbHTML += '<div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:5px;line-height:1.6">📝 '+q.explanation+'</div>';
-    if (q.lesson || q.page) {
-      fbHTML += '<div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.07);display:flex;flex-wrap:wrap;gap:10px">';
-      if (q.lesson)  fbHTML += '<span>📖 '+q.lesson+'</span>';
-      if (q.chapter) fbHTML += '<span>📂 '+q.chapter+'</span>';
-      if (q.page)    fbHTML += '<span>📄 ص '+q.page+'</span>';
-      fbHTML += '</div>';
-    }
-    fb.innerHTML = fbHTML;
+    fb.innerHTML = h;
   }
 
-  // Show hint box if present
   var hbox = document.getElementById('quiz-hint-box');
   if (hbox) hbox.style.display = 'block';
-  var hbtn = document.querySelector('button[onclick*="quiz-hint-box"]');
-  if (hbtn) hbtn.style.display = 'none';
 
   state.current++;
   window._ZAD_AI_QUIZ_SELECTED = -1;
-
   setTimeout(function() {
     var area = document.getElementById('ai-quiz-q-area');
     if (area) area.innerHTML = renderAIQuizQuestion();
@@ -18082,75 +18049,46 @@ function selectAIQuizOption(i) {
 
 function buildAIQuizResult() {
   var state = window._ZAD_AI_QUIZ_STATE;
-  var isEng = state && state.subjectId === 'english';
-  var RL = {
-    perfect: isEng ? 'Excellent! Outstanding performance' : 'ممتاز! أداء رائع',
-    good:    isEng ? 'Very Good! Keep it up' : 'جيد جداً! استمر',
-    ok:      isEng ? 'Good, you can improve' : 'جيد، يمكنك تحسينه',
-    retry:   isEng ? 'Review the material again' : 'راجع المادة مجدداً',
-    correct: isEng ? 'correct out of' : 'صحيح من',
-    review:  isEng ? '📋 Review Answers' : RL.review,
-    retry_btn: isEng ? '🔄 Retry Quiz' : RL.retry_btn,
-    lesson_lbl: isEng ? '📖 Lesson:' : '📖',
-    chapter_lbl: isEng ? '📂 Chapter:' : '📂',
-    page_lbl: isEng ? '📄 Page' : '📄 ص',
-    correct_lbl: isEng ? '✔️ Correct answer:' : '✔️ الصحيح:',
-    explain_lbl: isEng ? '📝 Explanation:' : '📝 الشرح:',
-  };
-  if (!state || !state.questions.length) return '';
+  if (!state||!state.questions.length) return '';
+  var isEng = state.subjectId === 'english';
   var total = state.questions.length;
-  var score = state.score;
-  var pct = Math.round((score / total) * 100);
-  var col = pct>=70 ? '#66BB6A' : pct>=50 ? '#FFA726' : '#EF5350';
+  var pct = Math.round((state.score/total)*100);
+  var col = pct>=70?'#66BB6A':pct>=50?'#FFA726':'#EF5350';
   var emoji = pct>=90?'🏆':pct>=70?'⭐':pct>=50?'👍':'💪';
-  var msg = pct>=90 ? RL.perfect : pct>=70 ? RL.good : pct>=50 ? RL.ok : RL.retry;
+  var msg = isEng
+    ? (pct>=90?'Excellent! Outstanding!':pct>=70?'Very Good! Keep it up!':pct>=50?'Good, keep practicing!':'Review the material again.')
+    : (pct>=90?'ممتاز! أداء رائع':pct>=70?'جيد جداً! استمر':pct>=50?'جيد، يمكنك تحسينه':'راجع المادة مجدداً');
 
-  // Track quiz completion
-  if (typeof trackQuizCompleted === 'function') trackQuizCompleted(state.subjectId, pct);
+  if (typeof trackQuizCompleted==='function') trackQuizCompleted(state.subjectId, pct);
 
-  var reviewHTML = state.questions.map(function(q, i) {
-    var userAns = state.answers[i];
-    var isCorrect = userAns === q.answer;
-    return '<div style="padding:12px;border-radius:12px;border:1px solid '+(isCorrect?'rgba(102,187,106,0.2)':'rgba(239,83,80,0.2)')+';'
-      + 'background:'+(isCorrect?'rgba(102,187,106,0.05)':'rgba(239,83,80,0.05)')+';margin-bottom:8px">'
+  var reviewHTML = state.questions.map(function(q,i) {
+    var ua = state.answers[i];
+    var ok = ua===q.answer;
+    return '<div style="padding:12px;border-radius:12px;border:1px solid '+(ok?'rgba(102,187,106,0.2)':'rgba(239,83,80,0.2)')+';background:'+(ok?'rgba(102,187,106,0.05)':'rgba(239,83,80,0.05)')+';margin-bottom:8px;direction:'+(isEng?'ltr':'rtl')+'">'
       + '<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px">'
-        + '<span style="font-size:1rem;flex-shrink:0">'+(isCorrect?'✅':'❌')+'</span>'
+        + '<span style="font-size:1rem;flex-shrink:0">'+(ok?'✅':'❌')+'</span>'
         + '<div style="font-size:0.83rem;font-weight:700;line-height:1.5;flex:1">'+(i+1)+'. '+q.q+'</div>'
       + '</div>'
-      + (!isCorrect ? '<div style="font-size:0.78rem;color:#66BB6A;margin-bottom:4px">✔️ الصحيح: '+(q.options[q.answer]||'')+'</div>' : '')
-      + (q.explanation ? '<div style="font-size:0.76rem;color:var(--text-muted);margin-bottom:4px">📝 '+q.explanation+'</div>' : '')
+      + (!ok?'<div style="font-size:0.78rem;color:#66BB6A;margin-bottom:4px">'+(isEng?'✔️ Answer:':'✔️ الصحيح:')+' '+(q.options[q.answer]||'')+'</div>':'')
+      + (q.explanation?'<div style="font-size:0.76rem;color:var(--text-muted);margin-bottom:4px">'+q.explanation+'</div>':'')
       + '<div style="font-size:0.7rem;color:var(--text-muted);display:flex;gap:10px;flex-wrap:wrap">'
-        + (q.lesson  ? '<span>📖 '+q.lesson+'</span>'  : '')
-        + (q.chapter ? '<span>📂 '+q.chapter+'</span>' : '')
-        + (q.page    ? '<span>📄 ص '+q.page+'</span>'  : '')
+        + (q.lesson?'<span>📖 '+q.lesson+'</span>':'')
+        + (q.page?'<span>'+(isEng?'📄 pg.':'📄 ص')+' '+q.page+'</span>':'')
       + '</div>'
     + '</div>';
   }).join('');
 
-  return '<div style="direction:rtl">'
-    // Score card
+  return '<div style="direction:'+(isEng?'ltr':'rtl')+'">'
     + '<div style="text-align:center;padding:24px;background:rgba(255,255,255,0.03);border-radius:18px;margin-bottom:16px">'
       + '<div style="font-size:3rem;margin-bottom:6px">'+emoji+'</div>'
       + '<div style="font-size:2.5rem;font-weight:900;color:'+col+';margin-bottom:4px">'+pct+'%</div>'
-      + '<div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:4px">'+score+' صحيح من '+total+' سؤال</div>'
+      + '<div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:4px">'+state.score+(isEng?' correct out of ':' صحيح من ')+total+'</div>'
       + '<div style="font-size:0.88rem;font-weight:700;color:'+col+'">'+msg+'</div>'
     + '</div>'
-    // Action buttons
     + '<div style="display:flex;gap:8px;margin-bottom:18px">'
-      + '<button onclick="'
-        + 'window._ZAD_AI_QUIZ_STATE.current=0;'
-        + 'window._ZAD_AI_QUIZ_STATE.score=0;'
-        + 'window._ZAD_AI_QUIZ_STATE.answers=[];'
-        + 'window._ZAD_AI_QUIZ_SELECTED=-1;'
-        + 'document.getElementById(\'ai-quiz-q-area\').innerHTML=renderAIQuizQuestion()"'
-        + ' style="flex:1;padding:11px;border-radius:12px;border:none;cursor:pointer;'
-        + 'background:linear-gradient(135deg,var(--primary),#a78bfa);color:white;'
-        + 'font-family:var(--font);font-weight:800;font-size:0.85rem">🔄 إعادة الاختبار</button>'
-      + '<button onclick="document.getElementById(\'quiz-review\').style.display=document.getElementById(\'quiz-review\').style.display===\'none\'?\'block\':\'none\'"'
-        + ' style="flex:1;padding:11px;border-radius:12px;border:1px solid var(--border);background:rgba(255,255,255,0.04);'
-        + 'cursor:pointer;font-family:var(--font);font-weight:700;font-size:0.85rem;color:var(--text-muted)">📋 مراجعة الإجابات</button>'
+      + '<button onclick="window._ZAD_AI_QUIZ_STATE.current=0;window._ZAD_AI_QUIZ_STATE.score=0;window._ZAD_AI_QUIZ_STATE.answers=[];window._ZAD_AI_QUIZ_SELECTED=-1;document.getElementById(\'ai-quiz-q-area\').innerHTML=renderAIQuizQuestion()" style="flex:1;padding:11px;border-radius:12px;border:none;cursor:pointer;background:linear-gradient(135deg,var(--primary),#a78bfa);color:white;font-family:var(--font);font-weight:800;font-size:0.85rem">'+(isEng?'🔄 Retry Quiz':'🔄 إعادة الاختبار')+'</button>'
+      + '<button onclick="document.getElementById(\'quiz-review\').style.display=document.getElementById(\'quiz-review\').style.display===\'none\'?\'block\':\'none\'" style="flex:1;padding:11px;border-radius:12px;border:1px solid var(--border);background:rgba(255,255,255,0.04);cursor:pointer;font-family:var(--font);font-weight:700;font-size:0.85rem;color:var(--text-muted)">'+(isEng?'📋 Review Answers':'📋 مراجعة الإجابات')+'</button>'
     + '</div>'
-    // Review section (collapsed)
     + '<div id="quiz-review" style="display:none">'+reviewHTML+'</div>'
   + '</div>';
 }

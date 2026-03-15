@@ -9050,8 +9050,9 @@ const ZAD_UPLOADS = (() => {
     return (APP.student.email || 'anonymous').replace(/[^a-z0-9]/gi, '_');
   }
 
-  // ── Sync in-memory cache (populated on first getAll) ──────
-  let _cache = null;
+  // ── Sync in-memory cache — per-user ─────────────────────────
+  let _cache     = null;
+  let _cacheOwner = null; // email of the user this cache belongs to
 
   return {
     // Initialize / load from IndexedDB into cache
@@ -9065,14 +9066,20 @@ const ZAD_UPLOADS = (() => {
           _cache = (e.target.result || [])
             .filter(u => u._owner === eKey)
             .sort((a,b) => new Date(b.savedAt||0) - new Date(a.savedAt||0));
+          _cacheOwner = eKey; // Remember which user this cache belongs to
           res(_cache);
         };
         req.onerror = () => { _cache = _cache || []; res(_cache); };
       });
     },
 
-    // Sync getter — returns cache (always call init first on login)
+    // Sync getter — returns CURRENT user's cache only
     getAll() {
+      // Invalidate cache if the logged-in user changed
+      if (_cache && _cacheOwner !== _emailKey()) {
+        _cache = null;
+        _cacheOwner = null;
+      }
       if (_cache) return _cache;
       // Fallback: try localStorage migration
       try {
@@ -9101,10 +9108,13 @@ const ZAD_UPLOADS = (() => {
     },
 
     async save(bundle) {
-      bundle._owner = _emailKey();
+      const eKey = _emailKey();
+      bundle._owner = eKey;
       bundle.savedAt = bundle.savedAt || new Date().toISOString();
+      // Invalidate cache if user changed
+      if (_cacheOwner && _cacheOwner !== eKey) { _cache = null; _cacheOwner = null; }
       // Update cache
-      if (!_cache) _cache = [];
+      if (!_cache) { _cache = []; _cacheOwner = eKey; }
       _cache = _cache.filter(u => u.id !== bundle.id);
       _cache.unshift(bundle);
       // Persist to IDB
@@ -9134,7 +9144,7 @@ const ZAD_UPLOADS = (() => {
       return _cache || [];
     },
 
-    resetCache() { _cache = null; },
+    resetCache() { _cache = null; _cacheOwner = null; },
 
     // Delete multiple uploads silently (no toast per item)
     async deleteAll(ids, subjectId) {
@@ -9186,7 +9196,9 @@ async function saveAILessonForUser(lesson, subjectId, uploadId, originalFileName
 
   const newLesson = {
     id: lessonId,
-    title: lesson.lessonTitle || originalFileName,
+    title: (lesson.lessonTitle && lesson.lessonTitle.trim() && isValidTitle(lesson.lessonTitle))
+              ? lesson.lessonTitle.trim()
+              : (originalFileName ? originalFileName.replace(/\.[^.]+$/, '') : 'درس مرفوع'),
     type: 'concept',
     aiGenerated: true,
     ownerEmail: email,
@@ -9223,8 +9235,12 @@ async function saveAILessonForUser(lesson, subjectId, uploadId, originalFileName
   const bundle = {
     id: uploadId,
     subjectId,
-    title: lesson.lessonTitle || originalFileName,
+    title: (lesson.lessonTitle && lesson.lessonTitle.trim() && isValidTitle(lesson.lessonTitle))
+              ? lesson.lessonTitle.trim()
+              : (originalFileName ? originalFileName.replace(/\.[^.]+$/, '') : 'درس مرفوع'),
     fileName: originalFileName,
+    // Store detected chapter title separately (file/document title, not lesson title)
+    chapterTitle: originalFileName ? originalFileName.replace(/\.[^.]+$/, '') : '',
     lessonId,
     savedAt: new Date().toISOString(),
     lesson: newLesson,
@@ -13611,6 +13627,8 @@ function logoutStudent() {
   closeSidebar();
   saveCurrentStudent();
   clearLocation();
+  // Clear uploads cache so next user gets their own data
+  if (typeof ZAD_UPLOADS !== 'undefined') ZAD_UPLOADS.resetCache();
   setActiveEmail('');
   Object.assign(APP.student, { name:'', email:'', gender:'', level:'beginner', joinDate:'' });
   Object.assign(APP.progress, { lessons:0, quizzes:0, scores:[], streak:1, lastDate:'', subjectProgress:{} });
@@ -13923,7 +13941,9 @@ function openLesson(subjectId, lessonId) {
     }
     var ul = bundle.lesson || {};
     var aiLesson = {
-      lessonTitle:     ul.title || bundle.title || bundle.fileName || 'درس مرفوع',
+      lessonTitle: (ul.title && isValidTitle(ul.title)) ? ul.title
+                     : ((bundle.title && isValidTitle(bundle.title)) ? bundle.title
+                       : (bundle.fileName ? bundle.fileName.replace(/\.[^.]+$/, '') : 'درس مرفوع')),
       definition:      (ul.content && ul.content.definition) || ul.definition || '',
       whyLearn:        (ul.content && ul.content.whyLearn)   || ul.whyLearn   || [],
       keyTerms:        (ul.content && ul.content.keyTerms)   || ul.keyTerms   || [],
@@ -20930,8 +20950,9 @@ function getSubjectWithUploads(subjectId) {
     var chKey  = 'up-ch-' + baseId;
 
     if (!chapMap[chKey]) {
-      // Chapter title = fileName without extension, or fallback
-      var rawName = u.fileName || u.title || 'ملف مرفوع';
+      // Chapter title = fileName without extension
+      // Use AI-detected chapter title if stored, else fileName
+      var rawName = u.chapterTitle || u.fileName || u.title || 'ملف مرفوع';
       var chapterName = rawName.replace(/\.[^.]+$/, ''); // strip extension
       chapMap[chKey] = {
         id:      chKey,
@@ -20946,7 +20967,11 @@ function getSubjectWithUploads(subjectId) {
 
     var l   = u.lesson || {};
     var lid = u.lessonId || ('ai-' + u.id);
-    var lessonTitle = (l.title) || u.title || u.fileName || 'درس مرفوع';
+    // Full title fallback chain
+    var lessonTitle = (l.title && l.title.trim() && typeof isValidTitle==='function' && isValidTitle(l.title))
+      ? l.title.trim()
+      : (u.title && u.title.trim() ? u.title.trim()
+        : (u.fileName ? u.fileName.replace(/\.[^.]+$/, '') : 'درس مرفوع'));
 
     chapMap[chKey].lessons.push({
       id:             lid,

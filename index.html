@@ -13176,7 +13176,7 @@ function showSection(name) {
     }
     if (typeof updateApiBanner === 'function') updateApiBanner();
   // Refresh progress bars with real data
-  if (typeof refreshProgressBars === 'function') setTimeout(refreshProgressBars, 300);
+  if (typeof refreshProgressBars === 'function') setTimeout(function(){ try { refreshProgressBars(); } catch(e){} }, 500);
   }
   if (name === 'subjects') renderAllSubjects();
 
@@ -13226,8 +13226,8 @@ function initDashboard() {
     if (b) b.style.display = 'none';
   }
   renderSubjectCards('quick-subjects', 6);
-  renderProgressChart();
-  updateStats();
+  try { renderProgressChart(); } catch(e) {}
+  try { updateStats(); } catch(e) {}
   if (typeof refreshUserCurriculumSection === 'function') {
     refreshUserCurriculumSection();
   }
@@ -20491,16 +20491,59 @@ function refreshProgressBars() {
   });
 }
 
-// ── Override getLessonCompletion to use new system ─────────────
-var _origGetLessonCompletion = getLessonCompletion;
-getLessonCompletion = function(subjectId, lessonId) {
+// ── Override getLessonCompletion to use new system (safe) ──────
+function getLessonCompletionNew(subjectId, lessonId) {
   var a = getLessonActivity(subjectId, lessonId);
   if (!a) return null;
   var pct = calcLessonProgress(subjectId, lessonId);
   if (pct >= 80) return { status: 'completed', label: 'مكتمل', pct: pct };
   if (pct >= 20) return { status: 'partial',   label: Math.round(pct)+'%', pct: pct };
   return { status: 'started', label: 'بدأ', pct: pct };
-};
+}
+// Apply override after DOM ready
+document.addEventListener('DOMContentLoaded', function() {
+  getLessonCompletion = getLessonCompletionNew;
+});
+
+// ── Handle Android back button + browser history ─────────────
+(function() {
+  // Push a state on each navigation so back button goes within app
+  var _navStack = [];
+
+  var _origShowSection = window.showSection;
+  window.showSection = function(name) {
+    if (_origShowSection) _origShowSection(name);
+    _navStack.push({ type: 'section', name: name });
+    try { history.pushState({ zad: 'section', name: name }, '', '#' + name); } catch(e) {}
+  };
+
+  var _origShowSubject = window.showSubject;
+  window.showSubject = function(sid, tab) {
+    if (_origShowSubject) _origShowSubject(sid, tab);
+    _navStack.push({ type: 'subject', sid: sid, tab: tab });
+    try { history.pushState({ zad: 'subject', sid: sid, tab: tab }, '', '#subject-' + sid); } catch(e) {}
+  };
+
+  // Handle back button
+  window.addEventListener('popstate', function(e) {
+    var state = e.state;
+    if (state && state.zad) {
+      // Don't navigate again (already done by popstate)
+      return;
+    }
+    // No state = user went back to start = go to dashboard
+    var page = document.getElementById('page-app');
+    if (page && page.classList.contains('active')) {
+      if (typeof showSection === 'function') {
+        history.pushState({ zad: 'section', name: 'dashboard' }, '', '#dashboard');
+        showSection('dashboard');
+      }
+    }
+  });
+
+  // Initial state
+  try { history.replaceState({ zad: 'section', name: 'dashboard' }, '', '#dashboard'); } catch(e) {}
+})();
 </script>
 
 

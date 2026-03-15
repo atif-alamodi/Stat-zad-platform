@@ -14276,7 +14276,21 @@ function showSubject(subjectId, activeTab) {
     if (activeTab === 'adaptive') body = buildAdaptiveDashboard(subjectId);
     if (activeTab === 'lab') {
       var _labUps = ZAD_UPLOADS.getAll().filter(function(u){ return u.subjectId===subjectId&&u.lesson; });
-      if (_labUps.length>0) {
+      var _isStats  = (subjectId==='statistics' || subjectId==='stat' || subjectId==='sta104');
+      var _isPython = (subjectId==='python');
+
+      if (_isPython) {
+        // Python subject: Python-only lab (no Excel tab)
+        body = (_labUps.length > 0 ? buildContentLab(subjectId) + '<div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)"><div style="font-weight:800;font-size:0.85rem;margin-bottom:12px;color:var(--text-muted)">🐍 بيئة Python</div>' : '')
+          + buildPythonOnlyLab()
+          + (_labUps.length > 0 ? '</div>' : '');
+      } else if (_isStats) {
+        // Statistics subject: Excel + charts from uploaded lessons
+        body = (_labUps.length > 0 ? buildContentLab(subjectId) + '<div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">' : '')
+          + buildStatsLabFull(subjectId, _labUps)
+          + (_labUps.length > 0 ? '</div>' : '');
+        setTimeout(function(){ elabInitXl(); elabBuildFnRef(); }, 200);
+      } else if (_labUps.length > 0) {
         var _origLab = '';
         if (subjectId==='communication') _origLab=buildCommLab();
         else if (subjectId==='english')  _origLab=buildEnglishLab(subjectId);
@@ -15761,15 +15775,108 @@ function selectSubjectLab(subjectId) {
 }
 
 function buildStatsLab() {
-  return '<div style="direction:rtl">'
-    + '<div style="font-weight:800;font-size:0.9rem;margin-bottom:14px;color:#6C63FF">📊 مختبر الإحصاء</div>'
-    + '<div style="background:rgba(108,99,255,0.06);border:1px solid rgba(108,99,255,0.2);border-radius:14px;padding:14px;margin-bottom:12px">'
-      + '<div style="font-weight:700;font-size:0.83rem;margin-bottom:8px">🔢 حساب المقاييس الإحصائية</div>'
-      + '<div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:8px">أدخل أرقامك مفصولة بفواصل:</div>'
-      + '<input id="stats-lab-data" placeholder="مثال: 5, 10, 15, 20, 25" style="width:100%;box-sizing:border-box;padding:9px 12px;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text);font-family:var(--font);font-size:0.85rem;outline:none;direction:ltr;margin-bottom:8px">'
-      + '<button onclick="calcStatsLab()" style="width:100%;padding:10px;border-radius:10px;border:none;background:linear-gradient(135deg,#6C63FF,#a78bfa);color:white;font-family:var(--font);font-weight:800;cursor:pointer">⚡ احسب</button>'
-      + '<div id="stats-lab-result" style="margin-top:10px;font-size:0.82rem;min-height:20px"></div>'
+  return buildStatsLabFull('statistics', []);
+}
+
+function buildStatsLabFull(subjectId, uploads) {
+  // Extract numeric data from uploaded lessons (keyTerms with numbers, examples with numbers)
+  var lessonDatasets = [];
+  (uploads || []).forEach(function(u) {
+    var l = u.lesson || {};
+    var cnt = l.content || {};
+    var nums = [];
+    // Try to extract numbers from steps, keyTerms, examples
+    var textSrc = [
+      (cnt.steps||[]).join(' '),
+      (cnt.keyTerms||[]).map(function(k){ return k.def||''; }).join(' '),
+      (cnt.realExamples||[]).map(function(e){ return e.desc||''; }).join(' '),
+      l.summary||''
+    ].join(' ');
+    var matches = textSrc.match(/\d+\.?\d*/g) || [];
+    nums = matches.slice(0,20).map(Number).filter(function(n){ return n > 0 && n < 10000; });
+    if (nums.length >= 3) {
+      lessonDatasets.push({ title: l.title || u.fileName || 'درس', nums: nums });
+    }
+  });
+
+  // Build lesson selector if we have datasets
+  var datasetSelector = '';
+  if (lessonDatasets.length > 0) {
+    datasetSelector = '<div style="margin-bottom:12px">'
+      + '<div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:6px;font-weight:700">📂 تحميل بيانات من درس مرفوع:</div>'
+      + '<div style="display:flex;flex-wrap:wrap;gap:6px">'
+      + lessonDatasets.map(function(ds, i) {
+          return '<button onclick="statsLoadDataset(' + i + ')" '
+            + 'style="padding:5px 12px;border-radius:8px;border:1px solid rgba(108,99,255,0.4);background:rgba(108,99,255,0.08);color:var(--primary);font-size:0.75rem;font-weight:700;cursor:pointer">'
+            + '📊 ' + (ds.title||'').slice(0,25) + '</button>';
+        }).join('')
+      + '</div></div>';
+    // Store datasets globally for the onclick
+    setTimeout(function() {
+      window._statsDatasets = lessonDatasets;
+    }, 50);
+  }
+
+  return '<div style="direction:rtl" id="stats-lab-wrap">'
+    + '<div style="font-weight:800;font-size:0.9rem;margin-bottom:14px;color:#6C63FF">📊 مختبر الإحصاء — Excel تفاعلي</div>'
+
+    // ── Input section ─────────────────────────────────
+    + '<div style="background:rgba(108,99,255,0.06);border:1px solid rgba(108,99,255,0.2);border-radius:16px;padding:14px;margin-bottom:14px">'
+      + datasetSelector
+      + '<div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:6px;font-weight:700">🔢 أدخل بياناتك (مفصولة بفواصل أو مسافات):</div>'
+      + '<div style="display:flex;gap:8px;margin-bottom:10px">'
+        + '<input id="stats-lab-data" placeholder="مثال: 5, 10, 15, 20, 25, 30" '
+          + 'style="flex:1;padding:9px 12px;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text);font-family:var(--font);font-size:0.85rem;outline:none;direction:ltr">'
+        + '<button onclick="calcStatsLabFull()" style="padding:9px 18px;border-radius:10px;border:none;background:linear-gradient(135deg,#6C63FF,#a78bfa);color:white;font-family:var(--font);font-weight:800;cursor:pointer">⚡ تحليل</button>'
+      + '</div>'
+      + '<div id="stats-lab-result" style="min-height:10px"></div>'
     + '</div>'
+
+    // ── Excel grid ────────────────────────────────────
+    + '<div style="background:rgba(33,115,70,0.05);border:1px solid rgba(33,115,70,0.2);border-radius:16px;padding:14px;margin-bottom:14px">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:6px">'
+        + '<div style="font-weight:700;font-size:0.83rem;color:#5cb888">📊 جدول Excel التفاعلي</div>'
+        + '<div style="display:flex;gap:6px;flex-wrap:wrap">'
+          + '<select id="elab-xl-tmpl" onchange="elabLoadXlTmpl(this.value)" style="padding:5px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-family:var(--font);font-size:0.78rem">'
+            + '<option value="">📊 قوالب...</option>'
+            + '<option value="grades">درجات الطلاب</option>'
+            + '<option value="stats">تحليل إحصائي</option>'
+            + '<option value="sales">بيانات مبيعات</option>'
+            + '<option value="employees">رواتب الموظفين</option>'
+          + '</select>'
+          + '<button onclick="elabXlClear()" style="padding:5px 10px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.04);color:var(--text-muted);font-family:var(--font);font-size:0.75rem;cursor:pointer">🗑️</button>'
+        + '</div>'
+      + '</div>'
+      + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px;padding:6px 12px">'
+        + '<span id="elab-xl-ref" style="font-weight:700;color:#5cb888;font-family:monospace;font-size:0.82rem;min-width:30px">A1</span>'
+        + '<span style="color:var(--border)">|</span>'
+        + '<span style="font-size:0.78rem;color:var(--text-muted)">fx</span>'
+        + '<input id="elab-xl-fbar" style="flex:1;background:transparent;border:none;outline:none;color:var(--text);font-family:monospace;font-size:0.82rem;direction:ltr" onchange="elabXlFbarCommit()" placeholder="أدخل قيمة أو صيغة...">'
+      + '</div>'
+      + '<div id="elab-xl-grid" style="overflow-x:auto;border-radius:10px;border:1px solid var(--border)"></div>'
+      + '<div id="elab-xl-stats" style="margin-top:10px"></div>'
+      + '<div id="elab-xl-feedback" style="margin-top:6px;font-size:0.78rem;color:var(--text-muted);min-height:20px"></div>'
+      + '<div style="margin-top:10px"><div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:5px">📌 الدوال (اضغط للإدراج):</div><div id="elab-xl-fnref" style="display:flex;flex-wrap:wrap;gap:4px"></div></div>'
+    + '</div>'
+
+    // ── Charts section ────────────────────────────────
+    + '<div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:14px">'
+      + '<div style="font-weight:700;font-size:0.83rem;margin-bottom:12px">📈 الرسوم البيانية الإحصائية</div>'
+      + '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">'
+        + ['مدرج تكراري','مخطط خطي','مخطط دائري','مخطط تشتت','مقارنة القيم'].map(function(t,i){
+            var types = ['bar','line','pie','scatter','bar'];
+            var icons = ['📊','📈','🥧','🔵','📊'];
+            return '<button onclick="statsChart(\''+types[i]+'\',\''+t+'\')" '
+              + 'style="padding:6px 12px;border-radius:8px;border:1px solid rgba(108,99,255,0.3);background:rgba(108,99,255,0.08);color:var(--primary);font-size:0.75rem;font-weight:700;cursor:pointer">'
+              + icons[i]+' '+t+'</button>';
+          }).join('')
+      + '</div>'
+      + '<div id="stats-chart-area" style="min-height:60px">'
+        + '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:0.82rem">أدخل بيانات أو اختر قالب ثم اضغط رسماً بيانياً</div>'
+      + '</div>'
+    + '</div>'
+
+    + '<div id="elab-xl-chart-wrap" style="display:none;margin-top:14px;background:rgba(255,255,255,0.96);border-radius:14px;padding:14px"><canvas id="elab-xl-chart" style="max-width:100%;max-height:300px"></canvas></div>'
   + '</div>';
 }
 
@@ -15798,14 +15905,136 @@ function calcStatsLab() {
     + '</div>';
 }
 
-function buildPythonSubjectLab() {
-  return '<div style="direction:rtl;text-align:center;padding:30px;color:var(--text-muted)">'
-    + '<div style="font-size:2rem;margin-bottom:10px">🐍</div>'
-    + '<div style="font-weight:700;margin-bottom:8px">مختبر Python</div>'
-    + '<div style="font-size:0.85rem;margin-bottom:16px">استخدم بيئة Python في تبويب 🐍 بيئة Python</div>'
-    + '<button onclick="switchLab(\x27python\x27)" style="padding:10px 24px;border-radius:10px;border:none;background:linear-gradient(135deg,#3776AB,#6ab0e8);color:white;font-family:var(--font);font-weight:800;cursor:pointer">🐍 انتقل لبيئة Python</button>'
-  + '</div>';
+// Full stats lab calc + chart trigger
+function calcStatsLabFull() {
+  var inp = document.getElementById('stats-lab-data');
+  var res = document.getElementById('stats-lab-result');
+  if (!inp || !res) { calcStatsLab(); return; }
+  // Copy value to legacy input and run
+  var legInp = document.getElementById('stats-lab-data');
+  if (legInp) calcStatsLab();
+  // Also store nums for charts
+  var nums = inp.value.split(/[\s,،]+/).map(function(s){ return parseFloat(s.trim()); }).filter(function(n){ return !isNaN(n); });
+  window._statsCurrentNums = nums;
 }
+
+// Load numeric data from an uploaded lesson
+function statsLoadDataset(idx) {
+  var ds = (window._statsDatasets || [])[idx];
+  if (!ds || !ds.nums) return;
+  var inp = document.getElementById('stats-lab-data');
+  if (inp) {
+    inp.value = ds.nums.join(', ');
+    window._statsCurrentNums = ds.nums;
+    calcStatsLabFull();
+    showToast('📊 تم تحميل بيانات: ' + (ds.title||''), 'success');
+  }
+}
+
+// Draw chart from current stats data
+function statsChart(type, label) {
+  var nums = window._statsCurrentNums || [];
+  if (!nums.length) {
+    var inp = document.getElementById('stats-lab-data');
+    if (inp) nums = inp.value.split(/[\s,،]+/).map(function(s){ return parseFloat(s.trim()); }).filter(function(n){ return !isNaN(n); });
+  }
+  if (!nums.length) { showToast('أدخل بيانات أولاً', 'error'); return; }
+
+  var area = document.getElementById('stats-chart-area');
+  if (!area) return;
+  area.innerHTML = '<canvas id="stats-main-chart" style="max-width:100%;max-height:300px"></canvas>';
+
+  setTimeout(function() {
+    var ctx = document.getElementById('stats-main-chart');
+    if (!ctx) return;
+    if (window._statsChartInst) { try { window._statsChartInst.destroy(); } catch(e){} }
+
+    var labels = nums.map(function(_,i){ return 'Q'+(i+1); });
+    var COLORS = ['#6C63FF','#00BFA5','#FF7043','#FFD600','#FF5252','#28CA41','#3776AB','#E91E63','#4CAF50','#FFA726'];
+    var bgColors = nums.map(function(_,i){ return COLORS[i % COLORS.length]; });
+
+    var datasets = [{
+      label: label || 'البيانات',
+      data: type === 'scatter' ? nums.map(function(v,i){ return {x:i+1, y:v}; }) : nums,
+      backgroundColor: type === 'pie' ? bgColors : bgColors[0] + '88',
+      borderColor: type === 'pie' ? bgColors : bgColors[0],
+      borderWidth: 2,
+      borderRadius: type === 'bar' ? 6 : 0,
+      fill: type === 'line',
+      tension: 0.4,
+      pointRadius: type === 'scatter' ? 6 : 4,
+    }];
+
+    window._statsChartInst = new Chart(ctx, {
+      type: type === 'scatter' ? 'scatter' : type,
+      data: { labels: type !== 'scatter' ? labels : undefined, datasets: datasets },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { display: type === 'pie' },
+          title: { display: true, text: label + ' — n=' + nums.length, color: '#aaa', font: { size: 13 } }
+        },
+        scales: type === 'pie' ? {} : {
+          y: { beginAtZero: false, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#aaa' } },
+          x: { grid: { display: false }, ticks: { color: '#aaa' } }
+        }
+      }
+    });
+  }, 50);
+}
+
+function buildPythonSubjectLab() {
+  return buildPythonOnlyLab();
+}
+
+function buildPythonOnlyLab() {
+  var html = '<div style="direction:rtl">'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:6px">'
+      + '<div style="display:flex;align-items:center;gap:8px">'
+        + '<div id="elab-py-dot" style="width:9px;height:9px;border-radius:50%;background:#555"></div>'
+        + '<span id="elab-py-status" style="font-size:0.78rem;color:var(--text-muted)">جاري تحميل Python...</span>'
+      + '</div>'
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap">'
+        + '<select id="elab-py-tmpl" onchange="elabLoadPyTmpl()" style="padding:5px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-family:var(--font);font-size:0.78rem">'
+          + '<option value="">📋 قوالب...</option>'
+          + '<option value="hello">مرحبا</option><option value="mean">المتوسط</option>'
+          + '<option value="median">الوسيط</option><option value="variance">الانحراف</option>'
+          + '<option value="zscore">Z-Score</option><option value="histogram">مدرج تكراري</option>'
+          + '<option value="correlation">الارتباط</option>'
+        + '</select>'
+        + '<button onclick="(function(){document.getElementById(\'elab-editor\').value=\'\';document.getElementById(\'elab-lnums\').innerHTML=\'1\'})()" style="padding:5px 12px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text-muted);font-family:var(--font);font-size:0.78rem;cursor:pointer">🗑️</button>'
+        + '<button id="elab-run-btn" onclick="elabRunPy()" style="padding:6px 16px;border-radius:10px;border:none;background:linear-gradient(135deg,#3776AB,#1a4a7a);color:white;font-family:var(--font);font-weight:700;font-size:0.85rem;cursor:pointer">▶ تشغيل</button>'
+      + '</div>'
+    + '</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'
+      + '<div style="background:#1e1e2e;border-radius:14px;overflow:hidden;border:1px solid rgba(55,118,171,0.3)">'
+        + '<div style="background:#2d2d3e;padding:8px 14px;font-size:0.75rem;color:#6ab0e8;font-weight:600">🐍 المحرر</div>'
+        + '<div style="position:relative">'
+          + '<div id="elab-lnums" style="position:absolute;left:0;top:0;width:36px;background:#1a1a2a;padding:12px 0;text-align:center;font-size:0.72rem;color:#555;line-height:1.6;font-family:monospace;pointer-events:none;user-select:none;min-height:300px">1</div>'
+          + '<textarea id="elab-editor" spellcheck="false" oninput="elabUpdateLines()" onkeydown="elabTab(event)" placeholder="# اكتب كود Python هنا..." style="width:100%;min-height:300px;background:transparent;border:none;outline:none;color:#cdd6f4;font-family:\'Fira Code\',monospace;font-size:0.83rem;line-height:1.6;padding:12px 12px 12px 48px;resize:vertical;box-sizing:border-box;tab-size:4;direction:ltr;text-align:left"></textarea>'
+        + '</div>'
+      + '</div>'
+      + '<div style="background:#0d1117;border-radius:14px;overflow:hidden;border:1px solid rgba(55,118,171,0.2)">'
+        + '<div style="background:#161b22;padding:8px 14px;display:flex;align-items:center;justify-content:space-between">'
+          + '<span style="font-size:0.75rem;color:#8b949e;font-weight:600">📟 النتيجة</span>'
+          + '<button onclick="document.getElementById(\'elab-out\').innerHTML=\'<span style=color:#555>// جاهز</span>\'" style="background:none;border:none;color:#555;cursor:pointer;font-size:0.72rem">✕</button>'
+        + '</div>'
+        + '<div id="elab-out" style="padding:12px;min-height:300px;font-family:\'Fira Code\',monospace;font-size:0.8rem;color:#e6edf3;white-space:pre-wrap;overflow-y:auto;line-height:1.6;direction:ltr;text-align:left">'
+          + '<span style="color:#555">// اضغط ▶ تشغيل</span>'
+        + '</div>'
+      + '</div>'
+    + '</div>'
+    + '<div id="elab-chart-wrap" style="display:none;margin-top:12px;background:white;border-radius:14px;padding:14px;text-align:center">'
+      + '<canvas id="elab-chart-canvas" style="max-width:100%;max-height:360px"></canvas>'
+    + '</div>'
+    + '<div style="margin-top:10px;padding:10px 14px;background:rgba(55,118,171,0.07);border-radius:10px;border:1px solid rgba(55,118,171,0.18);font-size:0.76rem;color:#6ab0e8">'
+      + '💡 print()، numpy، pandas، statistics، matplotlib للرسوم. Tab للمسافة البادئة.'
+    + '</div>'
+  + '</div>';
+  setTimeout(function() { initEmbeddedLab(\'python\'); }, 150);
+  return html;
+}
+
 
 let pyodide = null;
 let pyReady = false;
@@ -21838,15 +22067,7 @@ function buildEmbeddedLab(subjectId) {
   var uid = 'emb_' + (subjectId || 'gen');
   var html = `
   <div style="direction:rtl" id="elab-wrap-${uid}">
-    <!-- Tab switcher -->
-    <div style="display:flex;gap:8px;margin-bottom:16px">
-      <button id="elab-tab-py" onclick="elabSwitch('py')"
-        style="padding:8px 18px;border-radius:12px;border:2px solid #3776AB;background:rgba(55,118,171,0.2);color:#6ab0e8;font-family:var(--font);font-weight:700;cursor:pointer;font-size:0.85rem">
-        🐍 Python</button>
-      <button id="elab-tab-xl" onclick="elabSwitch('xl')"
-        style="padding:8px 18px;border-radius:12px;border:2px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.05);color:var(--text-muted);font-family:var(--font);font-weight:700;cursor:pointer;font-size:0.85rem">
-        📊 Excel</button>
-    </div>
+    <!-- Python only — no Excel tab for non-stats subjects -->
 
     <!-- Python Panel -->
     <div id="elab-py" style="display:block">
@@ -21907,7 +22128,7 @@ function buildEmbeddedLab(subjectId) {
       </div>
     </div>
 
-    <!-- Excel Panel -->
+    <!-- Excel removed from generic lab (only in Statistics) -->
     <div id="elab-xl" style="display:none">
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
         <select id="elab-xl-tmpl" onchange="elabLoadXlTmpl(this.value)"
@@ -21947,7 +22168,12 @@ function buildEmbeddedLab(subjectId) {
 
   // Initialize after render
   setTimeout(function() {
+    // Python only for generic subjects
     initEmbeddedLab(subjectId);
+    var xl = document.getElementById('elab-xl');
+    if (xl) xl.style.display = 'none';
+    var xlBtn = document.getElementById('elab-tab-xl');
+    if (xlBtn) xlBtn.style.display = 'none';
   }, 100);
 
   return html;

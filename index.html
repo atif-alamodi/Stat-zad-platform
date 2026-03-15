@@ -13662,20 +13662,20 @@ function showSubject(subjectId, activeTab) {
     { id: 'upload',   icon: '📤', label: 'رفع محتوى'      }
   ];
 
-  var tabsHTML = '<div style="display:flex;flex-direction:row;gap:8px;overflow-x:auto;padding:4px 2px 10px;-webkit-overflow-scrolling:touch;scrollbar-width:none;margin-bottom:8px;justify-content:center">'
+  var tabsHTML = '<div style="display:flex;flex-direction:row;gap:8px;overflow-x:auto;padding:4px 2px 12px;-webkit-overflow-scrolling:touch;scrollbar-width:none;margin-bottom:8px;justify-content:center">'
     + TABS.map(function(t) {
         var active = t.id === activeTab;
         return '<button onclick="showSubject(\'' + subjectId + '\',\'' + t.id + '\')"'
-          + ' style="flex:0 0 auto;width:72px;height:72px;border-radius:16px;border:none;cursor:pointer;'
+          + ' style="flex:0 0 auto;width:68px;min-height:68px;border-radius:16px;border:none;cursor:pointer;'
           + 'font-family:var(--font);font-size:0.65rem;font-weight:800;transition:all 0.25s;'
-          + 'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;'
-          + 'white-space:nowrap;'
+          + 'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;'
+          + 'padding:8px 4px;box-sizing:border-box;'
           + (active
               ? 'background:linear-gradient(135deg,var(--primary),var(--secondary));color:white;box-shadow:0 4px 14px rgba(108,99,255,0.4);transform:scale(1.04)'
               : 'background:rgba(255,255,255,0.06);color:var(--text-muted);border:1px solid rgba(255,255,255,0.08)')
           + '">'
-          + '<span style="font-size:1.5rem;line-height:1">' + t.icon + '</span>'
-          + '<span style="font-size:0.62rem;text-align:center;line-height:1.2">' + t.label + '</span>'
+          + '<span style="font-size:1.4rem;line-height:1;flex-shrink:0">' + t.icon + '</span>'
+          + '<span style="font-size:0.58rem;text-align:center;line-height:1.25;word-break:break-word;white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;width:100%;max-height:2.5em">' + t.label + '</span>'
           + '</button>';
       }).join('')
     + '</div>';

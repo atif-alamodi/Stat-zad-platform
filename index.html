@@ -16690,6 +16690,496 @@ for x in test_cases:
 
 };
 
+const STATS_PY_TEMPLATES_EXT = {
+
+  /* CENTRAL TENDENCY */
+
+  stats_ungrouped_central: `# ==========================================
+# النزعة المركزية - بيانات غير مبوبة
+# Central Tendency - Ungrouped Data
+# ==========================================
+# البيانات غير المبوبة = قائمة أرقام مباشرة
+# لم تُرتَّب في فئات بعد
+#
+# المتوسط الحسابي: x̄ = Σx / n
+# الوسيط: القيمة الوسطى بعد الترتيب
+# المنوال: الأكثر تكراراً
+
+import statistics as st
+
+data = [23, 45, 12, 67, 34, 89, 56, 78, 43, 21,
+        65, 32, 87, 54, 11, 76, 43, 28, 62, 39]
+n = len(data)
+sorted_data = sorted(data)
+
+print("=" * 50)
+print("  النزعة المركزية - بيانات غير مبوبة")
+print("=" * 50)
+print(f"البيانات: {data}")
+print(f"n = {n}    مرتبة: {sorted_data}\\n")
+
+# ── 1. المتوسط الحسابي ──
+total = sum(data)
+mean  = total / n
+print("1. المتوسط الحسابي (Arithmetic Mean)")
+print(f"   x̄ = Σx / n")
+print(f"   x̄ = {total} / {n}")
+print(f"   x̄ = {mean:.4f}")
+print(f"   تحقق: {st.mean(data):.4f}\\n")
+
+# ── 2. الوسيط ──
+print("2. الوسيط (Median)")
+print(f"   n={n} {'زوجي' if n%2==0 else 'فردي'}")
+if n % 2 == 1:
+    pos = n // 2
+    median = sorted_data[pos]
+    print(f"   الموضع = (n+1)/2 = {(n+1)/2:.0f}")
+    print(f"   الوسيط = العنصر رقم {pos+1} = {median}")
+else:
+    p1, p2 = n//2-1, n//2
+    median = (sorted_data[p1] + sorted_data[p2]) / 2
+    print(f"   الوسيط = (العنصر {p1+1} + العنصر {p2+1}) / 2")
+    print(f"   الوسيط = ({sorted_data[p1]} + {sorted_data[p2]}) / 2 = {median}")
+print(f"   تحقق: {st.median(data)}\\n")
+
+# ── 3. المنوال ──
+from collections import Counter
+cnt = Counter(data)
+max_freq = max(cnt.values())
+modes = [k for k,v in cnt.items() if v==max_freq]
+print("3. المنوال (Mode)")
+if max_freq == 1:
+    print("   لا يوجد منوال (كل قيمة تتكرر مرة واحدة)")
+elif len(modes) == 1:
+    print(f"   المنوال = {modes[0]} (تكرر {max_freq} مرة)")
+else:
+    print(f"   متعدد المنوال: {modes} (كل منها تكرر {max_freq} مرة)")
+
+# ── المتوسط التوافقي والهندسي ──
+import math
+print("\\n4. المتوسط التوافقي (Harmonic Mean)")
+harm = n / sum(1/x for x in data)
+print(f"   HM = n / Σ(1/xi) = {n} / {sum(1/x for x in data):.4f} = {harm:.4f}")
+
+print("\\n5. المتوسط الهندسي (Geometric Mean)")
+geom = math.exp(sum(math.log(x) for x in data)/n)
+print(f"   GM = (∏xi)^(1/n) = e^(Σln(xi)/n) = {geom:.4f}")
+
+print("\\n── مقارنة ──")
+print(f"  HM ≤ GM ≤ AM: {harm:.2f} ≤ {geom:.2f} ≤ {mean:.2f} ← صحيح دائماً!")`,
+
+  stats_grouped_central: `# ==========================================
+# النزعة المركزية - بيانات مبوبة
+# Central Tendency - Grouped Data
+# ==========================================
+# البيانات المبوبة = مُقسَّمة لفئات (classes)
+# كل فئة لها: حد أدنى، حد أعلى، تكرار (f)
+#
+# المتوسط المبوب:  x̄ = Σ(f × m) / Σf
+#   حيث m = منتصف الفئة = (أدنى + أعلى) / 2
+#
+# الوسيط المبوب:
+#   L + [(n/2 - F) / f] × h
+#   L = الحد الأدنى للفئة الوسيطة
+#   F = التكرار التراكمي قبلها
+#   f = تكرار الفئة الوسيطة
+#   h = عرض الفئة
+
+import math
+
+# درجات 100 طالب مبوبة في فئات
+classes = [
+    (0,  10,  3),
+    (10, 20,  8),
+    (20, 30,  12),
+    (30, 40,  18),
+    (40, 50,  22),   # ← الفئة الأكثر تكراراً
+    (50, 60,  17),
+    (60, 70,  11),
+    (70, 80,  6),
+    (80, 90,  2),
+    (90, 100, 1),
+]
+
+print("=" * 55)
+print("  النزعة المركزية - بيانات مبوبة")
+print("=" * 55)
+
+n    = sum(c[2] for c in classes)
+h    = classes[0][1] - classes[0][0]  # عرض الفئة
+
+print(f"\\n{'الفئة':>12} {'المنتصف':>8} {'f':>5} {'f×m':>8} {'التراكمي':>10}")
+print("-"*48)
+cum_f = 0
+rows  = []
+for lo, hi, f in classes:
+    m  = (lo + hi) / 2
+    fm = f * m
+    cum_f += f
+    rows.append((lo, hi, f, m, fm, cum_f))
+    print(f"  {lo:3}-{hi:3}      {m:6.1f}  {f:5}  {fm:7.1f}  {cum_f:10}")
+print("-"*48)
+total_f  = sum(r[2] for r in rows)
+total_fm = sum(r[4] for r in rows)
+print(f"  {'المجموع':>10}          {total_f:5}  {total_fm:7.1f}")
+
+# ── المتوسط المبوب ──
+mean_g = total_fm / total_f
+print(f"\\n1. المتوسط المبوب")
+print(f"   x̄ = Σ(f×m) / Σf = {total_fm:.1f} / {total_f} = {mean_g:.4f}")
+
+# ── الوسيط المبوب ──
+print(f"\\n2. الوسيط المبوب")
+half_n = n / 2
+print(f"   n/2 = {n}/2 = {half_n}")
+median_class = None
+for r in rows:
+    if r[5] >= half_n:
+        median_class = r
+        break
+L  = median_class[0]
+F  = median_class[5] - median_class[2]  # التراكمي قبل الفئة
+f  = median_class[2]
+print(f"   فئة الوسيط: {L}-{median_class[1]} (التكرار={f}, التراكمي قبلها={F})")
+print(f"   الوسيط = L + [(n/2 - F) / f] × h")
+print(f"   الوسيط = {L} + [({half_n} - {F}) / {f}] × {h}")
+median_g = L + ((half_n - F) / f) * h
+print(f"   الوسيط = {L} + {((half_n-F)/f):.4f} × {h} = {median_g:.4f}")
+
+# ── المنوال المبوب ──
+print(f"\\n3. المنوال المبوب")
+mode_class = max(rows, key=lambda r: r[2])
+L_mo = mode_class[0]
+idx  = rows.index(mode_class)
+f_mo = mode_class[2]
+f1   = rows[idx-1][2] if idx > 0 else 0
+f2   = rows[idx+1][2] if idx < len(rows)-1 else 0
+delta1 = f_mo - f1
+delta2 = f_mo - f2
+mode_g = L_mo + (delta1 / (delta1 + delta2)) * h
+print(f"   فئة المنوال: {L_mo}-{mode_class[1]} (f={f_mo})")
+print(f"   Δ1={delta1}  Δ2={delta2}")
+print(f"   المنوال = {L_mo} + ({delta1}/({delta1}+{delta2})) × {h} = {mode_g:.4f}")
+
+print(f"\\n── ملخص ──")
+print(f"  المتوسط = {mean_g:.3f}")
+print(f"  الوسيط  = {median_g:.3f}")
+print(f"  المنوال  = {mode_g:.3f}")`,
+
+  /* DISPERSION */
+
+  stats_dispersion: `# ==========================================
+# مقاييس التشتت - غير مبوبة
+# Measures of Dispersion - Ungrouped
+# ==========================================
+# التشتت = كيف تتفرق البيانات عن المتوسط؟
+#
+# المدى           : أكبر - أصغر
+# التباين المعياري: Σ(xi - x̄)² / n  (مجتمع)
+# التباين العيني : Σ(xi - x̄)² / (n-1)  (عينة)
+# الانحراف المعياري: √التباين
+# معامل الاختلاف: (σ/x̄) × 100%
+
+import math
+
+data = [23, 45, 12, 67, 34, 89, 56, 78, 43, 21]
+n    = len(data)
+mean = sum(data) / n
+sorted_d = sorted(data)
+
+print("=" * 50)
+print("  مقاييس التشتت - بيانات غير مبوبة")
+print("=" * 50)
+print(f"البيانات: {data}")
+print(f"n={n}  المتوسط x̄={mean:.4f}\\n")
+
+# ── 1. المدى ──
+rng = max(data) - min(data)
+print(f"1. المدى (Range)")
+print(f"   R = الأكبر - الأصغر = {max(data)} - {min(data)} = {rng}\\n")
+
+# ── 2. انحرافات كل قيمة ──
+print(f"2. جدول الانحرافات xi - x̄")
+print(f"  {'xi':>6}  {'xi-x̄':>10}  {'(xi-x̄)²':>12}")
+print("  " + "-"*32)
+devs = []
+for x in data:
+    d  = x - mean
+    d2 = d**2
+    devs.append(d2)
+    print(f"  {x:6}  {d:+10.4f}  {d2:12.4f}")
+print("  " + "-"*32)
+sum_d2 = sum(devs)
+print(f"  {'Σ':>6}             {sum_d2:12.4f}\\n")
+
+# ── 3. التباين ──
+var_p = sum_d2 / n
+var_s = sum_d2 / (n-1)
+std_p = math.sqrt(var_p)
+std_s = math.sqrt(var_s)
+cv    = (std_s / mean) * 100
+
+print(f"3. التباين المعياري")
+print(f"   σ² (مجتمع) = Σ(xi-x̄)²/n = {sum_d2:.4f}/{n} = {var_p:.4f}")
+print(f"   s² (عينة)  = Σ(xi-x̄)²/(n-1) = {sum_d2:.4f}/{n-1} = {var_s:.4f}\\n")
+
+print(f"4. الانحراف المعياري")
+print(f"   σ (مجتمع)  = √{var_p:.4f} = {std_p:.4f}")
+print(f"   s (عينة)   = √{var_s:.4f} = {std_s:.4f}\\n")
+
+print(f"5. معامل الاختلاف CV")
+print(f"   CV = (s/x̄)×100 = ({std_s:.4f}/{mean:.4f})×100 = {cv:.2f}%")
+if cv < 15:
+    label = "بيانات متجانسة (تشتت منخفض)"
+elif cv < 30:
+    label = "تشتت معتدل"
+else:
+    label = "بيانات غير متجانسة (تشتت عالٍ)"
+print(f"   التفسير: {label}\\n")
+
+# ── 4. الربيعيات ──
+def pctile(s, p):
+    k=(len(s)-1)*p/100; f=int(k); c=math.ceil(k)
+    return s[f] if f==c else s[f]*(c-k)+s[c]*(k-f)
+q1,q2,q3=pctile(sorted_d,25),pctile(sorted_d,50),pctile(sorted_d,75)
+iqr=q3-q1
+print(f"6. الربيعيات (Quartiles)")
+print(f"   Q1 = {q1:.2f}   Q2 = {q2:.2f}   Q3 = {q3:.2f}")
+print(f"   IQR = Q3-Q1 = {iqr:.2f}")
+print(f"   القيم الشاذة خارج: [{q1-1.5*iqr:.2f}, {q3+1.5*iqr:.2f}]")`,
+
+  stats_grouped_dispersion: `# ==========================================
+# مقاييس التشتت - بيانات مبوبة
+# Measures of Dispersion - Grouped
+# ==========================================
+# التباين المبوب: σ² = Σ(f × (m-x̄)²) / Σf
+# م = منتصف الفئة
+# f = تكرار الفئة
+
+import math
+
+classes = [
+    (10, 20,  5),
+    (20, 30, 10),
+    (30, 40, 20),
+    (40, 50, 30),   # الأكثر تكراراً
+    (50, 60, 20),
+    (60, 70, 10),
+    (70, 80,  5),
+]
+
+print("=" * 60)
+print("  مقاييس التشتت - بيانات مبوبة")
+print("=" * 60)
+
+total_f  = sum(c[2] for c in classes)
+h        = classes[0][1] - classes[0][0]
+
+# حساب المتوسط المبوب أولاً
+total_fm = sum(((lo+hi)/2)*f for lo,hi,f in classes)
+mean_g   = total_fm / total_f
+
+print(f"\\nΣf = {total_f}   x̄ = {mean_g:.4f}   h = {h}\\n")
+print(f"{'الفئة':>10} {'m':>6} {'f':>5} {'m-x̄':>10} {'(m-x̄)²':>12} {'f(m-x̄)²':>12}")
+print("-"*60)
+
+rows_d = []
+for lo, hi, f in classes:
+    m    = (lo + hi) / 2
+    d    = m - mean_g
+    d2   = d**2
+    fd2  = f * d2
+    rows_d.append((lo, hi, m, f, d, d2, fd2))
+    print(f"  {lo}-{hi}   {m:5.1f}  {f:5}  {d:+10.4f}  {d2:12.4f}  {fd2:12.4f}")
+
+print("-"*60)
+sum_fd2 = sum(r[6] for r in rows_d)
+print(f"  {'Σ':>8}        {total_f:5}                        {sum_fd2:12.4f}\\n")
+
+# ── التباين والانحراف ──
+var_g = sum_fd2 / total_f
+std_g = math.sqrt(var_g)
+cv    = (std_g / mean_g) * 100
+
+print(f"التباين المبوب:    σ² = Σf(m-x̄)²/Σf = {sum_fd2:.4f}/{total_f} = {var_g:.4f}")
+print(f"الانحراف المبوب:   σ  = √{var_g:.4f} = {std_g:.4f}")
+print(f"معامل الاختلاف:    CV = ({std_g:.4f}/{mean_g:.4f})×100 = {cv:.2f}%")
+
+# ── المدى والمدى الربيعي ──
+print(f"\\n── مقاييس التشتت الأخرى ──")
+print(f"  المدى = {classes[-1][1]} - {classes[0][0]} = {classes[-1][1]-classes[0][0]}")
+
+# وسيط مبوب
+n2   = total_f / 2
+cum  = 0
+for lo,hi,f in classes:
+    cum += f
+    if cum >= n2:
+        F  = cum - f
+        L  = lo
+        med= L + ((n2-F)/f)*h
+        break
+print(f"  الوسيط المبوب = {med:.4f}")
+print(f"\\n── ملخص ──")
+print(f"  x̄={mean_g:.3f}  σ={std_g:.3f}  CV={cv:.1f}%  Median={med:.3f}")`,
+
+  /* CORRELATION */
+
+  stats_correlation: `# ==========================================
+# معاملات الارتباط
+# Correlation Coefficients
+# ==========================================
+# الارتباط يقيس: هل هناك علاقة بين X و Y؟
+# r بيرسون = للبيانات المتواصلة
+# ρ سبيرمان = للبيانات الرتبية أو غير طبيعية
+# r القيمة: -1 (عكسي كامل) إلى +1 (طردي كامل)
+
+import math
+
+# X = ساعات الدراسة  Y = الدرجة
+X = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+Y = [42, 53, 61, 68, 74, 80, 85, 90, 94, 97]
+
+n   = len(X)
+xm  = sum(X)/n
+ym  = sum(Y)/n
+
+print("=" * 55)
+print("  معاملات الارتباط")
+print("=" * 55)
+print(f"X: {X}")
+print(f"Y: {Y}\\n")
+
+# ── Pearson r ──
+print("1. معامل بيرسون r (للبيانات المتواصلة)")
+print("   r = Σ(xi-x̄)(yi-ȳ) / √[Σ(xi-x̄)² × Σ(yi-ȳ)²]\\n")
+
+print(f"  {'xi':>5} {'yi':>5} {'xi-x̄':>8} {'yi-ȳ':>8} {'(xi-x̄)(yi-ȳ)':>14} {'(xi-x̄)²':>10} {'(yi-ȳ)²':>10}")
+print("  " + "-"*65)
+xy_sum = sx2 = sy2 = 0
+for i in range(n):
+    dx = X[i]-xm; dy = Y[i]-ym
+    xy_sum += dx*dy; sx2 += dx**2; sy2 += dy**2
+    print(f"  {X[i]:5} {Y[i]:5} {dx:+8.1f} {dy:+8.1f} {dx*dy:14.2f} {dx**2:10.2f} {dy**2:10.2f}")
+print("  " + "-"*65)
+print(f"  Σ                          {xy_sum:14.2f} {sx2:10.2f} {sy2:10.2f}")
+r_pearson = xy_sum / math.sqrt(sx2 * sy2)
+print(f"\\n  r = {xy_sum:.2f} / √({sx2:.2f} × {sy2:.2f})")
+print(f"  r = {xy_sum:.2f} / {math.sqrt(sx2*sy2):.2f} = {r_pearson:.4f}")
+
+# ── Spearman ρ ──
+print(f"\\n2. معامل سبيرمان ρ (للبيانات الرتبية)")
+def rank_it(arr):
+    s=sorted(arr); return [s.index(v)+1 for v in arr]
+rx, ry = rank_it(X), rank_it(Y)
+d2_sum = sum((rx[i]-ry[i])**2 for i in range(n))
+r_spear = 1 - (6*d2_sum)/(n*(n**2-1))
+print(f"   رتب X: {rx}")
+print(f"   رتب Y: {ry}")
+print(f"   Σd²  = {d2_sum}")
+print(f"   ρ = 1 - 6Σd²/n(n²-1) = 1 - {6*d2_sum}/{n*(n**2-1)} = {r_spear:.4f}")
+
+# ── التفسير ──
+def interp(r):
+    a=abs(r)
+    dir_ = "طردي ↑" if r>0 else "عكسي ↓"
+    if a>=0.9: return f"قوي جداً {dir_}"
+    if a>=0.7: return f"قوي {dir_}"
+    if a>=0.5: return f"متوسط {dir_}"
+    if a>=0.3: return f"ضعيف {dir_}"
+    return "لا ارتباط"
+print(f"\\n── التفسير ──")
+print(f"  Pearson  r = {r_pearson:.4f} → {interp(r_pearson)}")
+print(f"  Spearman ρ = {r_spear:.4f} → {interp(r_spear)}")
+
+# ── الانحدار ──
+b = xy_sum/sx2; a = ym-b*xm; r2 = r_pearson**2
+print(f"\\n── معادلة الانحدار ──")
+print(f"  y = {a:.4f} + {b:.4f}x")
+print(f"  R² = {r2:.4f} → الساعات تفسر {r2*100:.1f}% من تباين الدرجات")`,
+
+  /* CHARTS */
+
+  stats_histogram_chart: `# ==========================================
+# المدرج التكراري والمدرج الشريطي
+# Histogram & Bar Chart
+# ==========================================
+# المدرج التكراري: للبيانات المتواصلة (تلتصق الأعمدة)
+# المدرج الشريطي: للبيانات المنفصلة (مسافة بين الأعمدة)
+import numpy as np
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+import math
+
+data = [23,45,12,67,34,89,56,78,43,21,65,32,87,54,11,76,43,28,62,39,
+        55,44,66,33,77,22,88,11,55,44,66,32,78,23,91,18,72,35,63,47]
+
+n    = len(data)
+mean = sum(data)/n
+std  = (sum((x-mean)**2 for x in data)/n)**0.5
+
+bins = 8
+fig, axes = plt.subplots(2, 2, figsize=(11, 9))
+fig.suptitle(f'المدرجات التكرارية والشريطية  (n={n})', fontsize=13, fontweight='bold')
+
+PURPLE = '#6C63FF'
+GREEN  = '#00BFA5'
+ORANGE = '#FF7043'
+GOLD   = '#FFD600'
+
+# 1: Histogram
+axes[0,0].hist(data, bins=bins, color=PURPLE+'aa', edgecolor='white', linewidth=1.5)
+axes[0,0].axvline(mean, color='red', linestyle='--', linewidth=2, label=f'μ={mean:.1f}')
+axes[0,0].axvline(mean+std, color=ORANGE, linestyle=':', linewidth=1.5, label=f'μ+σ={mean+std:.1f}')
+axes[0,0].axvline(mean-std, color=ORANGE, linestyle=':', linewidth=1.5, label=f'μ-σ={mean-std:.1f}')
+axes[0,0].set_title('مدرج تكراري (Histogram)')
+axes[0,0].set_xlabel('القيمة'); axes[0,0].set_ylabel('التكرار')
+axes[0,0].legend(fontsize=8); axes[0,0].grid(True, alpha=0.3)
+
+# 2: Frequency polygon (مضلع التكرار)
+counts, bins_e = np.histogram(data, bins=bins)
+midpoints = [(bins_e[i]+bins_e[i+1])/2 for i in range(len(counts))]
+axes[0,1].bar(midpoints, counts, width=(bins_e[1]-bins_e[0])*0.8,
+              color=GREEN+'99', edgecolor='white', label='التكرار')
+axes[0,1].plot(midpoints, counts, 'r-o', linewidth=2, markersize=6, label='مضلع التكرار')
+axes[0,1].set_title('مضلع التكرار (Freq Polygon)')
+axes[0,1].set_xlabel('منتصف الفئة'); axes[0,1].set_ylabel('التكرار')
+axes[0,1].legend(); axes[0,1].grid(True, alpha=0.3)
+
+# 3: Bar chart (comparative - مدرج شريطي)
+categories = ['الفصل أ','الفصل ب','الفصل ج','الفصل د']
+scores1    = [78, 85, 72, 91]
+scores2    = [82, 80, 79, 88]
+x = np.arange(len(categories)); w = 0.35
+axes[1,0].bar(x-w/2, scores1, w, label='اختبار 1', color=PURPLE+'bb', edgecolor='white')
+axes[1,0].bar(x+w/2, scores2, w, label='اختبار 2', color=ORANGE+'bb', edgecolor='white')
+axes[1,0].axhline(np.mean(scores1+scores2), color='red', linestyle='--', alpha=0.7, label='المتوسط')
+axes[1,0].set_title('مدرج شريطي مقارن (Bar Chart)')
+axes[1,0].set_xticks(x); axes[1,0].set_xticklabels(categories)
+axes[1,0].set_ylabel('الدرجة'); axes[1,0].legend(); axes[1,0].grid(True, alpha=0.3)
+
+# 4: Cumulative histogram (تكرار تراكمي)
+counts_c, bins_c = np.histogram(data, bins=bins)
+cumulative = np.cumsum(counts_c)
+mids_c = [(bins_c[i]+bins_c[i+1])/2 for i in range(len(counts_c))]
+axes[1,1].bar(mids_c, cumulative, width=(bins_c[1]-bins_c[0])*0.8,
+              color=GOLD+'aa', edgecolor='white', label='التكرار التراكمي')
+axes[1,1].plot(mids_c, cumulative, 'b-o', linewidth=2, markersize=5, label='منحنى Ogive')
+axes[1,1].axhline(n/2, color='red', linestyle='--', alpha=0.7, label=f'n/2={n//2}')
+axes[1,1].set_title('التكرار التراكمي (Ogive)')
+axes[1,1].set_xlabel('القيمة'); axes[1,1].set_ylabel('التكرار التراكمي')
+axes[1,1].legend(); axes[1,1].grid(True, alpha=0.3)
+
+plt.tight_layout()
+plt.savefig('/tmp/elab_chart.png', dpi=100, bbox_inches='tight')
+plt.close()
+print(f"n={n}  متوسط={mean:.2f}  انحراف={std:.2f}")
+print(f"الرسوم: مدرج تكراري + مضلع التكرار + مدرج شريطي + التراكمي")
+print("انظر الرسوم اسفل ⬇️")`,
+
+};
+
 function statsTabSwitch(tab) {
   var excel  = document.getElementById('stats-excel-panel');
   var python = document.getElementById('stats-py-panel');
@@ -16717,7 +17207,10 @@ function statsTabSwitch(tab) {
 function statsLoadPyTmpl() {
   var sel = document.getElementById('stats-py-tmpl');
   if (!sel || !sel.value) return;
-  var tmpl = (typeof STATS_PY_TEMPLATES !== 'undefined' && STATS_PY_TEMPLATES[sel.value]) || '';
+  var key  = sel.value;
+  var tmpl = (typeof STATS_PY_TEMPLATES_EXT !== 'undefined' && STATS_PY_TEMPLATES_EXT[key])
+          || (typeof STATS_PY_TEMPLATES     !== 'undefined' && STATS_PY_TEMPLATES[key])
+          || '';
   var ta   = document.getElementById('elab-editor');
   if (ta) { ta.value = tmpl; elabUpdateLines(); }
   var out  = document.getElementById('elab-out');
@@ -16792,16 +17285,27 @@ function buildStatsLabFull(subjectId, uploads) {
               + '<option value="stats_numpy">🔢 Numpy الإحصائي</option>'
               + '<option value="stats_pandas">🐼 Pandas جداول البيانات</option>'
               + '</optgroup>'
+              + '<optgroup label="── النزعة المركزية ──">'
+              + '<option value="stats_ungrouped_central">📐 غير مبوبة — Mean/Median/Mode</option>'
+              + '<option value="stats_grouped_central">📊 مبوبة — الوسيط والمتوسط</option>'
+              + '</optgroup>'
+              + '<optgroup label="── مقاييس التشتت ──">'
+              + '<option value="stats_dispersion">📏 غير مبوبة — Variance/Std/IQR</option>'
+              + '<option value="stats_grouped_dispersion">📋 مبوبة — التباين والانحراف</option>'
+              + '</optgroup>'
+              + '<optgroup label="── الارتباط ──">'
+              + '<option value="stats_correlation">📉 Pearson + Spearman كاملة</option>'
+              + '</optgroup>'
               + '<optgroup label="── الرسوم البيانية ──">'
+              + '<option value="stats_histogram_chart">📊 مدرج تكراري + شريطي + تراكمي</option>'
               + '<option value="stats_matplotlib">📈 Matplotlib 4 رسوم</option>'
               + '<option value="ml_full_chart">🤖 ML + Visualization</option>'
               + '</optgroup>'
               + '<optgroup label="── التحليل الإحصائي ──">'
               + '<option value="stats_descriptive">📐 الإحصاء الوصفي الكامل</option>'
               + '<option value="stats_zscore">📏 Z-Score التوحيد</option>'
-              + '<option value="stats_correlation">📉 الارتباط والانحدار</option>'
-              + '<option value="stats_probability">🎲 نظرية الاحتمالات</option>'
               + '<option value="stats_normal">🔔 التوزيع الطبيعي</option>'
+              + '<option value="stats_probability">🎲 نظرية الاحتمالات</option>'
               + '</optgroup>'
               + '<optgroup label="── تعلم الآلة ML ──">'
               + '<option value="ml_linear_regression">🤖 الانحدار الخطي</option>'
@@ -16885,18 +17389,36 @@ function buildStatsLabFull(subjectId, uploads) {
 
     // ── Charts section ────────────────────────────────
     + '<div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:14px">'
-      + '<div style="font-weight:700;font-size:0.83rem;margin-bottom:12px">📈 الرسوم البيانية الإحصائية</div>'
+      + '<div style="font-weight:700;font-size:0.83rem;margin-bottom:10px;color:var(--text)">📈 الرسوم البيانية الإحصائية</div>'
+      + '<div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:8px">أدخل بياناتك أعلاه ثم اختر نوع الرسم</div>'
       + '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">'
-        + ['مدرج تكراري','مخطط خطي','مخطط دائري','مخطط تشتت','مقارنة القيم'].map(function(t,i){
-            var types = ['bar','line','pie','scatter','bar'];
-            var icons = ['📊','📈','🥧','🔵','📊'];
-            return '<button onclick="statsChart(\''+types[i]+'\',\''+t+'\')" '
-              + 'style="padding:6px 12px;border-radius:8px;border:1px solid rgba(108,99,255,0.3);background:rgba(108,99,255,0.08);color:var(--primary);font-size:0.75rem;font-weight:700;cursor:pointer">'
-              + icons[i]+' '+t+'</button>';
+        + [
+            {fn:'histogram',   icon:'📊', label:'مدرج تكراري',   title:'Histogram — توزيع التكرارات'},
+            {fn:'bar_named',   icon:'📋', label:'مدرج شريطي',    title:'Bar Chart — مقارنة القيم'},
+            {fn:'line',        icon:'📈', label:'مخطط خطي',     title:'Line Chart'},
+            {fn:'pie',         icon:'🥧', label:'مخطط دائري',   title:'Pie Chart'},
+            {fn:'scatter',     icon:'🔵', label:'تشتت',         title:'Scatter Plot'},
+            {fn:'boxplot',     icon:'📦', label:'Boxplot',       title:'Box Plot — الربيعيات'},
+            {fn:'corr_scatter',icon:'📉', label:'الارتباط r',    title:'Correlation Scatter'},
+          ].map(function(b){
+            return '<button onclick="statsChart(\''+b.fn+'\',\''+b.title+'\')" title="'+b.title+'"'
+              + ' style="padding:6px 12px;border-radius:8px;border:1px solid rgba(108,99,255,0.3);background:rgba(108,99,255,0.08);color:var(--primary);font-size:0.73rem;font-weight:700;cursor:pointer">'
+              + b.icon+' '+b.label+'</button>';
           }).join('')
       + '</div>'
+      // Two-variable input for correlation
+      + '<div id="stats-corr-input" style="display:none;margin-bottom:10px;background:rgba(255,214,0,0.06);border:1px solid rgba(255,214,0,0.2);border-radius:10px;padding:10px">'
+        + '<div style="font-size:0.75rem;color:#E8A020;font-weight:700;margin-bottom:6px">📉 لحساب معامل الارتباط — أدخل متغيرين (X و Y)</div>'
+        + '<div style="display:flex;gap:8px;flex-wrap:wrap">'
+          + '<div style="flex:1;min-width:200px"><div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:3px">X (المتغير المستقل):</div>'
+            + '<input id="stats-x-data" placeholder="5,10,15,20,25" style="width:100%;box-sizing:border-box;padding:7px 10px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text);font-family:var(--font);font-size:0.82rem;outline:none;direction:ltr"></div>'
+          + '<div style="flex:1;min-width:200px"><div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:3px">Y (المتغير التابع):</div>'
+            + '<input id="stats-y-data" placeholder="12,25,34,48,62" style="width:100%;box-sizing:border-box;padding:7px 10px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text);font-family:var(--font);font-size:0.82rem;outline:none;direction:ltr"></div>'
+        + '</div>'
+        + '<button onclick="statsDrawCorrelation()" style="margin-top:8px;padding:7px 16px;border-radius:8px;border:none;background:linear-gradient(135deg,#6C63FF,#a78bfa);color:white;font-family:var(--font);font-weight:700;cursor:pointer;font-size:0.8rem">📉 ارسم + احسب r</button>'
+      + '</div>'
       + '<div id="stats-chart-area" style="min-height:60px">'
-        + '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:0.82rem">أدخل بيانات أو اختر قالب ثم اضغط رسماً بيانياً</div>'
+        + '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:0.82rem">أدخل بياناتك ثم اختر نوع الرسم ⬆️</div>'
       + '</div>'
     + '</div>'
 
@@ -16956,56 +17478,300 @@ function statsLoadDataset(idx) {
   }
 }
 
-// Draw chart from current stats data
+// ── statsChart: draw any chart type from current data ──
 function statsChart(type, label) {
+  // Show correlation input panel if needed
+  var corrPanel = document.getElementById('stats-corr-input');
+  if (corrPanel) corrPanel.style.display = type === 'corr_scatter' ? 'block' : 'none';
+  if (type === 'corr_scatter') return; // handled by statsDrawCorrelation()
+
   var nums = window._statsCurrentNums || [];
   if (!nums.length) {
     var inp = document.getElementById('stats-lab-data');
     if (inp) nums = inp.value.split(/[\s,،]+/).map(function(s){ return parseFloat(s.trim()); }).filter(function(n){ return !isNaN(n); });
   }
-  if (!nums.length) { showToast('أدخل بيانات أولاً', 'error'); return; }
+  if (!nums.length) { showToast('أدخل بيانات أولاً ثم اضغط ⚡ تحليل', 'error'); return; }
 
   var area = document.getElementById('stats-chart-area');
   if (!area) return;
-  area.innerHTML = '<canvas id="stats-main-chart" style="max-width:100%;max-height:300px"></canvas>';
 
-  setTimeout(function() {
-    var ctx = document.getElementById('stats-main-chart');
-    if (!ctx) return;
-    if (window._statsChartInst) { try { window._statsChartInst.destroy(); } catch(e){} }
+  var mean = nums.reduce(function(a,b){return a+b;},0)/nums.length;
+  var sorted = nums.slice().sort(function(a,b){return a-b;});
+  var median = nums.length%2===0
+    ? (sorted[nums.length/2-1]+sorted[nums.length/2])/2
+    : sorted[Math.floor(nums.length/2)];
+  var variance = nums.reduce(function(s,x){return s+(x-mean)*(x-mean);},0)/nums.length;
+  var std = Math.sqrt(variance);
 
-    var labels = nums.map(function(_,i){ return 'Q'+(i+1); });
-    var COLORS = ['#6C63FF','#00BFA5','#FF7043','#FFD600','#FF5252','#28CA41','#3776AB','#E91E63','#4CAF50','#FFA726'];
-    var bgColors = nums.map(function(_,i){ return COLORS[i % COLORS.length]; });
+  // ── histogram: group into bins ──
+  if (type === 'histogram') {
+    var bins = Math.max(5, Math.min(12, Math.ceil(Math.sqrt(nums.length))));
+    var mn = sorted[0], mx = sorted[sorted.length-1];
+    var bw = (mx - mn) / bins;
+    var freqs = Array(bins).fill(0);
+    nums.forEach(function(v){ var i=Math.min(bins-1, Math.floor((v-mn)/bw)); freqs[i]++; });
+    var binLabels = freqs.map(function(_,i){ return (mn+i*bw).toFixed(1)+'–'+(mn+(i+1)*bw).toFixed(1); });
 
-    var datasets = [{
-      label: label || 'البيانات',
-      data: type === 'scatter' ? nums.map(function(v,i){ return {x:i+1, y:v}; }) : nums,
-      backgroundColor: type === 'pie' ? bgColors : bgColors[0] + '88',
-      borderColor: type === 'pie' ? bgColors : bgColors[0],
-      borderWidth: 2,
-      borderRadius: type === 'bar' ? 6 : 0,
-      fill: type === 'line',
-      tension: 0.4,
-      pointRadius: type === 'scatter' ? 6 : 4,
-    }];
+    area.innerHTML = '<canvas id="stats-main-chart" style="max-width:100%;max-height:320px"></canvas>'
+      + '<div style="font-size:0.75rem;color:var(--text-muted);margin-top:8px;direction:rtl">'
+      + '<strong>المدرج التكراري:</strong> عدد الفئات='+bins+' | عرض الفئة='+bw.toFixed(2)
+      + ' | متوسط='+mean.toFixed(2)+' | انحراف='+std.toFixed(2)+'</div>'
+      + _makeFreqTable(binLabels, freqs, mean, std);
 
-    window._statsChartInst = new Chart(ctx, {
-      type: type === 'scatter' ? 'scatter' : type,
-      data: { labels: type !== 'scatter' ? labels : undefined, datasets: datasets },
-      options: {
-        responsive: true,
-        plugins: {
-          legend: { display: type === 'pie' },
-          title: { display: true, text: label + ' — n=' + nums.length, color: '#aaa', font: { size: 13 } }
-        },
-        scales: type === 'pie' ? {} : {
-          y: { beginAtZero: false, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#aaa' } },
-          x: { grid: { display: false }, ticks: { color: '#aaa' } }
+    setTimeout(function(){
+      var ctx = document.getElementById('stats-main-chart');
+      if (!ctx) return;
+      if (window._statsChartInst){try{window._statsChartInst.destroy();}catch(e){}}
+      window._statsChartInst = new Chart(ctx, {
+        type: 'bar',
+        data: { labels: binLabels, datasets: [{
+          label: 'التكرار',
+          data: freqs,
+          backgroundColor: '#6C63FF99',
+          borderColor: '#6C63FF',
+          borderWidth: 2,
+          borderRadius: 4,
+          barPercentage: 0.95,
+          categoryPercentage: 1.0,
+        }]},
+        options: {
+          responsive:true,
+          plugins:{
+            title:{display:true,text:'مدرج تكراري — n='+nums.length,color:'#aaa',font:{size:13}},
+            legend:{display:false},
+            annotation:{annotations:{mean:{type:'line',xMin:mean,xMax:mean,borderColor:'#FF5252',borderWidth:2,borderDash:[6,3],label:{display:true,content:'μ='+mean.toFixed(1),color:'#FF5252',position:'start'}}}}
+          },
+          scales:{
+            y:{title:{display:true,text:'التكرار',color:'#aaa'},grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#aaa'}},
+            x:{title:{display:true,text:'الفئات',color:'#aaa'},grid:{display:false},ticks:{color:'#aaa',maxRotation:45}}
+          }
         }
-      }
+      });
+    }, 50);
+    return;
+  }
+
+  // ── bar_named: value comparison ──
+  if (type === 'bar_named') {
+    var COLORS = ['#6C63FF','#00BFA5','#FF7043','#FFD600','#FF5252','#28CA41','#3776AB','#E91E63'];
+    var labels = nums.map(function(_,i){ return 'Q'+(i+1); });
+    area.innerHTML = '<canvas id="stats-main-chart" style="max-width:100%;max-height:300px"></canvas>'
+      + '<div style="font-size:0.75rem;color:var(--text-muted);margin-top:6px">المدرج الشريطي يقارن القيم المختلفة — المتوسط='+mean.toFixed(2)+'</div>';
+    setTimeout(function(){
+      var ctx=document.getElementById('stats-main-chart'); if(!ctx) return;
+      if(window._statsChartInst){try{window._statsChartInst.destroy();}catch(e){}}
+      window._statsChartInst = new Chart(ctx,{
+        type:'bar',
+        data:{labels:labels,datasets:[{
+          label:'القيم',data:nums,
+          backgroundColor:nums.map(function(_,i){return COLORS[i%COLORS.length]+'cc';}),
+          borderColor:nums.map(function(_,i){return COLORS[i%COLORS.length];}),
+          borderWidth:2,borderRadius:8
+        }]},
+        options:{responsive:true,plugins:{
+          title:{display:true,text:'مدرج شريطي — n='+nums.length,color:'#aaa',font:{size:13}},
+          legend:{display:false}
+        },scales:{
+          y:{grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#aaa'}},
+          x:{grid:{display:false},ticks:{color:'#aaa'}}
+        }}
+      });
+    },50);
+    return;
+  }
+
+  // ── boxplot: show Q1/Q2/Q3/whiskers ──
+  if (type === 'boxplot') {
+    var q1 = _pctile(sorted, 25);
+    var q3 = _pctile(sorted, 75);
+    var iqr = q3 - q1;
+    var lower = q1 - 1.5*iqr;
+    var upper = q3 + 1.5*iqr;
+    var whiskerLow = sorted.find(function(v){return v>=lower;}) || sorted[0];
+    var whiskerHigh = sorted.slice().reverse().find(function(v){return v<=upper;}) || sorted[sorted.length-1];
+    var outliers = nums.filter(function(v){return v<lower||v>upper;});
+
+    area.innerHTML = '<canvas id="stats-main-chart" style="max-width:100%;max-height:240px"></canvas>'
+      + '<div style="font-size:0.75rem;direction:rtl;margin-top:8px;display:grid;grid-template-columns:repeat(4,1fr);gap:6px">'
+      + [['Min',sorted[0],'#42A5F5'],['Q1',q1,'#6C63FF'],['وسيط',median,'#00BFA5'],['Q3',q3,'#FF7043'],['Max',sorted[sorted.length-1],'#AB47BC'],['IQR',iqr.toFixed(3),'#FFD600'],['متوسط',mean.toFixed(3),'#FF5252'],['شاذة',outliers.length,'#f97316']]
+      .map(function(r){return '<div style="padding:6px;background:rgba(255,255,255,0.04);border-radius:6px;border-right:3px solid '+r[2]+'">'
+        +'<div style="font-size:0.65rem;color:var(--text-muted)">'+r[0]+'</div>'
+        +'<div style="font-weight:800;color:'+r[2]+';font-size:0.85rem">'+r[1]+'</div></div>';}).join('')
+      + '</div>';
+
+    // Draw custom boxplot using bar chart
+    setTimeout(function(){
+      var ctx=document.getElementById('stats-main-chart'); if(!ctx) return;
+      if(window._statsChartInst){try{window._statsChartInst.destroy();}catch(e){}}
+      window._statsChartInst = new Chart(ctx,{
+        type:'bar',
+        data:{labels:[''],datasets:[
+          {label:'Min→Q1',data:[[sorted[0],q1]],backgroundColor:'rgba(66,165,245,0.2)',borderColor:'#42A5F5',borderWidth:2,borderRadius:4},
+          {label:'IQR (Q1→Q3)',data:[[q1,q3]],backgroundColor:'rgba(108,99,255,0.5)',borderColor:'#6C63FF',borderWidth:2,borderRadius:4},
+          {label:'Q3→Max',data:[[q3,sorted[sorted.length-1]]],backgroundColor:'rgba(171,71,188,0.2)',borderColor:'#AB47BC',borderWidth:2,borderRadius:4},
+        ]},
+        options:{indexAxis:'y',responsive:true,plugins:{
+          title:{display:true,text:'Box Plot — الربيعيات',color:'#aaa',font:{size:13}},
+          tooltip:{callbacks:{label:function(c){return c.dataset.label+': '+c.raw;}}}
+        },scales:{
+          x:{grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#aaa'}},
+          y:{display:false}
+        }}
+      });
+    },50);
+    return;
+  }
+
+  // ── default: line / pie / scatter ──
+  area.innerHTML = '<canvas id="stats-main-chart" style="max-width:100%;max-height:300px"></canvas>';
+  setTimeout(function(){
+    var ctx=document.getElementById('stats-main-chart'); if(!ctx) return;
+    if(window._statsChartInst){try{window._statsChartInst.destroy();}catch(e){}}
+    var COLORS=['#6C63FF','#00BFA5','#FF7043','#FFD600','#FF5252','#28CA41'];
+    var bgC=nums.map(function(_,i){return COLORS[i%COLORS.length];});
+    var lbs=nums.map(function(_,i){return 'Q'+(i+1);});
+    window._statsChartInst=new Chart(ctx,{
+      type:type==='scatter'?'scatter':type,
+      data:{labels:type!=='scatter'?lbs:undefined,datasets:[{
+        label:label||'البيانات',
+        data:type==='scatter'?nums.map(function(v,i){return{x:i+1,y:v};}):nums,
+        backgroundColor:type==='pie'?bgC:COLORS[0]+'88',
+        borderColor:type==='pie'?bgC:COLORS[0],
+        borderWidth:2,borderRadius:type==='bar'?6:0,
+        fill:type==='line',tension:0.4,pointRadius:type==='scatter'?6:4
+      }]},
+      options:{responsive:true,plugins:{
+        legend:{display:type==='pie'},
+        title:{display:true,text:label+' — n='+nums.length,color:'#aaa',font:{size:13}}
+      },scales:type==='pie'?{}:{
+        y:{grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#aaa'}},
+        x:{grid:{display:false},ticks:{color:'#aaa'}}
+      }}
     });
-  }, 50);
+  },50);
+}
+
+// ── helper: percentile ──
+function _pctile(sorted, p) {
+  var k=(sorted.length-1)*p/100, f=Math.floor(k), c=Math.ceil(k);
+  return f===c ? sorted[k] : sorted[f]*(c-k)+sorted[c]*(k-f);
+}
+
+// ── helper: frequency table HTML ──
+function _makeFreqTable(labels, freqs, mean, std) {
+  var total=freqs.reduce(function(a,b){return a+b;},0);
+  var cumFreq=0;
+  var html='<div style="overflow-x:auto;margin-top:10px"><table style="width:100%;border-collapse:collapse;font-size:0.72rem;direction:rtl">'
+    +'<tr style="background:rgba(108,99,255,0.15)">'
+    +'<th style="padding:5px 8px;text-align:right;border:1px solid rgba(255,255,255,0.1)">الفئة</th>'
+    +'<th style="padding:5px 8px;border:1px solid rgba(255,255,255,0.1)">التكرار f</th>'
+    +'<th style="padding:5px 8px;border:1px solid rgba(255,255,255,0.1)">النسبة %</th>'
+    +'<th style="padding:5px 8px;border:1px solid rgba(255,255,255,0.1)">التكرار التراكمي</th>'
+    +'</tr>';
+  labels.forEach(function(l,i){
+    cumFreq+=freqs[i];
+    var pct=(freqs[i]/total*100).toFixed(1);
+    html+='<tr style="background:rgba(255,255,255,0.02)">'
+      +'<td style="padding:5px 8px;text-align:right;border:1px solid rgba(255,255,255,0.06)">'+l+'</td>'
+      +'<td style="padding:5px 8px;text-align:center;border:1px solid rgba(255,255,255,0.06);color:#6C63FF;font-weight:700">'+freqs[i]+'</td>'
+      +'<td style="padding:5px 8px;text-align:center;border:1px solid rgba(255,255,255,0.06)">'+pct+'%</td>'
+      +'<td style="padding:5px 8px;text-align:center;border:1px solid rgba(255,255,255,0.06);color:#00BFA5">'+cumFreq+'</td>'
+      +'</tr>';
+  });
+  html+='<tr style="background:rgba(108,99,255,0.08);font-weight:700">'
+    +'<td style="padding:5px 8px;text-align:right;border:1px solid rgba(255,255,255,0.1)">المجموع</td>'
+    +'<td style="padding:5px 8px;text-align:center;border:1px solid rgba(255,255,255,0.1);color:#6C63FF">'+total+'</td>'
+    +'<td style="padding:5px 8px;text-align:center;border:1px solid rgba(255,255,255,0.1)">100%</td>'
+    +'<td style="padding:5px 8px;text-align:center;border:1px solid rgba(255,255,255,0.1)">—</td>'
+    +'</tr></table></div>';
+  return html;
+}
+
+// ── statsDrawCorrelation: pearson + spearman + kendall + chart ──
+function statsDrawCorrelation() {
+  var xInp = document.getElementById('stats-x-data');
+  var yInp = document.getElementById('stats-y-data');
+  var area = document.getElementById('stats-chart-area');
+  if (!xInp || !yInp || !area) return;
+
+  var X = xInp.value.split(/[\s,،]+/).map(Number).filter(function(v){return !isNaN(v);});
+  var Y = yInp.value.split(/[\s,،]+/).map(Number).filter(function(v){return !isNaN(v);});
+
+  if (X.length < 3 || Y.length < 3) { showToast('أدخل على الأقل 3 أزواج من القيم', 'error'); return; }
+  if (X.length !== Y.length) { showToast('يجب أن يكون عدد X = عدد Y', 'error'); return; }
+
+  var n = X.length;
+  var xm = X.reduce(function(a,b){return a+b;})/n;
+  var ym = Y.reduce(function(a,b){return a+b;})/n;
+
+  // Pearson r
+  var num = X.reduce(function(s,_,i){return s+(X[i]-xm)*(Y[i]-ym);},0);
+  var denom = Math.sqrt(X.reduce(function(s,v){return s+(v-xm)**2;},0)*Y.reduce(function(s,v){return s+(v-ym)**2;},0));
+  var pearson = denom ? num/denom : 0;
+
+  // Regression line
+  var b = num / X.reduce(function(s,v){return s+(v-xm)**2;},0);
+  var a = ym - b*xm;
+  var r2 = pearson**2;
+  var MAE = X.reduce(function(s,_,i){return s+Math.abs(Y[i]-(a+b*X[i]));},0)/n;
+
+  // Spearman: rank correlation
+  function rankArray(arr) {
+    var sorted=arr.slice().sort(function(a,b){return a-b;});
+    return arr.map(function(v){return sorted.indexOf(v)+1;});
+  }
+  var rankX=rankArray(X), rankY=rankArray(Y);
+  var d2=rankX.reduce(function(s,_,i){return s+(rankX[i]-rankY[i])**2;},0);
+  var spearman=1-(6*d2/(n*(n*n-1)));
+
+  // Interpret
+  function interpret(r) {
+    var a=Math.abs(r);
+    if(a>=0.9) return 'قوي جداً';
+    if(a>=0.7) return 'قوي';
+    if(a>=0.5) return 'متوسط';
+    if(a>=0.3) return 'ضعيف';
+    return 'لا ارتباط';
+  }
+
+  area.innerHTML =
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">'
+    +[['Pearson r',pearson.toFixed(4),pearson>=0?'#00BFA5':'#FF5252',interpret(pearson)],
+      ['Spearman ρ',spearman.toFixed(4),spearman>=0?'#6C63FF':'#FF7043',interpret(spearman)],
+      ['R² (تحديد)',r2.toFixed(4),'#FFD600',(r2*100).toFixed(1)+'% من التباين مُفسَّر'],
+      ['معادلة',`y = ${a.toFixed(2)} + ${b.toFixed(2)}x`,'#a78bfa','خط الانحدار الخطي'],
+      ['MAE',MAE.toFixed(3),'#FF7043','متوسط الخطأ المطلق'],
+      ['n',n,'#28CA41','عدد أزواج البيانات'],
+     ].map(function(r){return '<div style="padding:8px 10px;background:rgba(255,255,255,0.04);border-radius:8px;border-right:3px solid '+r[2]+'">'
+      +'<div style="font-size:0.65rem;color:var(--text-muted)">'+r[0]+'</div>'
+      +'<div style="font-weight:800;color:'+r[2]+';font-size:0.9rem">'+r[1]+'</div>'
+      +'<div style="font-size:0.62rem;color:var(--text-muted)">'+r[3]+'</div></div>';}).join('')
+    +'</div>'
+    +'<canvas id="stats-corr-chart" style="max-width:100%;max-height:280px"></canvas>';
+
+  setTimeout(function(){
+    var ctx=document.getElementById('stats-corr-chart'); if(!ctx) return;
+    if(window._statsCorrInst){try{window._statsCorrInst.destroy();}catch(e){}}
+    var xLine=[Math.min.apply(null,X), Math.max.apply(null,X)];
+    window._statsCorrInst=new Chart(ctx,{
+      type:'scatter',
+      data:{datasets:[
+        {label:'البيانات',data:X.map(function(v,i){return{x:v,y:Y[i]};}),
+         backgroundColor:'#6C63FF99',borderColor:'#6C63FF',pointRadius:7,pointHoverRadius:9},
+        {label:'خط الانحدار y='+a.toFixed(1)+'+'+b.toFixed(2)+'x',
+         data:xLine.map(function(v){return{x:v,y:a+b*v};}),
+         type:'line',borderColor:'#FF5252',borderWidth:2,borderDash:[6,3],
+         backgroundColor:'transparent',pointRadius:0,fill:false},
+      ]},
+      options:{responsive:true,plugins:{
+        title:{display:true,text:'مخطط الارتباط | r='+pearson.toFixed(3)+' ('+interpret(pearson)+')',color:'#aaa',font:{size:13}},
+        legend:{display:true,labels:{color:'#aaa'}}
+      },scales:{
+        x:{title:{display:true,text:'X',color:'#aaa'},grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#aaa'}},
+        y:{title:{display:true,text:'Y',color:'#aaa'},grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#aaa'}}
+      }}
+    });
+  },50);
 }
 
 function buildPythonSubjectLab() {

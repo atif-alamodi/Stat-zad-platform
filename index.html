@@ -14923,8 +14923,7 @@ function buildSubjectLabsPanel() {
   var selectorHTML = '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px">'
     + labSubjects.map(function(s) {
         var active = s.id === selectedId;
-        return '<button onclick="selectSubjectLab(''+s.id+'')" '
-          + 'style="padding:9px 16px;border-radius:12px;border:1.5px solid '+(active?s.color||'var(--primary)':'rgba(255,255,255,0.1)')+';'
+        return '<bonclick="selectSubjectLab('+s.id+')" padding:9px 16px;border-radius:12px;border:1.5px solid '+(active?s.color||'var(--primary)':'rgba(255,255,255,0.1)')+';'
           + 'background:'+(active?'rgba(108,99,255,0.15)':'rgba(255,255,255,0.04)')+';'
           + 'color:'+(active?s.color||'var(--primary)':'var(--text-muted)')+';'
           + 'font-family:var(--font);font-weight:700;font-size:0.82rem;cursor:pointer">'

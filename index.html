@@ -11000,6 +11000,9 @@ LANGUAGE RULES:
     window._ZAD_LAST_UPLOAD_SUBJECT = subjectId;
     upd('✅', `تم! ${totalSaved} درس — ${totalTerms} مصطلح — ${totalQ} سؤال`, 100);
     showToast(`✅ تم إنشاء ${totalSaved} درس من الملف`, 'success');
+    if (typeof logActivity === 'function') {
+      logActivity({ type: 'upload', title: 'رُفع: ' + (detectedChapterTitle || fileName), subjectId: subjectId, tab: 'lessons' });
+    }
     hideUploadStatus();
 
     // Hide progress bar after short delay
@@ -13554,6 +13557,9 @@ async function enterApp() {
   // Load all saved uploads from IndexedDB FIRST before rendering anything
   await restoreUserAILessons();
 
+  // Render activity feed from persisted log
+  if (typeof renderActivityFeed === 'function') setTimeout(renderActivityFeed, 200);
+
   const loc = loadLocation();
   if (loc) {
     if (loc.type === 'lesson' && loc.subjectId && loc.lessonId) {
@@ -13817,6 +13823,16 @@ function openLesson(subjectId, lessonId) {
       saveLessonActivity(bundle.subjectId, _lid, { opened: true, openedAt: Date.now() });
       refreshProgressBars();
     }
+    if (typeof logActivity === 'function') {
+      var _subj = CURRICULUM[bundle.subjectId] || {};
+      logActivity({
+        type: 'lesson',
+        title: bundle.title || bundle.fileName || '',
+        subjectId: bundle.subjectId,
+        subjectTitle: (_subj.icon||'📂') + ' ' + (_subj.title||bundle.subjectId),
+        lessonId: bundle.lessonId || ('ai-' + bundle.id)
+      });
+    }
     var ul = bundle.lesson || {};
     var aiLesson = {
       lessonTitle:     ul.title || bundle.title || bundle.fileName || 'درس مرفوع',
@@ -13875,7 +13891,15 @@ function openLesson(subjectId, lessonId) {
 
   APP.progress.lessons++;
   try { saveProgress(); updateStats(); } catch(e) {}
-  if (typeof addActivity==='function') addActivity((subject.icon||'📚')+' '+(lesson.title||''));
+  if (typeof logActivity==='function') {
+    logActivity({
+      type: 'lesson',
+      title: lesson.title || '',
+      subjectId: subjectId,
+      subjectTitle: (subject.icon||'📚')+' '+(subject.title||subjectId),
+      lessonId: lessonId
+    });
+  }
 
   showSection('lesson');
   var container = document.getElementById('lesson-content');
@@ -14169,6 +14193,15 @@ function showSubject(subjectId, activeTab) {
   + '</div>';
 
   if (typeof trackUserActivity === 'function') trackUserActivity('مادة: ' + (subject.title||subjectId));
+  if (typeof logActivity === 'function') {
+    logActivity({
+      type: 'subject',
+      title: (subject.title || subjectId),
+      subjectId: subjectId,
+      subjectTitle: (subject.icon||'📚') + ' ' + (subject.title||subjectId),
+      tab: activeTab || 'lessons'
+    });
+  }
   if (typeof pingWorker === 'function') pingWorker('subject-' + subjectId);
   if (APP.student && APP.student.email) {
     try { saveLocation({ type: 'subject', subjectId: subjectId, tab: activeTab }); } catch(e) {}
@@ -14605,6 +14638,11 @@ function fixMobileLayout() {
 
 function startQuiz() {
   if (typeof trackUserActivity === 'function') trackUserActivity('اختبار');
+  if (typeof logActivity === 'function') {
+    var _hwSid = subjectId || APP.currentSubject || '';
+    var _hwS   = CURRICULUM[_hwSid] || {};
+    logActivity({ type:'homework', title:'واجب مُصحَّح', subjectId:_hwSid, subjectTitle:(_hwS.icon||'📚')+' '+(_hwS.title||_hwSid), tab:'homework' });
+  }
   if (window.innerWidth <= 768) closeSidebar();
   showPage('page-quiz');
   APP.quiz.subject = 'statistics';
@@ -14796,7 +14834,15 @@ function showQuizResults() {
     }
   }
   setTimeout(function(){ showQuizCelebration(score); }, 800);
-  addActivity(`اختبار: ${score}% ✅`);
+  var _qSubj = APP.currentSubject || 'unknown';
+  var _qSubjObj = CURRICULUM[_qSubj] || {};
+  logActivity({
+    type: 'quiz',
+    title: 'اختبار: ' + score + '%' + (score >= 70 ? ' ✅' : ' 📝'),
+    subjectId: _qSubj,
+    subjectTitle: (_qSubjObj.icon||'📚') + ' ' + (_qSubjObj.title||_qSubj),
+    tab: 'quiz'
+  });
   
   const msg = score >= 90 ? { text: '🏆 ممتاز! أنت متفوق!', sub: 'نتيجة رائعة جداً!', color: '#00E676' }
     : score >= 70 ? { text: '👍 جيد جداً!', sub: 'تقريباً وصلت للقمة', color: '#43CBFF' }
@@ -14986,18 +15032,101 @@ function renderProgress() {
   }, 100);
 }
 
-function addActivity(text) {
-  const feed = document.getElementById('activity-feed');
+// ══════════════════════════════════════════════════════
+// ACTIVITY LOG SYSTEM — persistent, rich, navigable
+// ══════════════════════════════════════════════════════
+const ZAD_ACTIVITY_LOG_KEY = 'zad_actlog_v2';
+
+function getActivityLog() {
+  var email = APP.student.email || 'guest';
+  var key = ZAD_ACTIVITY_LOG_KEY + '_' + email.replace(/[^a-z0-9]/gi,'_');
+  try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch(e) { return []; }
+}
+
+function saveActivityLog(log) {
+  var email = APP.student.email || 'guest';
+  var key = ZAD_ACTIVITY_LOG_KEY + '_' + email.replace(/[^a-z0-9]/gi,'_');
+  try { localStorage.setItem(key, JSON.stringify(log.slice(0, 50))); } catch(e) {}
+}
+
+function logActivity(entry) {
+  // entry: { type, title, icon, subjectId, lessonId, tab, pct }
+  if (!APP.student.email) return;
+  var log = getActivityLog();
+  // Remove duplicate (same lesson/subject)
+  log = log.filter(function(e) {
+    return !(e.subjectId === entry.subjectId && e.lessonId === entry.lessonId && e.type === entry.type);
+  });
+  entry.ts = Date.now();
+  entry.studentName = APP.student.name || '';
+  log.unshift(entry);
+  saveActivityLog(log);
+  renderActivityFeed();
+}
+
+function timeAgo(ts) {
+  var diff = Math.floor((Date.now() - ts) / 1000);
+  if (diff < 60)   return 'الآن';
+  if (diff < 3600) return Math.floor(diff/60) + ' د';
+  if (diff < 86400) return Math.floor(diff/3600) + ' س';
+  return Math.floor(diff/86400) + ' يوم';
+}
+
+function activityIcon(type) {
+  var icons = { lesson:'📖', quiz:'❓', upload:'📤', subject:'📚', mindmap:'🧠', cards:'🃏', homework:'✏️', join:'🎓', exam:'📝' };
+  return icons[type] || '⚡';
+}
+
+function resumeActivity(entry) {
+  if (!entry) return;
+  if (entry.type === 'lesson' && entry.subjectId && entry.lessonId) {
+    openLesson(entry.subjectId, entry.lessonId);
+  } else if (entry.subjectId) {
+    showSubject(entry.subjectId, entry.tab || 'lessons');
+  } else if (entry.section) {
+    showSection(entry.section);
+  }
+}
+
+function renderActivityFeed() {
+  var feed = document.getElementById('activity-feed');
   if (!feed) return;
-  const item = document.createElement('div');
-  item.className = 'activity-item';
-  item.innerHTML = `
-    <div class="activity-icon" style="background: rgba(108,99,255,0.2);">⚡</div>
-    <div class="activity-text">${text}</div>
-    <div class="activity-time">الآن</div>
-  `;
-  feed.insertBefore(item, feed.firstChild);
-  if (feed.children.length > 5) feed.removeChild(feed.lastChild);
+  var log = getActivityLog();
+
+  if (!log.length) {
+    feed.innerHTML = '<div class="activity-item">'
+      + '<div class="activity-icon" style="background:rgba(108,99,255,0.2);">🎓</div>'
+      + '<div class="activity-text">انضمت إلى المنصة</div>'
+      + '<div class="activity-time">الآن</div>'
+      + '</div>';
+    return;
+  }
+
+  feed.innerHTML = log.slice(0, 6).map(function(e, i) {
+    var ic = activityIcon(e.type);
+    var ago = timeAgo(e.ts || Date.now());
+    var hasNav = !!(e.subjectId || e.section);
+
+    return '<div class="activity-item" style="' + (i===0 ? 'border-right:3px solid var(--primary)' : '') + '">'
+      + '<div class="activity-icon" style="background:rgba(108,99,255,0.15);font-size:1.1rem">' + ic + '</div>'
+      + '<div class="activity-text" style="flex:1;min-width:0">'
+        + '<div style="font-weight:700;font-size:0.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (e.title || '') + '</div>'
+        + (e.subjectTitle ? '<div style="font-size:0.7rem;color:var(--text-muted);margin-top:1px">' + e.subjectTitle + '</div>' : '')
+      + '</div>'
+      + '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">'
+        + '<div class="activity-time">' + ago + '</div>'
+        + (hasNav ? '<button onclick="event.stopPropagation();resumeActivity(' + JSON.stringify(e).replace(/"/g, '&quot;') + ')" '
+            + 'style="padding:3px 8px;border-radius:6px;border:1px solid var(--primary);background:rgba(108,99,255,0.1);'
+            + 'color:var(--primary);font-size:0.62rem;font-weight:800;cursor:pointer;white-space:nowrap;font-family:var(--font)">▶ استمر</button>'
+          : '')
+      + '</div>'
+      + '</div>';
+  }).join('');
+}
+
+function addActivity(text) {
+  // Legacy wrapper — maps old string calls to new logActivity
+  logActivity({ type: 'general', title: text, icon: '⚡' });
 }
 
 function showToast(msg, type = 'info') {
@@ -20998,6 +21127,13 @@ function trackLessonOpened(subjectId, lessonId) {
 function trackCardsViewed(subjectId, lessonId) {
   saveLessonActivity(subjectId, lessonId, { cardsViewed: true });
   refreshProgressBars();
+  var s = CURRICULUM[subjectId] || {};
+  var merged = (typeof getSubjectWithUploads==='function') ? getSubjectWithUploads(subjectId) : s;
+  var lesson = null;
+  (merged.chapters||[]).forEach(function(ch){ (ch.lessons||[]).forEach(function(l){ if(l.id===lessonId) lesson=l; }); });
+  if (lesson && typeof logActivity==='function') {
+    logActivity({ type:'cards', title:'بطاقات: '+(lesson.title||lessonId), subjectId:subjectId, subjectTitle:(s.icon||'📚')+' '+(s.title||subjectId), lessonId:lessonId });
+  }
 }
 
 // Track: quiz completed with score

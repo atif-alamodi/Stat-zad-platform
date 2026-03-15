@@ -10562,21 +10562,55 @@ function loadPDFjs() {
 
 
 // ── Arabic text normalizer ─────────────────────────────────
-// Converts Arabic Presentation Forms (FE70-FEFF, FB50-FDFF)
-// to standard Unicode Arabic (0600-06FF) via NFKC normalization
-// This fixes garbled text from PDFs that use ligature forms
+// Fixes two PDF Arabic encoding issues:
+// 1. Presentation Forms (FE70-FEFF) → standard Unicode via NFKC
+// 2. Visually-ordered Arabic (stored LTR) → logical order via char reversal
 function normalizeArabicText(text) {
   if (!text) return '';
   try {
+    // Step 1: NFKC — converts Arabic ligature/presentation forms to base chars
     var normalized = text.normalize('NFKC');
+
+    // Step 2: Fix visually-ordered lines (some PDF pages store Arabic reversed)
+    var lines = normalized.split('\n');
+    lines = lines.map(function(line) {
+      var s = line.trim();
+      if (!s) return line;
+
+      var arChars = (s.match(/[\u0600-\u06FF]/g) || []).length;
+      if (arChars < 5) return line;
+
+      // Check if text is properly-spaced Arabic words (2-12 chars each)
+      var words = s.split(' ');
+      var arWords = words.filter(function(w){ return /^[\u0600-\u06FF\u064B-\u065F\.,:!?ü•]+$/.test(w); });
+      if (arWords.length > 0 && arWords.slice(0,3).every(function(w){ return w.length >= 2 && w.length <= 12; })) {
+        return line; // properly-spaced Arabic — leave as is
+      }
+
+      // Strong visual-order indicators:
+      // 1. Line starts with ':' (Arabic colon at visual-start = logical-end)
+      if (s[0] === ':' && arChars > 5) {
+        return s.split('').reverse().join('').trim();
+      }
+      // 2. Very long fused Arabic run (12+ chars) = words fused in visual order
+      if (/[\u0600-\u06FF]{12,}/.test(s)) {
+        return s.split('').reverse().join('').trim();
+      }
+      return line;
+    });
+    normalized = lines.join('\n');
+
+    // Step 3: Remove PDF artifacts
     normalized = normalized
-      .replace(/Restricted\s*[-–]\s*\S+/gi, '')
+      .replace(/Restricted\s*[-\u2013]\s*\S*/gi, '')
       .replace(/\x0C/g, '\n')
       .replace(/\r\n/g, '\n')
       .replace(/[ \t]{3,}/g, ' ')
-      .replace(/^\d+$/gm, '')
-      .replace(/^[-–—]+$/gm, '')
+      .replace(/^\s*\d{1,3}\s*$/gm, '')
+      .replace(/^[-\u2013\u2014]+$/gm, '')
+      .replace(/\n{3,}/g, '\n\n')
       .trim();
+
     return normalized;
   } catch(e) {
     return text;
@@ -10695,56 +10729,65 @@ async function analyzeAndGenerate(text, subjectId, fileName) {
 
     upd('🔍', 'تحليل هيكل الملف واكتشاف الدروس...', 8);
 
-    // ── STEP 1: Multi-pass structure detection across FULL document ──
-    // Scan in 8000-char windows with overlap to catch all topics
-    const SCAN_CHUNK  = 12000;  // larger window = fewer API calls for detection
-    const SCAN_OVERLAP = 1000; // overlap to catch titles near boundaries
-    const allTopics   = [];
+    // ── STEP 1: Efficient structure detection ────────────────────
+    // Extract SHORT heading-candidate lines from full text (low token cost)
+    // then send ONLY those to AI instead of full text chunks
     let detectedChapterTitle = fileName.replace(/\.[^.]+$/, '');
-    const seenTitles  = new Set();
 
-    const numScans = Math.ceil(clean.length / (SCAN_CHUNK - SCAN_OVERLAP));
-    upd('🔍', `مسح ${numScans} قسم للعثور على جميع الدروس...`, 10);
-
-    for (let si = 0; si < numScans; si++) {
-      const scanStart = si * (SCAN_CHUNK - SCAN_OVERLAP);
-      const scanEnd   = Math.min(scanStart + SCAN_CHUNK, clean.length);
-      const scanText  = clean.slice(scanStart, scanEnd);
-      const isFirst   = si === 0;
-      const pctScan   = 10 + (si / numScans) * 12;
-      upd('🔍', `اكتشاف الهيكل: ${si+1}/${numScans}...`, pctScan);
-
-      try {
-        const sR = await zadFetch({
-          model: 'llama-3.3-70b-versatile',
-          max_tokens: 1000,
-          system: 'Respond with valid JSON only. No markdown.',
-          messages: [{ role: 'user', content:
-            'List ALL lesson/topic/section titles found in this text. No limit on number.\n' +
-            'Text:\n' + scanText + '\n\n' +
-            'Return JSON: {' +
-            (isFirst ? '"chapterTitle":"doc main title",' : '') +
-            '"topics":[{"title":"Exact title","startHint":"first 6 words of that section"}]}\n' +
-            'Rules: only real titles from the text. No invented titles. Same language as text.'
-          }]
-        });
-        const sD = await sR.json();
-        const sT = (sD.content && sD.content[0] && sD.content[0].text) || '';
-        const sP = repairAndParseJSON(sT.trim());
-        if (sP) {
-          if (isFirst && sP.chapterTitle && sP.chapterTitle !== 'auto') {
-            detectedChapterTitle = sP.chapterTitle;
-          }
-          (sP.topics || []).forEach(function(t) {
-            if (t.title && !seenTitles.has(t.title.trim())) {
-              seenTitles.add(t.title.trim());
-              allTopics.push({ title: t.title.trim(), startHint: t.startHint || '' });
-            }
-          });
-        }
-      } catch(scanErr) {
-        console.warn('Scan', si, 'failed:', scanErr.message);
+    // Extract candidate heading lines (short lines, <120 chars)
+    const candidateLines = [];
+    const linePositions  = {}; // title text → char position in clean
+    let pos = 0;
+    clean.split('\n').forEach(function(line) {
+      const trimmed = line.trim();
+      if (trimmed.length > 4 && trimmed.length < 120) {
+        candidateLines.push(trimmed);
+        if (!linePositions[trimmed]) linePositions[trimmed] = pos;
       }
+      pos += line.length + 1;
+    });
+
+    // Send candidates to AI for title identification (one call, ~1000 tokens)
+    upd('🔍', `تحليل ${candidateLines.length} سطر للعثور على عناوين الدروس...`, 10);
+
+    const allTopics = [];
+
+    try {
+      const candidateText = candidateLines.slice(0, 400).join('\n'); // max 400 lines
+      const sR = await zadFetch({
+        model: 'llama-3.3-70b-versatile',
+        max_tokens: 1500,
+        system: 'Respond with valid JSON only. No markdown.',
+        messages: [{ role: 'user', content:
+          'From these lines extracted from an educational document, identify which ones are lesson/topic/section titles.\n' +
+          'Lines:\n' + candidateText + '\n\n' +
+          'Return JSON: {"chapterTitle":"main document title","topics":["exact title line 1","exact title line 2",...]}\n' +
+          'Rules: copy titles EXACTLY as they appear. Only real section titles, not body text. No invented titles.'
+        }]
+      });
+      const sD = await sR.json();
+      const sT  = (sD.content && sD.content[0] && sD.content[0].text) || '';
+      const sP  = repairAndParseJSON(sT.trim());
+
+      if (sP) {
+        if (sP.chapterTitle && sP.chapterTitle.length > 2) detectedChapterTitle = sP.chapterTitle;
+        (sP.topics || []).forEach(function(title) {
+          if (typeof title !== 'string') return;
+          title = title.trim();
+          if (!title || title.length < 3 || title.length > 120) return;
+          // Reject garbled titles: letter-soup (single chars separated by spaces)
+          const parts = title.split(/\s+/);
+          const singleLetters = parts.filter(function(p){ return p.length === 1 && /[\u0600-\u06FFa-zA-Z]/.test(p); });
+          if (parts.length > 4 && singleLetters.length / parts.length > 0.5) return; // garbled
+          // Find position in clean text
+          const startPos = linePositions[title] || clean.indexOf(title);
+          allTopics.push({ title: title, startHint: title.slice(0, 30), _pos: startPos >= 0 ? startPos : -1 });
+        });
+        // Sort by position in document
+        allTopics.sort(function(a,b){ return (a._pos < 0 ? 999999 : a._pos) - (b._pos < 0 ? 999999 : b._pos); });
+      }
+    } catch(scanErr) {
+      console.warn('Structure detection failed:', scanErr.message);
     }
 
     const topics = allTopics.length > 1 ? allTopics : null;
@@ -10796,29 +10839,21 @@ LANGUAGE RULES:
         const pct = 25 + (ti / topics.length) * 65;
         upd('📖', `معالجة الدرس ${ti+1}/${topics.length}: ${topic.title}...`, pct);
 
-        // Find section text using startHint, then cut to next section
-        let sectionStart = 0;
-        if (topic.startHint && topic.startHint.length > 3) {
-          const hintIdx = clean.indexOf(topic.startHint);
-          if (hintIdx >= 0) sectionStart = hintIdx;
-          else sectionStart = Math.floor((ti / topics.length) * clean.length);
-        } else {
-          sectionStart = Math.floor((ti / topics.length) * clean.length);
-        }
+        // Find section text using pre-computed _pos (document position)
+        let sectionStart = (topic._pos && topic._pos >= 0) ? topic._pos : Math.floor((ti / topics.length) * clean.length);
 
-        // End = next topic's startHint position, or proportional, max 12000 chars
+        // End = next topic's position, or proportional
         let sectionEnd = clean.length;
         if (ti < topics.length - 1) {
-          const nextHint = topics[ti+1].startHint;
-          if (nextHint && nextHint.length > 3) {
-            const nextIdx = clean.indexOf(nextHint, sectionStart + 100);
-            if (nextIdx > sectionStart) sectionEnd = nextIdx;
-          }
-          if (sectionEnd === clean.length) {
+          const nextPos = topics[ti+1]._pos;
+          if (nextPos && nextPos > sectionStart) {
+            sectionEnd = nextPos;
+          } else {
             sectionEnd = Math.floor(((ti+1) / topics.length) * clean.length);
           }
         }
-        const sectionText = clean.slice(sectionStart, sectionEnd); // no cap — full section
+        // Cap section at 20000 chars to avoid token overflow
+        const sectionText = clean.slice(sectionStart, Math.min(sectionEnd, sectionStart + 20000));
 
         const topicPrompt = `${langNote}\n\n⚠️ تعليمات مهمة: استخدم المحتوى من النص التالي فقط. لا تضف معلومات خارجية.\n\nموضوع هذا الدرس: "${topic.title}"\n\n=== النص المصدر (استخرج منه فقط) ===\n${sectionText}\n=== نهاية النص ===\n\nأجب بـ JSON صالح فقط:\n${jsonTemplate}`;
 

@@ -14739,9 +14739,10 @@ function renderExamQuestion() {
       <div id="exam-hint-box" style="display:none;background:rgba(255,214,0,0.08);border:1px solid rgba(255,214,0,0.25);border-radius:12px;padding:12px 16px;margin-top:12px;font-size:0.88rem;color:#FFD600;direction:${textDir};"></div>
       <div id="exam-exp-box" style="display:none;background:rgba(0,230,118,0.07);border:1px solid rgba(0,230,118,0.2);border-radius:12px;padding:12px 16px;margin-top:8px;font-size:0.88rem;color:var(--text-muted);line-height:1.55;direction:${textDir};"></div>
     </div>
-    <div style="display:flex;gap:10px;">
-      <button onclick="showExamHint()" style="flex:1;padding:13px;background:rgba(255,214,0,0.1);border:1px solid rgba(255,214,0,0.25);border-radius:12px;color:#FFD600;font-family:var(--font);font-weight:700;cursor:pointer;font-size:0.88rem;">${hintLabel}</button>
-      <button id="exam-next-btn" onclick="nextExamQuestion()" disabled style="flex:2;padding:13px;background:var(--primary);border:none;border-radius:12px;color:white;font-family:var(--font);font-weight:800;cursor:pointer;font-size:0.95rem;opacity:0.4;">${nextLabel}</button>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button onclick="showExamHint()" style="flex:1;min-width:60px;padding:12px;background:rgba(255,214,0,0.1);border:1px solid rgba(255,214,0,0.25);border-radius:12px;color:#FFD600;font-family:var(--font);font-weight:700;cursor:pointer;font-size:0.85rem;">${hintLabel}</button>
+      ${idx > 0 ? `<button onclick="prevExamQuestion()" style="flex:1;min-width:80px;padding:12px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:12px;color:var(--text-muted);font-family:var(--font);font-weight:700;cursor:pointer;font-size:0.85rem;">${isEng?'← Prev':'← السابق'}</button>` : ''}
+      <button id="exam-next-btn" onclick="nextExamQuestion()" disabled style="flex:2;min-width:100px;padding:12px;background:var(--primary);border:none;border-radius:12px;color:white;font-family:var(--font);font-weight:800;cursor:pointer;font-size:0.88rem;opacity:0.4;">${nextLabel}</button>
     </div>
   `;
 }
@@ -14749,7 +14750,8 @@ function renderExamQuestion() {
 function selectExamOption(i) {
   const q = examState.questions[examState.current];
   const correct = q.answer;
-  
+  const isEng = examState.subj === 'english';
+  const textDir = isEng ? 'ltr' : 'rtl';
 
   document.querySelectorAll('[id^="exam-opt-"]').forEach(el => {
     el.style.cursor = 'default';
@@ -14758,7 +14760,7 @@ function selectExamOption(i) {
   });
 
   const selectedEl = document.getElementById('exam-opt-'+i);
-  const correctEl = document.getElementById('exam-opt-'+correct);
+  const correctEl  = document.getElementById('exam-opt-'+correct);
 
   if(i === correct) {
     selectedEl.style.background = 'rgba(0,230,118,0.12)';
@@ -14767,20 +14769,33 @@ function selectExamOption(i) {
   } else {
     selectedEl.style.background = 'rgba(255,82,82,0.12)';
     selectedEl.style.borderColor = 'var(--danger)';
-    correctEl.style.background = 'rgba(0,230,118,0.1)';
-    correctEl.style.borderColor = 'var(--success)';
+    if(correctEl) {
+      correctEl.style.background = 'rgba(0,230,118,0.1)';
+      correctEl.style.borderColor = 'var(--success)';
+    }
   }
 
   examState.answers[examState.current] = i;
 
+  // Show explanation
   const exp = document.getElementById('exam-exp-box');
-  exp.style.display = 'block';
-  const isEngSE = examState.subj === 'english';
-  exp.innerHTML = (i===correct?(isEngSE?'✅ Correct! ':'✅ '):(isEngSE?'❌ Wrong. Correct: '+q.options[correct]+'. ':'❌ الصحيح: '+q.options[correct]+'. ')) + (q.explanation||'');
-  exp.style.direction = isEngSE ? 'ltr' : 'rtl';
+  if(exp) {
+    exp.style.display = 'block';
+    exp.style.direction = textDir;
+    const wrongMsg = isEng
+      ? '❌ Wrong. Correct: <strong style="color:var(--success)">' + q.options[correct] + '</strong>. '
+      : '❌ الصحيح: <strong style="color:var(--success)">' + q.options[correct] + '</strong>. ';
+    exp.innerHTML = (i===correct ? (isEng?'✅ Correct! ':'✅ ') : wrongMsg) + (q.explanation||'');
+  }
 
+  // Show navigation buttons (no auto-advance)
   const nb = document.getElementById('exam-next-btn');
-  if(nb) { nb.disabled=false; nb.style.opacity='1'; nb.textContent = examState.current < examState.questions.length-1 ? 'التالي ←' : '🏁 إنهاء الاختبار'; }
+  if(nb) {
+    nb.disabled = false;
+    nb.style.opacity = '1';
+    const isLast = examState.current >= examState.questions.length - 1;
+    nb.textContent = isLast ? (isEng?'🏁 Finish Exam':'🏁 إنهاء الاختبار') : (isEng?'Next →':'التالي ←');
+  }
 }
 
 function showExamHint() {
@@ -14798,6 +14813,14 @@ function nextExamQuestion() {
     finishExam();
   }
 }
+
+function prevExamQuestion() {
+  if (examState.current <= 0) return;
+  examState.current--;
+  examState.answers[examState.current] = null; // Allow re-answering
+  renderExamQuestion();
+}
+
 
 function startExamTimer() {
   if(examState.timer) clearInterval(examState.timer);

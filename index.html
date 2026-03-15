@@ -20234,6 +20234,55 @@ function showDevSummariesPage() {
     if (dc) dc.scrollIntoView({behavior:'smooth'});
   }, 100);
 }
+
+// ── Missing utility functions ─────────────────────────────────
+function getLessonTypeIcon(type) {
+  var icons = { concept:'💡', example:'📌', practice:'✏️', quiz:'❓', video:'🎬', reading:'📖', lab:'🔬' };
+  return icons[type] || '💡';
+}
+
+function getLessonTypeLabel(type) {
+  var labels = { concept:'مفهوم', example:'مثال', practice:'تطبيق', quiz:'اختبار', video:'فيديو', reading:'قراءة', lab:'مختبر' };
+  return labels[type] || 'مفهوم';
+}
+
+function toggleChapter(chapterId) {
+  var el = document.getElementById('ch-' + chapterId);
+  if (!el) return;
+  el.classList.toggle('open');
+  var list = el.querySelector('.lesson-list');
+  if (list) list.style.display = el.classList.contains('open') ? 'block' : 'none';
+}
+
+// ── Additional missing functions ──────────────────────────────
+function buildEmbeddedLab(subjectId) {
+  // Generic lab with Python environment
+  return `
+    <div style="direction:rtl;text-align:center;padding:30px;color:var(--text-muted)">
+      <div style="font-size:2rem;margin-bottom:12px">🔬</div>
+      <div style="font-weight:700;margin-bottom:8px">المختبر التفاعلي</div>
+      <div style="font-size:0.85rem">ارفع محتوى من تبويب "رفع محتوى" لتفعيل المختبر الذكي</div>
+    </div>
+  `;
+}
+
+function renderAllSubjects() {
+  var container = document.getElementById('section-subjects');
+  if (!container) return;
+  var grid = container.querySelector('.subjects-grid') || container;
+  var subjects = Object.values(CURRICULUM);
+  grid.innerHTML = subjects.map(function(s) {
+    var prog = 0;
+    try { prog = typeof calcSubjectProgress==='function' ? calcSubjectProgress(s.id) : 0; } catch(e) {}
+    var color = s.color || '#6C63FF';
+    return '<div class="subject-card" onclick="showSubject(\''+s.id+'\')" style="border-color:'+color+'30">'
+      + '<div class="subject-icon">'+(s.icon||'📚')+'</div>'
+      + '<div class="subject-title">'+(s.title||s.id)+'</div>'
+      + '<div class="subject-chapters">'+(s.chapters?s.chapters.length:0)+' فصل</div>'
+      + '<div class="progress-bar"><div class="progress-fill" style="width:'+prog+'%;background:'+color+'"></div></div>'
+      + '</div>';
+  }).join('');
+}
 </script>
 
 

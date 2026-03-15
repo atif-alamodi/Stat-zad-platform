@@ -12261,6 +12261,69 @@ body {
     flex-direction: column-reverse !important;
   }
 }
+/* ══════════════════════════════════════════════════
+   DESKTOP LAYOUT (> 1024px)
+══════════════════════════════════════════════════ */
+@media (min-width: 1024px) {
+  .main-content { max-width: 1200px; margin-left: auto; }
+  .subjects-grid { grid-template-columns: repeat(3, 1fr) !important; }
+  .stats-grid    { grid-template-columns: repeat(4, 1fr) !important; }
+  .dashboard-grid{ grid-template-columns: repeat(2, 1fr) !important; }
+  .lesson-content-wrap { max-width: 860px; margin: 0 auto; }
+  #section-exam-generator > div { max-width: 700px; margin: 0 auto; }
+  #admin-panel-content { max-width: 900px; }
+}
+
+/* ══════════════════════════════════════════════════
+   TABLET (768px – 1023px)
+══════════════════════════════════════════════════ */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .main-content { margin-right: 0; padding: 20px; }
+  .sidebar { transform: translateX(100%); }
+  .sidebar.open { transform: translateX(0); }
+  .mobile-toggle { display: flex !important; }
+  .subjects-grid { grid-template-columns: repeat(2, 1fr) !important; }
+  .stats-grid    { grid-template-columns: repeat(2, 1fr) !important; }
+}
+
+/* ══════════════════════════════════════════════════
+   MOBILE SMALL (< 480px)
+══════════════════════════════════════════════════ */
+@media (max-width: 480px) {
+  .topbar { padding: 10px 12px; margin-bottom: 12px; }
+  .topbar-greeting { font-size: 0.82rem; }
+  .section-title { font-size: 1rem !important; margin-bottom: 12px !important; }
+  .subject-card { padding: 14px 12px !important; }
+  .subject-title { font-size: 0.88rem !important; }
+  .subject-icon { font-size: 2.2rem !important; }
+  .landing-title { font-size: 1.8rem !important; }
+  .chapter-header { padding: 10px 12px !important; }
+  .lesson-item { padding: 10px 12px !important; font-size: 0.85rem !important; }
+  .streak-badge { padding: 5px 8px; font-size: 0.72rem; }
+  .icon-btn { font-size: 1rem; }
+  #section-exam-generator .quiz-container { padding: 12px !important; }
+  .quiz-container { padding: 14px !important; }
+  #quiz-content > div { padding: 16px !important; }
+  #exam-opts > div { padding: 10px 12px !important; font-size: 0.85rem !important; }
+  .admin-tab { padding: 6px 10px !important; font-size: 0.78rem !important; }
+}
+
+/* ══════════════════════════════════════════════════
+   UNIVERSAL FIXES
+══════════════════════════════════════════════════ */
+* { box-sizing: border-box; }
+img, video, canvas, svg { max-width: 100%; }
+input, select, textarea { max-width: 100%; font-size: 16px; /* prevent iOS zoom */ }
+pre, code { overflow-x: auto; max-width: 100%; }
+table { display: block; overflow-x: auto; max-width: 100%; }
+
+/* Prevent overflow from inline styles */
+.main-content > div, .main-content section {
+  max-width: 100%;
+  overflow-x: hidden;
+  word-break: break-word;
+}
+
 
 /* ============ VIDEO PLAYER STYLE (animated steps) ============ */
 .video-player {

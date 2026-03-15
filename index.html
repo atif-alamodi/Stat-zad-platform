@@ -13576,9 +13576,9 @@ function buildLessonsTab(subject, subjectId) {
     chapHtml += [
       '<div class="chapter-item'+_chOpen+'" id="ch-'+safeChId+'"'+_chStyle+'>',
         '<div class="chapter-header"',
-          ' onclick="toggleChapter('+JSON.stringify(safeChId)+')"',
-          ' oncontextmenu="event.preventDefault();showDeleteChapterConfirm('+JSON.stringify(subjectId)+','+JSON.stringify(safeChId)+','+JSON.stringify(safeChTitle)+')"',
-          ' ontouchstart="startLongPress(event,'+JSON.stringify('__ch__'+safeChId)+',\'\','+JSON.stringify(subjectId)+','+JSON.stringify(safeChTitle)+');" ontouchend="clearLongPress()" ontouchmove="clearLongPress()"',
+          ' onclick="toggleChapter(\''+safeChId+'\')"',
+          ' oncontextmenu="event.preventDefault();showDeleteChapterConfirm(\''+subjectId+'\',\''+safeChId+'\',\''+safeChTitle+'\');"',
+          ' ontouchstart="startLongPress(event,\'__ch__'+safeChId+'\',\'\',\''+subjectId+'\',\''+safeChTitle+'\');" ontouchend="clearLongPress()" ontouchmove="clearLongPress()"',
         '>',
           '<div class="chapter-num" style="'+_chNum+'">'+(i+1)+'</div>',
           '<div class="chapter-info">',
@@ -20365,8 +20365,13 @@ function getSubjectWithUploads(subjectId) {
   var chapters = base ? (base.chapters || []) : [];
 
   // Deep-clone base chapters, filtering deleted ones
+  // Exclude AI-generated (uploaded) chapters — they're rebuilt from ZAD_UPLOADS below
   var merged_chapters = chapters
-    .filter(function(ch) { return !isChapterDeleted(subjectId, ch.id); })
+    .filter(function(ch) {
+      return !isChapterDeleted(subjectId, ch.id)
+          && !ch.aiGenerated
+          && !(ch.id && ch.id.startsWith('up-ch-'));
+    })
     .map(function(ch) {
       return {
         id: ch.id, title: ch.title, pages: ch.pages||'', icon: ch.icon||'📘',
@@ -20374,7 +20379,8 @@ function getSubjectWithUploads(subjectId) {
           return !l.aiGenerated && !isLessonDeleted(subjectId, l.id);
         })
       };
-    });
+    })
+    .filter(function(ch) { return ch.lessons.length > 0; });
 
   // ── Group uploads by their source file (fileName) into chapters ──
   // Each distinct fileName = one chapter; lessons within = individual topics
@@ -21033,10 +21039,10 @@ function getLessonTypeLabel(type) {
 
 function toggleChapter(chapterId) {
   var el = document.getElementById('ch-' + chapterId);
-  if (!el) return;
+  if (!el) { console.warn('toggleChapter: not found', chapterId); return; }
   el.classList.toggle('open');
   var list = el.querySelector('.lesson-list');
-  if (list) list.style.display = el.classList.contains('open') ? 'block' : 'none';
+  if (list) list.style.display = el.classList.contains('open') ? 'flex' : 'none';
 }
 
 // ── Additional missing functions ──────────────────────────────

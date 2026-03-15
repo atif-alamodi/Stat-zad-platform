@@ -14407,7 +14407,7 @@ function showSubject(subjectId, activeTab) {
         body = (_labUps.length > 0 ? buildContentLab(subjectId) + '<div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">' : '')
           + buildStatsLabFull(subjectId, _labUps)
           + (_labUps.length > 0 ? '</div>' : '');
-        setTimeout(function(){ elabInitXl(); elabBuildFnRef(); }, 200);
+        setTimeout(function(){ elabInitXl(); elabBuildFnRef(); if(!pyReady && !_pyodideLoading) initPyodide(); }, 200);
       } else if (_labUps.length > 0) {
         var _origLab = '';
         if (subjectId==='communication') _origLab=buildCommLab();
@@ -15933,6 +15933,798 @@ function selectSubjectLab(subjectId) {
   if (panel) panel.innerHTML = buildSubjectLabsPanel();
 }
 
+const STATS_PY_TEMPLATES = {
+
+  /* BASICS */
+
+  stats_intro: `# ========================================
+# مرحبا في مختبر الاحصاء بـ Python!
+# ========================================
+# Python = آلة حاسبة علمية مجانية
+# لا تحتاج تثبيت - تعمل مباشرة هنا!
+
+import statistics  # مكتبة احصاء Python
+
+بيانات = [4, 7, 13, 2, 1, 8, 15, 6, 11, 3, 9, 5]
+
+print("=" * 40)
+print("    تحليل إحصائي سريع")
+print("=" * 40)
+print(f"البيانات : {بيانات}")
+print(f"العدد n  : {len(بيانات)}")
+print(f"المجموع  : {sum(بيانات)}")
+print()
+print(f"المتوسط  (Mean)   : {statistics.mean(بيانات):.3f}")
+print(f"الوسيط   (Median) : {statistics.median(بيانات):.3f}")
+print(f"الانحراف (Std Dev): {statistics.stdev(بيانات):.3f}")
+print(f"التباين  (Var)    : {statistics.variance(بيانات):.3f}")
+print(f"الاكبر   (Max)    : {max(بيانات)}")
+print(f"الاصغر   (Min)    : {min(بيانات)}")
+print(f"المدى    (Range)  : {max(بيانات)-min(بيانات)}")
+print()
+print("المتوسط = مجموع الارقام / عددها")
+print(f"        = {sum(بيانات)} / {len(بيانات)} = {statistics.mean(بيانات):.3f}")`,
+
+  stats_numpy: `# ========================================
+# Numpy - الاحصاء العلمي
+# numpy = Python على 'تربو' للارقام!
+# ========================================
+import numpy as np
+
+data = np.array([23, 45, 12, 67, 34, 89, 56, 78, 43, 21,
+                 65, 32, 87, 54, 11, 76, 43, 28, 62, 39])
+
+print("=" * 45)
+print("  Numpy Statistical Analysis")
+print("=" * 45)
+print(f"البيانات  : {data}")
+print(f"الشكل     : {data.shape} ({len(data)} قيمة)")
+print()
+
+# المقاييس الاساسية
+print("── النزعة المركزية ──")
+print(f"المتوسط  (Mean)     : {np.mean(data):.4f}")
+print(f"الوسيط   (Median)   : {np.median(data):.4f}")
+
+# التشتت
+print()
+print("── مقاييس التشتت ──")
+print(f"الانحراف (Std pop)  : {np.std(data):.4f}")
+print(f"الانحراف (Std samp) : {np.std(data, ddof=1):.4f}")
+print(f"التباين  (Var pop)  : {np.var(data):.4f}")
+print(f"التباين  (Var samp) : {np.var(data, ddof=1):.4f}")
+
+# الربيعيات
+print()
+print("── الربيعيات (Quartiles) ──")
+q1 = np.percentile(data, 25)
+q2 = np.percentile(data, 50)
+q3 = np.percentile(data, 75)
+iqr = q3 - q1
+print(f"Q1 (25%) : {q1}")
+print(f"Q2 (50%) : {q2}")
+print(f"Q3 (75%) : {q3}")
+print(f"IQR      : {iqr}  (المدى بين الربيعيين)")
+
+# الاطراف
+print()
+print("── الاطراف ──")
+print(f"Min: {np.min(data)}  Max: {np.max(data)}  Range: {np.ptp(data)}")
+lower_fence = q1 - 1.5*iqr
+upper_fence = q3 + 1.5*iqr
+outliers = data[(data < lower_fence) | (data > upper_fence)]
+print(f"حدود القيم الشاذة: [{lower_fence:.1f}, {upper_fence:.1f}]")
+print(f"القيم الشاذة: {outliers if len(outliers) else 'لا يوجد'}")`,
+
+  stats_pandas: `# ========================================
+# Pandas - تحليل جداول البيانات
+# pandas = Excel الذكي في Python!
+# ========================================
+import pandas as pd
+import statistics as st
+
+# انشاء DataFrame (جدول)
+data = {
+    'الاسم':    ['عاطف','سارة','محمد','نورة','خالد','ريم','عمر','لمى'],
+    'العمر':    [22, 20, 25, 21, 23, 19, 24, 22],
+    'اختبار1':  [85, 92, 78, 95, 70, 88, 82, 91],
+    'اختبار2':  [88, 90, 75, 97, 68, 85, 79, 93],
+    'مشروع':    [90, 95, 80, 92, 72, 87, 84, 96],
+}
+
+df = pd.DataFrame(data)
+df['المجموع'] = df['اختبار1'] + df['اختبار2'] + df['مشروع']
+df['المتوسط'] = df['المجموع'] / 3
+
+print("=" * 55)
+print("         تحليل درجات الطلاب")
+print("=" * 55)
+print(df[['الاسم','اختبار1','اختبار2','مشروع','المتوسط']].to_string(index=False))
+
+print("\\n── إحصاءات وصفية ──")
+for col in ['اختبار1','اختبار2','مشروع','المتوسط']:
+    vals = df[col].tolist()
+    print(f"\\n{col}:")
+    print(f"  mean={sum(vals)/len(vals):.2f}  median={st.median(vals):.2f}  std={st.stdev(vals):.2f}")
+    print(f"  min={min(vals)}  max={max(vals)}")
+
+print("\\n── تصفية وفرز ──")
+ناجحون = df[df['المتوسط'] >= 85][['الاسم','المتوسط']]
+print(f"الطلاب >=85:\\n{ناجحون.to_string(index=False)}")
+
+أفضل = df.loc[df['المتوسط'].idxmax(), 'الاسم']
+print(f"\\nأفضل طالب: {أفضل} ({df['المتوسط'].max():.2f})")`,
+
+  /* VISUALIZATION */
+
+  stats_matplotlib: `# ========================================
+# Matplotlib - الرسوم البيانية
+# اضغط تشغيل وسيظهر الرسم اسفله!
+# ========================================
+import numpy as np
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+
+# بيانات الاختبارات
+اسماء = ['عاطف','سارة','محمد','نورة','خالد','ريم']
+اختبار1 = [85, 92, 78, 95, 70, 88]
+اختبار2 = [88, 90, 75, 97, 68, 85]
+
+fig, axes = plt.subplots(2, 2, figsize=(10, 8))
+fig.suptitle('تحليل درجات الطلاب', fontsize=14, fontweight='bold')
+
+colors = ['#6C63FF','#00BFA5','#FF7043','#FFD600','#FF5252','#28CA41']
+
+# رسم 1: مقارنة الاختبارين (Bar)
+axes[0,0].bar([x-0.2 for x in range(len(اسماء))], اختبار1, 0.4, label='اختبار1', color='#6C63FF', alpha=0.8)
+axes[0,0].bar([x+0.2 for x in range(len(اسماء))], اختبار2, 0.4, label='اختبار2', color='#00BFA5', alpha=0.8)
+axes[0,0].set_title('مقارنة الاختبارين')
+axes[0,0].set_xticks(range(len(اسماء)))
+axes[0,0].set_xticklabels(اسماء)
+axes[0,0].legend()
+axes[0,0].grid(True, alpha=0.3)
+
+# رسم 2: التوزيع (Histogram)
+all_grades = اختبار1 + اختبار2
+axes[0,1].hist(all_grades, bins=8, color='#a78bfa', edgecolor='white', alpha=0.8)
+axes[0,1].axvline(np.mean(all_grades), color='red', linestyle='--', label=f'Mean={np.mean(all_grades):.1f}')
+axes[0,1].set_title('توزيع الدرجات (Histogram)')
+axes[0,1].legend()
+axes[0,1].grid(True, alpha=0.3)
+
+# رسم 3: Scatter الارتباط
+axes[1,0].scatter(اختبار1, اختبار2, c=colors, s=120, zorder=5)
+for i, name in enumerate(اسماء):
+    axes[1,0].annotate(name, (اختبار1[i], اختبار2[i]+0.5), fontsize=8)
+z = np.polyfit(اختبار1, اختبار2, 1)
+xline = np.linspace(min(اختبار1), max(اختبار1), 100)
+axes[1,0].plot(xline, np.poly1d(z)(xline), 'r--', alpha=0.6, label='خط الانحدار')
+axes[1,0].set_title('الارتباط بين الاختبارين')
+axes[1,0].set_xlabel('اختبار 1')
+axes[1,0].set_ylabel('اختبار 2')
+axes[1,0].legend()
+axes[1,0].grid(True, alpha=0.3)
+
+# رسم 4: Box Plot
+axes[1,1].boxplot([اختبار1, اختبار2], labels=['اختبار 1','اختبار 2'],
+                   patch_artist=True,
+                   boxprops=dict(facecolor='#6C63FF', alpha=0.5),
+                   medianprops=dict(color='red', linewidth=2))
+axes[1,1].set_title('Box Plot - توزيع الدرجات')
+axes[1,1].grid(True, alpha=0.3)
+
+plt.tight_layout()
+plt.savefig('/tmp/elab_chart.png', dpi=100, bbox_inches='tight')
+plt.close()
+print("تم رسم 4 مخططات - انظر اسفل!")
+print(f"متوسط اختبار1: {np.mean(اختبار1):.2f}")
+print(f"متوسط اختبار2: {np.mean(اختبار2):.2f}")`,
+
+  ml_full_chart: `# ========================================
+# ML + رسم بياني كامل
+# الانحدار الخطي مع Visualization
+# ========================================
+import numpy as np
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+import statistics as st
+
+X = np.array([1,2,3,4,5,6,7,8,9,10])
+Y = np.array([42,53,61,68,74,80,85,90,94,97])
+
+# حساب معاملات الانحدار
+x_m, y_m = np.mean(X), np.mean(Y)
+b = np.sum((X-x_m)*(Y-y_m)) / np.sum((X-x_m)**2)
+a = y_m - b*x_m
+Y_pred = a + b*X
+R2 = 1 - np.sum((Y-Y_pred)**2)/np.sum((Y-y_m)**2)
+residuals = Y - Y_pred
+
+fig, axes = plt.subplots(2, 2, figsize=(11, 9))
+fig.suptitle(f'ML: Linear Regression  y={a:.2f}+{b:.2f}x  R²={R2:.3f}',
+             fontsize=13, fontweight='bold')
+
+# 1: Scatter + خط الانحدار
+axes[0,0].scatter(X, Y, color='#6C63FF', s=100, zorder=5, label='بيانات فعلية')
+x_line = np.linspace(0.5, 11, 100)
+axes[0,0].plot(x_line, a+b*x_line, 'r-', linewidth=2, label=f'y={a:.1f}+{b:.1f}x')
+axes[0,0].fill_between(x_line, a+b*x_line-10, a+b*x_line+10, alpha=0.1, color='red')
+axes[0,0].set_xlabel('ساعات المذاكرة')
+axes[0,0].set_ylabel('الدرجة')
+axes[0,0].set_title(f'الانحدار الخطي  R²={R2:.3f}')
+axes[0,0].legend(); axes[0,0].grid(True, alpha=0.3)
+
+# 2: الاخطاء (Residuals)
+axes[0,1].bar(X, residuals, color=['#28CA41' if r>=0 else '#FF5252' for r in residuals],
+              edgecolor='white', alpha=0.8)
+axes[0,1].axhline(y=0, color='black', linestyle='-', linewidth=1)
+axes[0,1].set_xlabel('ساعات')
+axes[0,1].set_ylabel('الخطأ')
+axes[0,1].set_title('الاخطاء (Residuals)')
+axes[0,1].grid(True, alpha=0.3)
+
+# 3: توزيع الاخطاء
+axes[1,0].hist(residuals, bins=6, color='#FF7043', edgecolor='white', alpha=0.8)
+axes[1,0].axvline(0, color='black', linestyle='--')
+axes[1,0].set_title('توزيع الاخطاء')
+axes[1,0].set_xlabel('الخطأ')
+axes[1,0].grid(True, alpha=0.3)
+
+# 4: مقارنة فعلي vs متنبأ
+axes[1,1].scatter(Y, Y_pred, color='#00BFA5', s=80, zorder=5)
+perfect = np.linspace(min(Y)-5, max(Y)+5, 100)
+axes[1,1].plot(perfect, perfect, 'r--', alpha=0.6, label='مثالي')
+axes[1,1].set_xlabel('فعلي'); axes[1,1].set_ylabel('متنبأ')
+axes[1,1].set_title('فعلي مقابل متنبأ')
+axes[1,1].legend(); axes[1,1].grid(True, alpha=0.3)
+
+plt.tight_layout()
+plt.savefig('/tmp/elab_chart.png', dpi=100, bbox_inches='tight')
+plt.close()
+
+print(f"R² = {R2:.4f} → النموذج ممتاز!")
+print(f"MAE = {np.mean(np.abs(residuals)):.3f}")
+print("انظر الرسوم البيانية اسفل ⬇️")`,
+
+  /* STATISTICAL ANALYSIS */
+
+  stats_descriptive: `# ========================================
+# الاحصاء الوصفي الكامل
+# Descriptive Statistics
+# ========================================
+import statistics as st
+import math
+
+data = [23, 45, 12, 67, 34, 89, 56, 78, 43, 21,
+        65, 32, 87, 54, 11, 76, 43, 28, 62, 39]
+
+n = len(data)
+sorted_data = sorted(data)
+
+print("=" * 50)
+print("    الاحصاء الوصفي الكامل")
+print("=" * 50)
+print(f"البيانات: {data}")
+print(f"n = {n}\\n")
+
+# النزعة المركزية
+mean = st.mean(data)
+median = st.median(data)
+try: mode = st.mode(data)
+except: mode = "لا يوجد"
+
+print("── 1. النزعة المركزية (Central Tendency) ──")
+print(f"  المتوسط الحسابي (Mean)   = {mean:.4f}")
+print(f"  الوسيط           (Median) = {median:.4f}")
+print(f"  المنوال           (Mode)   = {mode}")
+print(f"  المتوسط التوافقي          = {n/sum(1/x for x in data):.4f}")
+
+# التشتت
+variance_p = sum((x-mean)**2 for x in data) / n
+variance_s = st.variance(data)
+std_p = math.sqrt(variance_p)
+std_s = st.stdev(data)
+cv = (std_s / mean) * 100
+
+print("\\n── 2. مقاييس التشتت (Dispersion) ──")
+print(f"  المدى        (Range)    = {max(data)-min(data)}")
+print(f"  التباين      (Var pop)  = {variance_p:.4f}")
+print(f"  التباين      (Var samp) = {variance_s:.4f}")
+print(f"  الانحراف     (Std pop)  = {std_p:.4f}")
+print(f"  الانحراف     (Std samp) = {std_s:.4f}")
+print(f"  معامل الاختلاف (CV)     = {cv:.2f}%")
+
+# الربيعيات
+def percentile(data, p):
+    sorted_d = sorted(data)
+    k = (len(sorted_d)-1) * p / 100
+    f = math.floor(k); c = math.ceil(k)
+    if f==c: return sorted_d[int(k)]
+    return sorted_d[f]*(c-k) + sorted_d[c]*(k-f)
+
+q1=percentile(data,25); q2=percentile(data,50); q3=percentile(data,75)
+iqr=q3-q1
+
+print("\\n── 3. الربيعيات (Quartiles) ──")
+print(f"  Min={min(data)}  Q1={q1}  Q2={q2}  Q3={q3}  Max={max(data)}")
+print(f"  IQR = Q3 - Q1 = {iqr}")
+print(f"  القيم الشاذة خارج: [{q1-1.5*iqr:.1f}, {q3+1.5*iqr:.1f}]")
+
+# الالتواء والتفلطح
+skew = (mean - median) / std_s
+print("\\n── 4. شكل التوزيع ──")
+shape = "متماثل" if abs(skew)<0.5 else ("يمين" if skew>0 else "يسار")
+print(f"  الالتواء (Skewness) = {skew:.4f} → التوزيع ملتوٍ لـ {shape}")`,
+
+  stats_zscore: `# ========================================
+# Z-Score وتوحيد البيانات
+# Z-Score = كم انحراف معياري عن المتوسط؟
+# مثال: درجتك 85، المتوسط 70 → انت فوق المتوسط!
+# ========================================
+import math
+
+grades = [55, 63, 70, 72, 78, 80, 82, 85, 88, 92, 95, 98]
+names  = ['علي','مها','خالد','ريم','عمر','سارة','نورا','عاطف','لمى','بدر','منى','فيصل']
+
+n = len(grades)
+mean = sum(grades) / n
+std  = math.sqrt(sum((x-mean)**2 for x in grades) / (n-1))
+
+print("=" * 55)
+print("  Z-Score لكل طالب")
+print("=" * 55)
+print(f"  المتوسط = {mean:.2f}  |  الانحراف المعياري = {std:.2f}\\n")
+print(f"  {'الاسم':>8}  {'الدرجة':>8}  {'Z-Score':>10}  {'الوضع':>15}")
+print("  " + "-"*50)
+
+for name, g in zip(names, grades):
+    z = (g - mean) / std
+    if z > 1.5:    status = "ممتاز جداً 🌟"
+    elif z > 0.5:  status = "فوق المتوسط ↑"
+    elif z > -0.5: status = "حول المتوسط →"
+    elif z > -1.5: status = "اسفل المتوسط ↓"
+    else:           status = "تحت المتوسط ⚠️"
+    print(f"  {name:>8}  {g:>8}  {z:>+10.3f}  {status}")
+
+print("\\n── معيار التصنيف ──")
+print("  Z > +1.5  : ممتاز (اعلى 6.7%)")
+print("  Z 0.5-1.5 : جيد جدا")
+print("  Z ±0.5    : متوسط (68% من الطلاب)")
+print("  Z -1.5--0.5: اسفل المتوسط")
+print("  Z < -1.5  : يحتاج دعم (اقل 6.7%)")`,
+
+  stats_correlation: `# ========================================
+# الارتباط والانحدار
+# Correlation & Regression
+# هل الدراسة تؤثر على الدرجة؟
+# ========================================
+import math
+
+# ساعات الدراسة vs الدرجة
+hours  = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+grades = [45, 55, 62, 70, 75, 82, 87, 91, 94, 98]
+
+n = len(hours)
+Sx = sum(hours); Sy = sum(grades)
+Sxx = sum(x**2 for x in hours)
+Sxy = sum(hours[i]*grades[i] for i in range(n))
+x_mean = Sx/n; y_mean = Sy/n
+
+# معامل الارتباط بيرسون r
+num = n*Sxy - Sx*Sy
+sx = math.sqrt(n*Sxx - Sx**2)
+sy = math.sqrt(n*sum(y**2 for y in grades) - Sy**2)
+r = num / (sx * sy)
+
+# معاملات الانحدار y = a + bx
+b = num / (n*Sxx - Sx**2)
+a = y_mean - b*x_mean
+r2 = r**2
+
+print("=" * 50)
+print("  الارتباط والانحدار الخطي")
+print("=" * 50)
+print(f"  بيانات: {n} طالب")
+print(f"  متوسط ساعات = {x_mean:.1f}  |  متوسط درجة = {y_mean:.1f}\\n")
+
+print(f"  معامل الارتباط r = {r:.4f}")
+if abs(r) >= 0.9:   level = "ارتباط قوي جداً"
+elif abs(r) >= 0.7: level = "ارتباط قوي"
+elif abs(r) >= 0.5: level = "ارتباط متوسط"
+elif abs(r) >= 0.3: level = "ارتباط ضعيف"
+else:               level = "لا ارتباط"
+direction = "موجب" if r > 0 else "سالب"
+print(f"  التفسير: {level} {direction}")
+print(f"  R² = {r2:.4f} → الساعات تفسر {r2*100:.1f}% من التباين\\n")
+
+print(f"  معادلة الانحدار: y = {a:.2f} + {b:.2f}x\\n")
+print(f"  {'ساعات':>8}  {'فعلي':>8}  {'متنبأ':>8}  {'خطأ':>8}")
+print("  " + "-"*38)
+errors = []
+for h, g in zip(hours, grades):
+    pred = a + b*h; e = abs(g-pred); errors.append(e)
+    print(f"  {h:>8}  {g:>8}  {pred:>8.1f}  {e:>8.2f}")
+print(f"\\n  متوسط الخطأ المطلق (MAE): {sum(errors)/n:.3f}")
+
+print("\\n── تنبؤات جديدة ──")
+for h in [3.5, 5.5, 11, 15]:
+    pred = a + b*h
+    print(f"  {h} ساعات → درجة متوقعة = {pred:.1f}")`,
+
+  stats_probability: `# ========================================
+# نظرية الاحتمالات - Probability
+# ما احتمال ان تنجح؟ ان يكون الرقم زوجياً؟
+# ========================================
+import math
+from fractions import Fraction
+
+print("=" * 50)
+print("  الاحتمالات - Probability Theory")
+print("=" * 50)
+
+print("\\n── القاعدة الاساسية ──")
+print("  P(A) = عدد الحالات المناسبة / مجموع الحالات")
+
+print("\\n── نرد عادي (1-6) ──")
+sample_space = list(range(1, 7))
+events = {
+    "زوجي {2,4,6}":   [x for x in sample_space if x%2==0],
+    "أكبر من 4":      [x for x in sample_space if x>4],
+    "أقل من 3":       [x for x in sample_space if x<3],
+    "1 أو 6":         [x for x in sample_space if x in [1,6]],
+}
+for name, event in events.items():
+    p = Fraction(len(event), len(sample_space))
+    print(f"  P({name}) = {len(event)}/{len(sample_space)} = {p} = {float(p):.4f}")
+
+print("\\n── احتمالات مركبة ──")
+# P(A و B) = P(A) × P(B) للمستقلة
+p_a = Fraction(1, 2)  # نرد زوجي
+p_b = Fraction(1, 3)  # نرد يساوي 2
+print(f"  P(A) = {p_a}  P(B) = {p_b}")
+print(f"  P(A∩B) = {p_a}×{p_b} = {p_a*p_b}")
+print(f"  P(A∪B) = {p_a}+{p_b}-{p_a*p_b} = {p_a+p_b-p_a*p_b}")
+
+print("\\n── التوزيع الثنائي - Binomial ──")
+def comb(n, k):
+    return math.factorial(n) // (math.factorial(k)*math.factorial(n-k))
+
+n, p_success = 10, 0.6
+print(f"  10 محاولات، P(نجاح) = 0.6")
+print(f"  P(X=k) = C(n,k) × p^k × (1-p)^(n-k)")
+print()
+total = 0
+for k in range(n+1):
+    prob = comb(n,k) * (p_success**k) * ((1-p_success)**(n-k))
+    total += prob
+    bar = "█" * int(prob*50)
+    print(f"  P(X={k:2}) = {prob:.4f} {bar}")
+print(f"\\n  المجموع = {total:.4f} (يجب = 1)")
+print(f"  المتوقع E[X] = n×p = {n*p_success:.1f}")`,
+
+  stats_normal: `# ========================================
+# التوزيع الطبيعي - Normal Distribution
+# المنحنى الجرسي الشهير!
+# معظم البيانات الطبيعية تتبعه
+# ========================================
+import math
+
+def normal_pdf(x, mu, sigma):
+    # دالة الكثافة للتوزيع الطبيعي
+    return (1/(sigma*math.sqrt(2*math.pi))) * math.exp(-0.5*((x-mu)/sigma)**2)
+
+def std_normal_cdf(z):
+    # CDF التقريبية للتوزيع الطبيعي المعياري
+    return 0.5 * (1 + math.erf(z/math.sqrt(2)))
+
+print("=" * 50)
+print("  التوزيع الطبيعي")
+print("=" * 50)
+
+mu, sigma = 70, 10
+print(f"\\n  معاملات: μ={mu}, σ={sigma}")
+print(f"  (متوسط الدرجات={mu}، الانحراف={sigma})\\n")
+
+print("── قيم دالة الكثافة PDF ──")
+for x in [40, 50, 60, 70, 80, 90, 100]:
+    pdf = normal_pdf(x, mu, sigma)
+    z = (x - mu) / sigma
+    bar = "*" * int(pdf * 200)
+    print(f"  x={x:3}  z={z:+.1f}  pdf={pdf:.4f} |{bar}")
+
+print("\\n── قاعدة 68-95-99.7 ──")
+print("  P(μ-σ < X < μ+σ)   ≈ 68.26%")
+print("  P(μ-2σ < X < μ+2σ) ≈ 95.44%")
+print("  P(μ-3σ < X < μ+3σ) ≈ 99.73%")
+
+print("\\n── احتمالات فعلية ──")
+ranges = [
+    (mu-sigma, mu+sigma, "68%"),
+    (mu-2*sigma, mu+2*sigma, "95%"),
+    (mu-3*sigma, mu+3*sigma, "99.7%"),
+]
+for a, b, expected in ranges:
+    p_a = std_normal_cdf((a-mu)/sigma)
+    p_b = std_normal_cdf((b-mu)/sigma)
+    print(f"  P({a:.0f}<X<{b:.0f}) = {(p_b-p_a)*100:.2f}%  (متوقع≈{expected})")
+
+print("\\n── Z-Table تطبيق ──")
+print(f"  P(X < 85) = P(Z < {(85-mu)/sigma:.1f}) = {std_normal_cdf((85-mu)/sigma)*100:.2f}%")
+print(f"  P(X > 85) = {(1-std_normal_cdf((85-mu)/sigma))*100:.2f}%")
+print(f"  P(60<X<80)= {(std_normal_cdf((80-mu)/sigma)-std_normal_cdf((60-mu)/sigma))*100:.2f}%")`,
+
+  /* MACHINE LEARNING */
+
+  ml_linear_regression: `# ========================================
+# ML - الانحدار الخطي البسيط
+# Simple Linear Regression
+# هدف: التنبؤ بقيمة مجهولة من قيمة معلومة
+# y = a + bx  ← نبني هذه المعادلة!
+# ========================================
+import math
+import statistics as st
+
+# بيانات التدريب: ساعات مذاكرة → درجة
+X_train = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+Y_train = [42, 53, 61, 68, 74, 80, 85, 90, 94, 97]
+
+n = len(X_train)
+x_mean = st.mean(X_train)
+y_mean = st.mean(Y_train)
+
+print("=" * 55)
+print("  خطوات بناء نموذج الانحدار الخطي")
+print("=" * 55)
+
+# خطوة 1: حساب الميل b
+numerator = sum((X_train[i]-x_mean)*(Y_train[i]-y_mean) for i in range(n))
+denominator = sum((X_train[i]-x_mean)**2 for i in range(n))
+b = numerator / denominator
+a = y_mean - b * x_mean
+
+print(f"\\nخطوة 1: حساب الميل b")
+print(f"  b = Σ(xi-x̄)(yi-ȳ) / Σ(xi-x̄)²")
+print(f"  b = {numerator:.2f} / {denominator:.2f} = {b:.4f}")
+print(f"\\nخطوة 2: حساب الثابت a")
+print(f"  a = ȳ - b·x̄ = {y_mean:.2f} - {b:.4f}×{x_mean:.2f} = {a:.4f}")
+print(f"\\n✅ المعادلة: y = {a:.2f} + {b:.2f}x")
+
+# خطوة 3: تقييم النموذج
+Y_pred = [a + b*x for x in X_train]
+SS_res = sum((Y_train[i]-Y_pred[i])**2 for i in range(n))
+SS_tot = sum((Y_train[i]-y_mean)**2 for i in range(n))
+R2 = 1 - SS_res/SS_tot
+MAE = sum(abs(Y_train[i]-Y_pred[i]) for i in range(n))/n
+RMSE = math.sqrt(SS_res/n)
+
+print(f"\\nخطوة 3: تقييم النموذج")
+print(f"  R²   = {R2:.4f} → النموذج يفسر {R2*100:.1f}% من التباين")
+print(f"  MAE  = {MAE:.3f}  (متوسط الخطأ المطلق)")
+print(f"  RMSE = {RMSE:.3f}  (جذر متوسط مربع الخطأ)")
+
+print(f"\\n{'ساعات':>8} {'فعلي':>8} {'متنبأ':>8} {'خطأ':>8}")
+print("-"*38)
+for i in range(n):
+    e = abs(Y_train[i]-Y_pred[i])
+    print(f"{X_train[i]:>8} {Y_train[i]:>8} {Y_pred[i]:>8.1f} {e:>8.2f}")
+
+print(f"\\n── تنبؤات جديدة ──")
+for h in [3.5, 6.5, 12, 15]:
+    pred = a + b*h
+    print(f"  {h} ساعات → {min(100,max(0,pred)):.1f} درجة")`,
+
+  ml_knn: `# ========================================
+# ML - KNN (K-Nearest Neighbors)
+# أقرب الجيران
+# فكرة: انت مثل جيرانك!
+# إذا جيرانك الـ3 يحبون Python → انت ستحبه
+# ========================================
+import math
+
+# بيانات التدريب: [ساعات_دراسة, اختبار_قبلي] → النتيجة
+train = [
+    ([2, 40], "راسب"),   ([3, 55], "راسب"),   ([4, 60], "مقبول"),
+    ([5, 65], "مقبول"),  ([6, 70], "جيد"),    ([7, 75], "جيد"),
+    ([8, 80], "جيد جدا"),([9, 85], "جيد جدا"),([10,90], "ممتاز"),
+    ([3, 50], "راسب"),   ([6, 72], "جيد"),    ([9, 88], "ممتاز"),
+]
+
+def euclidean(p1, p2):
+    return math.sqrt(sum((a-b)**2 for a,b in zip(p1,p2)))
+
+def knn_predict(test_point, k=3):
+    distances = [(euclidean(test_point, x), label) for x,label in train]
+    distances.sort(key=lambda x: x[0])
+    k_nearest = distances[:k]
+    votes = {}
+    for _, label in k_nearest: votes[label] = votes.get(label,0)+1
+    return max(votes, key=votes.get), k_nearest
+
+print("=" * 55)
+print("  KNN - K أقرب الجيران (k=3)")
+print("=" * 55)
+print("  بيانات التدريب:")
+for x, y in train:
+    print(f"    ساعات={x[0]}  قبلي={x[1]}  → {y}")
+
+test_students = [[4,62], [7,74], [10,91], [5,58]]
+names = ["طالب أ","طالب ب","طالب ج","طالب د"]
+
+print(f"\\n  {'الطالب':>8} {'ساعات':>8} {'قبلي':>8} {'التنبؤ':>10}")
+print("  " + "-"*40)
+for name, point in zip(names, test_students):
+    pred, neighbors = knn_predict(point)
+    print(f"  {name:>8} {point[0]:>8} {point[1]:>8} {pred:>10}")
+    for dist, label in neighbors:
+        print(f"         جار: {label:8} (مسافة={dist:.2f})")
+    print()`,
+
+  ml_kmeans: `# ========================================
+# ML - K-Means Clustering
+# التجميع بـ K متوسطات
+# فكرة: قسّم البيانات لـ k مجموعات
+# تلقائياً بدون تسميات مسبقة!
+# ========================================
+import math, random
+
+random.seed(42)
+
+# بيانات: [ساعات_دراسة, درجة_اختبار]
+students = [
+    [2,45],[3,50],[2,42],[3,55],      # مجموعة ضعيفة
+    [6,72],[7,75],[6,70],[7,78],[6,73],# مجموعة متوسطة
+    [9,90],[10,95],[9,88],[10,92],     # مجموعة ممتازة
+]
+
+def euclidean(p1, p2):
+    return math.sqrt(sum((a-b)**2 for a,b in zip(p1,p2)))
+
+def kmeans(data, k=3, max_iter=20):
+    # اختيار مراكز ابتدائية
+    centers = random.sample(data, k)
+    
+    for iteration in range(max_iter):
+        # تعيين كل نقطة لاقرب مركز
+        clusters = [[] for _ in range(k)]
+        for point in data:
+            dists = [euclidean(point, c) for c in centers]
+            nearest = dists.index(min(dists))
+            clusters[nearest].append(point)
+        
+        # تحديث المراكز
+        new_centers = []
+        for cluster in clusters:
+            if cluster:
+                new_c = [sum(p[i] for p in cluster)/len(cluster) for i in range(2)]
+                new_centers.append(new_c)
+            else:
+                new_centers.append(centers[clusters.index(cluster)])
+        
+        if new_centers == centers: break
+        centers = new_centers
+    
+    return clusters, centers
+
+clusters, centers = kmeans(students, k=3)
+
+print("=" * 55)
+print("  K-Means Clustering (k=3)")
+print("=" * 55)
+
+labels = ["الفئة الاولى","الفئة الثانية","الفئة الثالثة"]
+level_names = []
+for i, (cluster, center) in enumerate(sorted(zip(clusters,centers), key=lambda x:x[1][1])):
+    avg_grade = sum(p[1] for p in cluster)/len(cluster) if cluster else 0
+    if avg_grade < 60: level = "ضعيف"
+    elif avg_grade < 80: level = "متوسط"
+    else: level = "ممتاز"
+    print(f"\\n  المجموعة {i+1}: {level}")
+    print(f"  المركز: ساعات={center[0]:.1f}, درجة={center[1]:.1f}")
+    print(f"  الاعضاء ({len(cluster)}):")
+    for p in cluster:
+        print(f"    ساعات={p[0]:.0f}  درجة={p[1]:.0f}")
+
+print(f"\\n  تم تقسيم {len(students)} طالب لـ 3 مجموعات تلقائياً!")
+print("  بدون ان يعرف النموذج الدرجات مسبقاً")`,
+
+  ml_naive_bayes: `# ========================================
+# ML - Naive Bayes
+# الاحتمال المشروط البسيط
+# هل هذا البريد spam؟
+# ========================================
+import math
+
+# بيانات التدريب: ميزات الطالب → يجتاز؟
+# [ساعات_دراسة, نسبة_حضور, درجة_سابقة] → نتيجة
+training = [
+    ([8, 90, 85], "نجح"),  ([9, 95, 90], "نجح"),
+    ([7, 85, 78], "نجح"),  ([8, 88, 82], "نجح"),
+    ([6, 80, 72], "نجح"),  ([10,98, 95], "نجح"),
+    ([2, 50, 45], "رسب"),  ([3, 55, 50], "رسب"),
+    ([1, 40, 38], "رسب"),  ([2, 60, 42], "رسب"),
+    ([4, 65, 55], "رسب"),
+]
+
+classes = ["نجح", "رسب"]
+class_data = {c: [x for x,y in training if y==c] for c in classes}
+prior = {c: len(class_data[c])/len(training) for c in classes}
+
+def mean_std(vals):
+    m = sum(vals)/len(vals)
+    s = math.sqrt(sum((v-m)**2 for v in vals)/(len(vals)-1)) or 0.01
+    return m, s
+
+def gaussian_pdf(x, mean, std):
+    return (1/(std*math.sqrt(2*math.pi))) * math.exp(-0.5*((x-mean)/std)**2)
+
+# حساب الاحصاءات لكل ميزة لكل فئة
+stats = {}
+for c in classes:
+    stats[c] = [mean_std([d[i] for d in class_data[c]]) for i in range(3)]
+
+def predict(x):
+    posteriors = {}
+    for c in classes:
+        p = math.log(prior[c])
+        for i, (m, s) in enumerate(stats[c]):
+            pdf = gaussian_pdf(x[i], m, s)
+            p += math.log(pdf + 1e-10)
+        posteriors[c] = p
+    return max(posteriors, key=posteriors.get), posteriors
+
+print("=" * 55)
+print("  Naive Bayes - التصنيف الاحتمالي")
+print("=" * 55)
+print(f"  احتمال النجاح مسبقاً: {prior['نجح']*100:.1f}%")
+print(f"  احتمال الرسوب مسبقاً: {prior['رسب']*100:.1f}%\\n")
+
+test_cases = [[7,85,78],[3,55,50],[9,92,88],[4,60,55]]
+print(f"  {'ساعات':>7} {'حضور':>7} {'سابقة':>8} {'التنبؤ':>8}")
+print("  " + "-"*35)
+for x in test_cases:
+    pred, post = predict(x)
+    print(f"  {x[0]:>7} {x[1]:>7} {x[2]:>8} {pred:>8}")`,
+
+};
+
+function statsTabSwitch(tab) {
+  var excel  = document.getElementById('stats-excel-panel');
+  var python = document.getElementById('stats-py-panel');
+  var btnE   = document.getElementById('stats-tab-excel');
+  var btnP   = document.getElementById('stats-tab-python');
+  if (!excel || !python) return;
+
+  if (tab === 'excel') {
+    excel.style.display  = 'block';
+    python.style.display = 'none';
+    if (btnE) { btnE.style.borderColor='#217346'; btnE.style.background='rgba(33,115,70,0.2)'; btnE.style.color='#5cb888'; }
+    if (btnP) { btnP.style.borderColor='rgba(255,255,255,0.15)'; btnP.style.background='rgba(255,255,255,0.05)'; btnP.style.color='var(--text-muted)'; }
+    // Init Excel if needed
+    setTimeout(function(){ elabInitXl(); elabBuildFnRef(); }, 100);
+  } else {
+    excel.style.display  = 'none';
+    python.style.display = 'block';
+    if (btnP) { btnP.style.borderColor='#3776AB'; btnP.style.background='rgba(55,118,171,0.2)'; btnP.style.color='#6ab0e8'; }
+    if (btnE) { btnE.style.borderColor='rgba(255,255,255,0.15)'; btnE.style.background='rgba(255,255,255,0.05)'; btnE.style.color='var(--text-muted)'; }
+    // Init Python
+    setTimeout(function(){ initEmbeddedLab('statistics'); }, 100);
+  }
+}
+
+function statsLoadPyTmpl() {
+  var sel = document.getElementById('stats-py-tmpl');
+  if (!sel || !sel.value) return;
+  var tmpl = (typeof STATS_PY_TEMPLATES !== 'undefined' && STATS_PY_TEMPLATES[sel.value]) || '';
+  var ta   = document.getElementById('elab-editor');
+  if (ta) { ta.value = tmpl; elabUpdateLines(); }
+  var out  = document.getElementById('elab-out');
+  if (out) out.innerHTML = '<span style="color:#555">// اضغط ▶ تشغيل لتشغيل القالب</span>';
+  var cw   = document.getElementById('elab-chart-wrap');
+  if (cw)  cw.style.display = 'none';
+}
+
 function buildStatsLab() {
   var uploads = ZAD_UPLOADS.getAll().filter(function(u){ return (u.subjectId==='statistics'||u.subjectId==='sta104') && u.lesson; });
   return buildStatsLabFull('statistics', uploads);
@@ -15978,7 +16770,78 @@ function buildStatsLabFull(subjectId, uploads) {
   }
 
   return '<div style="direction:rtl" id="stats-lab-wrap">'
-    + '<div style="font-weight:800;font-size:0.9rem;margin-bottom:14px;color:#6C63FF">📊 مختبر الإحصاء — Excel تفاعلي</div>'
+    // Tab switcher: Excel | Python
+    + '<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">'
+      + '<button id="stats-tab-excel" onclick="statsTabSwitch(\'excel\')" style="padding:9px 18px;border-radius:12px;border:2px solid #217346;background:rgba(33,115,70,0.2);color:#5cb888;font-family:var(--font);font-weight:700;cursor:pointer;font-size:0.85rem">📊 Excel</button>'
+      + '<button id="stats-tab-python" onclick="statsTabSwitch(\'python\')" style="padding:9px 18px;border-radius:12px;border:2px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.05);color:var(--text-muted);font-family:var(--font);font-weight:700;cursor:pointer;font-size:0.85rem">🐍 Python</button>'
+    + '</div>'
+    // Python Panel (hidden by default)
+    + '<div id="stats-py-panel" style="display:none">'
+      + '<div style="background:rgba(55,118,171,0.07);border:1.5px solid rgba(55,118,171,0.2);border-radius:16px;padding:14px;margin-bottom:14px">'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:6px">'
+          + '<div style="display:flex;align-items:center;gap:8px">'
+            + '<div id="elab-py-dot" style="width:9px;height:9px;border-radius:50%;background:#555"></div>'
+            + '<span id="elab-py-status" style="font-size:0.78rem;color:var(--text-muted)">جاري تحميل Python...</span>'
+          + '</div>'
+          + '<div style="display:flex;gap:6px;flex-wrap:wrap">'
+            + '<select id="stats-py-tmpl" onchange="statsLoadPyTmpl()" style="padding:5px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-family:var(--font);font-size:0.75rem">'
+              + '<option value="">📋 قوالب الإحصاء...</option>'
+              + '<optgroup label="── الأساسيات ──">'
+              + '<option value="stats_intro">📊 إحصاء سريع</option>'
+              + '<option value="stats_numpy">🔢 Numpy الإحصائي</option>'
+              + '<option value="stats_pandas">🐼 Pandas جداول البيانات</option>'
+              + '</optgroup>'
+              + '<optgroup label="── الرسوم البيانية ──">'
+              + '<option value="stats_matplotlib">📈 Matplotlib 4 رسوم</option>'
+              + '<option value="ml_full_chart">🤖 ML + Visualization</option>'
+              + '</optgroup>'
+              + '<optgroup label="── التحليل الإحصائي ──">'
+              + '<option value="stats_descriptive">📐 الإحصاء الوصفي الكامل</option>'
+              + '<option value="stats_zscore">📏 Z-Score التوحيد</option>'
+              + '<option value="stats_correlation">📉 الارتباط والانحدار</option>'
+              + '<option value="stats_probability">🎲 نظرية الاحتمالات</option>'
+              + '<option value="stats_normal">🔔 التوزيع الطبيعي</option>'
+              + '</optgroup>'
+              + '<optgroup label="── تعلم الآلة ML ──">'
+              + '<option value="ml_linear_regression">🤖 الانحدار الخطي</option>'
+              + '<option value="ml_knn">👥 KNN أقرب الجيران</option>'
+              + '<option value="ml_kmeans">🎯 K-Means التجميع</option>'
+              + '<option value="ml_naive_bayes">🎲 Naive Bayes</option>'
+              + '</optgroup>'
+            + '</select>'
+            + '<button onclick="(function(){var e=document.getElementById(\'elab-editor\');if(e)e.value=\'\';var l=document.getElementById(\'elab-lnums\');if(l)l.innerHTML=\'1\'})()" style="padding:5px 10px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.04);color:var(--text-muted);font-family:var(--font);font-size:0.75rem;cursor:pointer">🗑️</button>'
+            + '<button id="elab-run-btn" onclick="elabRunPy()" style="padding:6px 16px;border-radius:10px;border:none;background:linear-gradient(135deg,#3776AB,#1a4a7a);color:white;font-family:var(--font);font-weight:700;font-size:0.85rem;cursor:pointer">▶ تشغيل</button>'
+          + '</div>'
+        + '</div>'
+        // Editor
+        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
+          + '<div style="background:#1e1e2e;border-radius:12px;overflow:hidden;border:1px solid rgba(55,118,171,0.3)">'
+            + '<div style="background:#2d2d3e;padding:7px 12px;font-size:0.72rem;color:#6ab0e8;font-weight:600">🐍 المحرر</div>'
+            + '<div style="position:relative">'
+              + '<div id="elab-lnums" style="position:absolute;left:0;top:0;width:34px;background:#1a1a2a;padding:10px 0;text-align:center;font-size:0.68rem;color:#555;line-height:1.6;font-family:monospace;pointer-events:none;min-height:260px">1</div>'
+              + '<textarea id="elab-editor" spellcheck="false" oninput="elabUpdateLines()" onkeydown="elabTab(event)" placeholder="# اختر قالباً أو اكتب كود Python..." style="width:100%;min-height:260px;background:transparent;border:none;outline:none;color:#cdd6f4;font-family:\'Fira Code\',monospace;font-size:0.8rem;line-height:1.6;padding:10px 10px 10px 44px;resize:vertical;box-sizing:border-box;direction:ltr;text-align:left"></textarea>'
+            + '</div>'
+          + '</div>'
+          + '<div style="background:#0d1117;border-radius:12px;overflow:hidden;border:1px solid rgba(55,118,171,0.2)">'
+            + '<div style="background:#161b22;padding:7px 12px;display:flex;align-items:center;justify-content:space-between">'
+              + '<span style="font-size:0.72rem;color:#8b949e;font-weight:600">📟 النتيجة</span>'
+              + '<button onclick="document.getElementById(\'elab-out\').innerHTML=\'<span style=color:#555>//جاهز</span>\'" style="background:none;border:none;color:#555;cursor:pointer;font-size:0.68rem">✕</button>'
+            + '</div>'
+            + '<div id="elab-out" style="padding:10px;min-height:260px;font-family:\'Fira Code\',monospace;font-size:0.75rem;color:#e6edf3;white-space:pre-wrap;overflow-y:auto;line-height:1.6;direction:ltr;text-align:left"><span style="color:#555">// اضغط ▶ تشغيل</span></div>'
+          + '</div>'
+        + '</div>'
+        // Chart area
+        + '<div id="elab-chart-wrap" style="display:none;margin-top:10px;background:white;border-radius:12px;padding:12px;text-align:center">'
+          + '<canvas id="elab-chart-canvas" style="max-width:100%;max-height:400px"></canvas>'
+        + '</div>'
+        + '<div style="margin-top:8px;padding:8px 12px;background:rgba(55,118,171,0.06);border-radius:8px;font-size:0.72rem;color:#6ab0e8">'
+          + '💡 المكتبات المتاحة: statistics، numpy، pandas، matplotlib — الرسوم تظهر تلقائياً'
+        + '</div>'
+      + '</div>'
+    + '</div>'
+    // Excel Panel (shown by default)
+    + '<div id="stats-excel-panel">'
+    + '<div style="font-weight:800;font-size:0.9rem;margin-bottom:14px;color:#5cb888">📊 مختبر الإحصاء — Excel تفاعلي</div>'
 
     // ── Input section ─────────────────────────────────
     + '<div style="background:rgba(108,99,255,0.06);border:1px solid rgba(108,99,255,0.2);border-radius:16px;padding:14px;margin-bottom:14px">'
@@ -16037,7 +16900,8 @@ function buildStatsLabFull(subjectId, uploads) {
     + '</div>'
 
     + '<div id="elab-xl-chart-wrap" style="display:none;margin-top:14px;background:rgba(255,255,255,0.96);border-radius:14px;padding:14px"><canvas id="elab-xl-chart" style="max-width:100%;max-height:300px"></canvas></div>'
-  + '</div>';
+  + '</div>' // end stats-excel-panel
+  + '</div>'; // end stats-lab-wrap
 }
 
 function calcStatsLab() {

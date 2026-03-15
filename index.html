@@ -2050,27 +2050,31 @@ async function elabRunPy() {
       return;
     }
     _collectedVals = vals || [];
-    patchPyodideWithInputs(_elabPyodide, _collectedVals);
   }
 
   out.innerHTML = '<span style="color:#FFD600">⏳ جاري التنفيذ...</span>';
 
-  try {
-    const instantRes = runJsFallback(code, _collectedVals);
-    if (instantRes !== null) {
-      out.innerHTML = buildPyOutput(instantRes, code);
-      if (btn) { btn.textContent = '▶ تشغيل'; btn.disabled = false; }
-      return;
+  // Only try JS fallback if there are NO input() calls (or all values collected)
+  if (inputPrompts.length === 0) {
+    try {
+      const instantRes = runJsFallback(code, _collectedVals);
+      if (instantRes !== null) {
+        out.innerHTML = buildPyOutput(instantRes, code);
+        if (btn) { btn.textContent = '▶ تشغيل'; btn.disabled = false; }
+        return;
+      }
+    } catch(e) {
+      if (e.message !== '__NEEDS_INPUT__') {
+        out.innerHTML = buildPyError(e.message, code);
+        if (btn) { btn.textContent = '▶ تشغيل'; btn.disabled = false; }
+        return;
+      }
     }
-  } catch(e) {
-    if (e.message === '__NEEDS_INPUT__') {
-      // Code needs input — let it fall through to Pyodide or input dialog
-      // Don't show error, just continue
-    } else {
-      out.innerHTML = buildPyError(e.message, code);
-      if (btn) { btn.textContent = '▶ تشغيل'; btn.disabled = false; }
-      return;
-    }
+  }
+
+  // Patch Pyodide with collected inputs (do this after JS fallback attempt)
+  if (_collectedVals.length > 0) {
+    patchPyodideWithInputs(_elabPyodide, _collectedVals);
   }
 
   if (!_elabPyReady && typeof pyodide !== 'undefined' && pyodide && pyReady) {
@@ -2135,6 +2139,8 @@ function buildPyOutput(rawHtml, code) {
 }
 
 function buildPyError(errMsg, code) {
+  // Filter internal signals
+  if (!errMsg || errMsg === '__NEEDS_INPUT__') return '';
   const msg = String(errMsg || 'خطأ غير معروف')
     .replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>');
   const hints = getPyErrorHints(msg, code || '');
@@ -16577,15 +16583,21 @@ async function runPython() {
   const out = document.getElementById('py-output');
   const btn = document.getElementById('run-btn');
 
-  try {
-    const instantResult = runJsFallback(code, []);
-    if (instantResult !== null) {
-      out.innerHTML = buildPyOutput(instantResult, code);
-      return;
+  // Only try JS fallback if code has NO input() calls
+  // (to avoid __NEEDS_INPUT__ leaking as an error message)
+  if (detectInputCalls(code).length === 0) {
+    try {
+      const instantResult = runJsFallback(code, []);
+      if (instantResult !== null) {
+        out.innerHTML = buildPyOutput(instantResult, code);
+        return;
+      }
+    } catch(e) {
+      if (e.message !== '__NEEDS_INPUT__') {
+        out.innerHTML = buildPyError(e.message, code);
+        return;
+      }
     }
-  } catch(e) {
-    out.innerHTML = buildPyError(e.message, code);
-    return;
   }
 
   if (!pyReady || !pyodide) {

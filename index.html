@@ -1830,7 +1830,7 @@ let _elabPyReady = false;
 let _elabPyodide = null;
 let _elabXlInited = false;
 
-const ELAB_PY_TEMPLATES = typeof PY_TEMPLATES !== 'undefined' ? PY_TEMPLATES : {};
+let ELAB_PY_TEMPLATES = {}; // populated after PY_TEMPLATES loads
 
 const ELAB_XL_COLS = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'];
 let _exlData = {}, _exlStyles = {}, _exlRows = 10, _exlCols = 7;
@@ -16067,6 +16067,9 @@ countifs = sum(1 for r in بيانات if r["جنس"]=="ذكر" and r["درجة"
 print(f"COUNTIFS (ذكور درجتهم >75): {countifs}")`,
 };
 
+// Connect to embedded lab
+ELAB_PY_TEMPLATES = PY_TEMPLATES;
+
 function loadPyTemplate() {
   const sel = document.getElementById('py-template');
   const val = sel.value;
@@ -21864,7 +21867,7 @@ function buildEmbeddedLab(subjectId) {
             <option value="histogram">مدرج تكراري</option>
             <option value="correlation">الارتباط</option>
           </select>
-          <button onclick="document.getElementById('elab-code').value=''"
+          <button onclick="document.getElementById('elab-editor').value=''"
             style="padding:5px 12px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text-muted);font-family:var(--font);font-size:0.78rem;cursor:pointer">🗑️</button>
           <button id="elab-run-btn" onclick="elabRunPy()"
             style="padding:6px 16px;border-radius:10px;border:none;background:linear-gradient(135deg,#3776AB,#1a4a7a);color:white;font-family:var(--font);font-weight:700;font-size:0.85rem;cursor:pointer">▶ تشغيل</button>
@@ -21876,28 +21879,27 @@ function buildEmbeddedLab(subjectId) {
         <div style="background:#1e1e2e;border-radius:14px;overflow:hidden;border:1px solid rgba(55,118,171,0.3)">
           <div style="background:#2d2d3e;padding:8px 14px;font-size:0.75rem;color:#6ab0e8;font-weight:600">🐍 المحرر</div>
           <div style="position:relative">
-            <div id="elab-line-nums" style="position:absolute;left:0;top:0;width:36px;background:#1a1a2a;padding:12px 0;text-align:center;font-size:0.72rem;color:#555;line-height:1.6;font-family:monospace;pointer-events:none;user-select:none;min-height:300px">1</div>
-            <textarea id="elab-code" spellcheck="false"
+            <div id="elab-lnums" style="position:absolute;left:0;top:0;width:36px;background:#1a1a2a;padding:12px 0;text-align:center;font-size:0.72rem;color:#555;line-height:1.6;font-family:monospace;pointer-events:none;user-select:none;min-height:300px">1</div>
+            <textarea id="elab-editor" spellcheck="false"
               style="width:100%;min-height:300px;background:transparent;border:none;outline:none;color:#cdd6f4;font-family:'Fira Code',monospace;font-size:0.83rem;line-height:1.6;padding:12px 12px 12px 48px;resize:vertical;box-sizing:border-box;tab-size:4;direction:ltr;text-align:left"
               placeholder="# اكتب كود Python هنا..."
-              oninput="(function(ta){var lines=ta.value.split('\n').length;var el=document.getElementById('elab-line-nums');if(el)el.innerHTML=Array.from({length:lines},(_,i)=>i+1).join('<br>')})(this)"
-              onkeydown="handleTabKey(event)"></textarea>
+              oninput="elabUpdateLines()"
+              onkeydown="elabTab(event)"></textarea>
           </div>
         </div>
         <!-- Output -->
         <div style="background:#0d1117;border-radius:14px;overflow:hidden;border:1px solid rgba(55,118,171,0.2)">
           <div style="background:#161b22;padding:8px 14px;display:flex;align-items:center;justify-content:space-between">
             <span style="font-size:0.75rem;color:#8b949e;font-weight:600">📟 النتيجة</span>
-            <button onclick="document.getElementById('elab-output').innerHTML='<span style=color:#555>// جاهز</span>'" style="background:none;border:none;color:#555;cursor:pointer;font-size:0.72rem">✕</button>
+            <button onclick="document.getElementById('elab-out').innerHTML='<span style=color:#555>// جاهز</span>'" style="background:none;border:none;color:#555;cursor:pointer;font-size:0.72rem">✕</button>
           </div>
-          <div id="elab-output" style="padding:12px;min-height:300px;font-family:'Fira Code',monospace;font-size:0.8rem;color:#e6edf3;white-space:pre-wrap;overflow-y:auto;line-height:1.6;direction:ltr;text-align:left">
-            <span style="color:#555">// اضغط ▶ تشغيل</span>
-          </div>
+          <div id="elab-out" style="padding:12px;min-height:300px;font-family:'Fira Code',monospace;font-size:0.8rem;color:#e6edf3;white-space:pre-wrap;overflow-y:auto;line-height:1.6;direction:ltr;text-align:left">
+            <span style="color:#555">// اضغط ▶ تشغيل</span></div>
         </div>
       </div>
 
-      <div id="elab-chart-area" style="display:none;margin-top:12px;background:white;border-radius:14px;padding:14px;text-align:center">
-        <canvas id="elab-chart" style="max-width:100%;max-height:360px"></canvas>
+      <div id="elab-chart-wrap" style="display:none;margin-top:12px;background:white;border-radius:14px;padding:14px;text-align:center">
+        <canvas id="elab-chart-canvas" style="max-width:100%;max-height:360px"></canvas>
       </div>
 
       <div style="margin-top:10px;padding:10px 14px;background:rgba(55,118,171,0.07);border-radius:10px;border:1px solid rgba(55,118,171,0.18);font-size:0.76rem;color:#6ab0e8">

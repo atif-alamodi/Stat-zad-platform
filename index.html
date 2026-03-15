@@ -21073,16 +21073,20 @@ var ZAD_PROGRESS_WEIGHTS = {
 };
 
 // Get raw activity data for a lesson
+function _lessonKey(subjectId, lessonId) {
+  // Per-user key: each student's progress is isolated
+  var email = (APP.student && APP.student.email) ? APP.student.email.replace(/[^a-z0-9]/gi, '_') : 'guest';
+  return 'zad_lesson_' + email + '_' + subjectId + '_' + lessonId;
+}
+
 function getLessonActivity(subjectId, lessonId) {
-  var key = 'zad_lesson_' + subjectId + '_' + lessonId;
-  try { return JSON.parse(localStorage.getItem(key) || 'null'); } catch(e) { return null; }
+  try { return JSON.parse(localStorage.getItem(_lessonKey(subjectId, lessonId)) || 'null'); } catch(e) { return null; }
 }
 
 function saveLessonActivity(subjectId, lessonId, data) {
-  var key = 'zad_lesson_' + subjectId + '_' + lessonId;
   var existing = getLessonActivity(subjectId, lessonId) || {};
   var merged = Object.assign({}, existing, data, { updatedAt: Date.now() });
-  localStorage.setItem(key, JSON.stringify(merged));
+  localStorage.setItem(_lessonKey(subjectId, lessonId), JSON.stringify(merged));
 }
 
 // Calculate progress % for one lesson (0-100)

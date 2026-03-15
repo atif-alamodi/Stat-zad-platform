@@ -7688,7 +7688,7 @@ async function processUploadedFile(file, subjectId) {
       return;
     }
 
-    showUploadStatus('info', `✅ قُرئ ${text.length.toLocaleString()} حرف من "${file.name}" — الذكاء الاصطناعي يحلّل...`);
+    showUploadStatus('loading', `📖 قُرئ ${text.length.toLocaleString()} حرف — الذكاء الاصطناعي يحلّل...`);
     await analyzeAndGenerate(text, subjectId, file.name);
 
   } catch(e) {
@@ -18396,18 +18396,20 @@ function showUploadStatus(type, msg) {
   }
   
   var colors = {
-    loading: {bg:'rgba(66,165,245,0.15)',border:'rgba(66,165,245,0.4)',text:'#42A5F5'},
+    loading: {bg:'rgba(66,165,245,0.15)', border:'rgba(66,165,245,0.4)', text:'#42A5F5'},
     success: {bg:'rgba(102,187,106,0.15)',border:'rgba(102,187,106,0.4)',text:'#66BB6A'},
-    error:   {bg:'rgba(239,83,80,0.15)', border:'rgba(239,83,80,0.4)', text:'#EF5350'},
+    error:   {bg:'rgba(239,83,80,0.15)',  border:'rgba(239,83,80,0.4)', text:'#EF5350'},
+    info:    {bg:'rgba(108,99,255,0.12)', border:'rgba(108,99,255,0.4)',text:'#9C8CFF'},
+    warning: {bg:'rgba(255,214,0,0.12)',  border:'rgba(255,214,0,0.4)', text:'#FFD600'},
   };
-  var col = colors[type] || colors.error;
+  var col = colors[type] || colors.loading;
   
   el.style.background   = col.bg;
   el.style.border       = '1.5px solid ' + col.border;
   el.style.color        = col.text;
   el.style.display      = 'flex';
   
-  var icon = type==='loading'?'⏳':type==='success'?'✅':'❌';
+  var icon = type==='loading'?'⏳':type==='success'?'✅':type==='info'?'📊':type==='warning'?'⚠️':'❌';
   el.innerHTML = icon + ' ' + msg + 
     (type!=='loading' ? ' <button onclick="document.getElementById(\'upload-status\').style.display=\'none\'" ' +
     'style="margin-right:auto;background:transparent;border:none;color:inherit;cursor:pointer;font-size:1rem">×</button>' : '');

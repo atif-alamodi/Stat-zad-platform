@@ -10571,6 +10571,7 @@ async function analyzeAndGenerate(text, subjectId, fileName) {
     const subject  = CURRICULUM[subjectId];
     const subTitle = subject ? subject.title : (subjectId || 'المادة');
     const clean    = text.replace(/[\u0000-\u001F]/g, ' ').trim();
+    console.log('[ZAD] text length:', text.length, 'clean:', clean.length, 'subjectId:', subjectId);
     const isEng    = subjectId === 'english';
 
     upd('🔍', 'تحليل هيكل الملف واكتشاف الدروس...', 10);
@@ -10704,6 +10705,7 @@ VIOLATION: Writing Arabic in quiz.q or quiz.options is a critical error.`
       upd('📡', 'تحليل الملف...', 30);
       const chunkSize = 12000;
       const numChunks = Math.min(Math.ceil(clean.length / chunkSize), 8);
+      console.log('[ZAD] numChunks:', numChunks, 'chunkSize:', chunkSize);
       const allResults = [];
 
       for (let ci = 0; ci < numChunks; ci++) {
@@ -10718,6 +10720,7 @@ VIOLATION: Writing Arabic in quiz.q or quiz.options is a critical error.`
           : `${langNote}\n\nنص إضافي:\n${chunk}\n\nأجب بـ JSON مع مصطلحات وأسئلة إضافية فقط:\n{"keyTerms":[{"term":"...","def":"..."}],"steps":["..."],"quiz":[{"q":"...","options":["صحيح","خطأ1","خطأ2","خطأ3"],"answer":0,"explanation":"..."}]}`;
 
         let parsed = null;
+        console.log('[ZAD] chunk', ci, 'sending prompt length:', prompt.length);
         try {
           const resp = await zadFetch({
             model: 'llama-3.3-70b-versatile',
@@ -10727,7 +10730,9 @@ VIOLATION: Writing Arabic in quiz.q or quiz.options is a critical error.`
           });
           const data = await resp.json();
           const text = (data.content && data.content[0] && data.content[0].text) || '';
+          console.log('[ZAD] chunk', ci, 'got text length:', text.length, 'preview:', text.slice(0,100));
           parsed = repairAndParseJSON(text.trim());
+          console.log('[ZAD] chunk', ci, 'parsed:', !!parsed);
         } catch(fetchErr) {
           console.warn('Chunk', ci, 'failed:', fetchErr.message);
         }

@@ -15247,7 +15247,7 @@ function showToast(msg, type = 'info') {
 
   // Build message with progress bar
   t.innerHTML = `
-    <span style="flex:1">${msg}</span>
+    <span style="flex:1">${typeof escHTML==='function' ? escHTML(msg) : msg}</span>
     <div id="toast-progress-bar" style="
       position:absolute;bottom:0;right:0;height:3px;width:100%;
       background:rgba(255,255,255,0.15);border-radius:0 0 14px 14px;overflow:hidden">
@@ -19095,7 +19095,7 @@ function showUploadStatus(type, msg) {
 
   el.innerHTML =
     iconHtml +
-    '<span style="flex:1;line-height:1.4">' + msg + '</span>' +
+    '<span style="flex:1;line-height:1.4">' + (typeof escHTML==='function' ? escHTML(msg) : msg) + '</span>' +
     '<button onclick="hideUploadStatus()" title="إغلاق" ' +
       'style="flex-shrink:0;background:transparent;border:none;color:' + c.text +
       ';opacity:0.7;cursor:pointer;font-size:1.1rem;line-height:1;padding:0 2px">' +
@@ -19487,7 +19487,7 @@ function setAdminPKStatus(type, msg) {
   el.style.background = colors[type]  || 'rgba(255,255,255,0.04)';
   el.style.borderColor= borders[type] || 'var(--border)';
   el.style.color      = textc[type]   || 'var(--text)';
-  el.innerHTML        = msg;
+  el.innerHTML        = typeof escHTML==='function' ? escHTML(msg) : msg;
 }
 
 function buildAdminPlatformKeySection() {
@@ -21168,7 +21168,7 @@ async function labAskQuestion(subjectId) {
     history.scrollTop = history.scrollHeight;
   } catch(err) {
     var loadEl2 = document.getElementById('lab-loading');
-    if (loadEl2) loadEl2.outerHTML = '<div style="color:#FF5252;font-size:0.8rem;padding:8px">❌ '+err.message+'</div>';
+    if (loadEl2) loadEl2.outerHTML = '<div style="color:#FF5252;font-size:0.8rem;padding:8px">❌ '+escHTML(err.message)+'</div>';
   }
 }
 
@@ -21369,12 +21369,21 @@ async function fetchDevLessons() {
 }
 
 async function pushDevLessons(lessons) {
-  var resp = await fetch(ZAD_WORKER_URL + '/summaries', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({secret: ZAD_WORKER_SECRET, summaries: lessons})
-  });
-  return await resp.json();
+  if (typeof isAdmin === 'function' && !isAdmin()) {
+    throw new Error('غير مصرح — فقط المدير يستطيع تعديل الملخصات');
+  }
+  try {
+    var resp = await fetch(ZAD_WORKER_URL + '/summaries', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({secret: ZAD_WORKER_SECRET, summaries: lessons})
+    });
+    if (!resp.ok) throw new Error('فشل الحفظ: ' + resp.status);
+    return await resp.json();
+  } catch(e) {
+    console.error('[ZAD] pushDevLessons error:', e);
+    throw e;
+  }
 }
 
 function getDevLessons() {
@@ -21505,7 +21514,7 @@ async function devProcessAndSave() {
     if (body) body.innerHTML = buildDevSummaryTab();
     showToast('✅ تم رفع "' + lesson.lessonTitle + '" لجميع الطلاب', 'success');
   } catch(err) {
-    if (st) st.innerHTML = '❌ ' + err.message;
+    if (st) st.innerHTML = '❌ ' + escHTML(err.message);
   }
 }
 
@@ -22098,22 +22107,15 @@ async function translateQuizItemsToEnglish(questions) {
     + 'Items:\n' + JSON.stringify(toTranslate);
 
   try {
-    var resp = await fetch('https://zad-proxy.atif-alamodi.workers.dev', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'llama-3.1-8b-instant',
-        messages: [
-          { role: 'system', content: 'You are a translator. Return ONLY valid JSON array, no markdown.' },
-          { role: 'user', content: prompt }
-        ],
-        max_tokens: 2000, temperature: 0.1
-      })
+    var resp = await zadFetch({
+      model: 'llama-3.1-8b-instant',
+      max_tokens: 2000,
+      system: 'You are a translator. Return ONLY valid JSON array, no markdown.',
+      messages: [{ role: 'user', content: prompt }]
     });
 
-    if (!resp.ok) return questions;
     var data = await resp.json();
-    var raw = (data.choices && data.choices[0].message.content) || '[]';
+    var raw = (data.content && data.content[0] && data.content[0].text) || '[]';
     raw = raw.replace(/```json|```/g, '').trim();
     var translated = JSON.parse(raw);
 

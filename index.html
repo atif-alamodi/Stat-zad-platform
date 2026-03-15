@@ -13811,6 +13811,12 @@ function openLesson(subjectId, lessonId) {
   });
 
   if (bundle) {
+    // Track this uploaded lesson as opened (for progress calculation)
+    if (typeof saveLessonActivity === 'function') {
+      var _lid = bundle.lessonId || ('ai-' + bundle.id);
+      saveLessonActivity(bundle.subjectId, _lid, { opened: true, openedAt: Date.now() });
+      refreshProgressBars();
+    }
     var ul = bundle.lesson || {};
     var aiLesson = {
       lessonTitle:     ul.title || bundle.title || bundle.fileName || 'درس مرفوع',
@@ -14220,6 +14226,48 @@ function initDashboard() {
       + '<span style="margin-right:auto;font-size:0.78rem;color:var(--text-muted)">' + doneCnt + '/' + tasks.length + ' مهمة مكتملة</span>'
       + '<span style="color:var(--primary);font-size:0.8rem">←</span></div></div>';
   }
+}
+
+// ── Render dashboard progress chart ──────────────────────────
+function renderProgressChart() {
+  var canvas = document.getElementById('progressChart');
+  if (!canvas) return;
+
+  // Collect ALL subjects: built-in + custom + any subject with uploads
+  var allSids = new Set(Object.keys(CURRICULUM));
+  ZAD_UPLOADS.getAll().forEach(function(u){ if(u.subjectId) allSids.add(u.subjectId); });
+
+  var subjects = Array.from(allSids).map(function(sid) {
+    var s = CURRICULUM[sid];
+    if (!s) {
+      var saved = (typeof getCustomSubjects==='function') ? getCustomSubjects().find(function(x){return x.id===sid;}) : null;
+      s = saved || { id:sid, title:sid, icon:'📚', color:'#6C63FF', chapters:[] };
+    }
+    var prog = (typeof calcSubjectProgress==='function') ? calcSubjectProgress(sid) : (APP.progress.subjectProgress[sid]||0);
+    return { title:(s.icon||'📚')+' '+(s.title||sid), color:s.color||'#6C63FF', prog:prog, id:sid };
+  }).filter(function(s){ return s.prog >= 0; });
+
+  if (!subjects.length) {
+    canvas.parentElement.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-muted);font-size:0.85rem">📚 أضف مواد وابدأ الدراسة لرؤية تقدمك</div>';
+    return;
+  }
+
+  // Build interactive HTML bars (no Chart.js needed — pure CSS)
+  var barsHtml = subjects.map(function(s) {
+    var col = s.color || '#6C63FF';
+    var pct = Math.max(s.prog, 2); // min 2% for visibility
+    return '<div onclick="showSubject(\''+s.id+'\')" style="cursor:pointer;margin-bottom:10px" title="'+s.title+' — '+s.prog+'%">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'
+        + '<span style="font-size:0.78rem;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:70%">'+s.title+'</span>'
+        + '<span style="font-size:0.75rem;font-weight:800;color:'+col+'">'+s.prog+'%</span>'
+      + '</div>'
+      + '<div style="height:8px;background:rgba(255,255,255,0.06);border-radius:20px;overflow:hidden">'
+        + '<div style="height:100%;width:'+pct+'%;background:linear-gradient(90deg,'+col+','+col+'99);border-radius:20px;transition:width 0.6s ease"></div>'
+      + '</div>'
+    + '</div>';
+  }).join('');
+
+  canvas.outerHTML = '<div id="progressChartBars" style="max-height:220px;overflow-y:auto;padding-left:4px">'+barsHtml+'</div>';
 }
 
 function updateStats() {
@@ -14853,27 +14901,57 @@ function renderProgress() {
       <canvas id="scoresChart" height="200"></canvas>
     </div>
     
-    <div class="section-title">📚 تقدمك في كل مادة</div>
-    <div style="display: flex; flex-direction: column; gap: 12px;">
-      ${Object.values(CURRICULUM).map(s => {
-        const prog = APP.progress.subjectProgress[s.id] || 0;
-        return `
-          <div style="
-            background: rgba(255,255,255,0.04);
-            border: 1px solid var(--border);
-            border-radius: 15px;
-            padding: 20px;
-          ">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-              <div style="font-weight: 700;">${s.icon} ${s.title}</div>
-              <div style="font-weight: 700; color: ${s.color};">${prog}%</div>
-            </div>
-            <div class="progress-bar">
-              <div class="progress-fill" style="width: ${prog}%; background: linear-gradient(to right, ${s.color}, ${s.color}88)"></div>
-            </div>
-          </div>
-        `;
-      }).join('')}
+    <div class="section-title" style="margin-bottom:14px">📚 تقدمك في كل مادة</div>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      ${(function() {
+        // Collect ALL subjects: built-in + custom + any with uploads
+        var allSids = new Set(Object.keys(CURRICULUM));
+        ZAD_UPLOADS.getAll().forEach(function(u){ if(u.subjectId) allSids.add(u.subjectId); });
+        if (!allSids.size) return '<div style="text-align:center;padding:30px;color:var(--text-muted)">لم تبدأ بعد — افتح مادة وابدأ الدراسة</div>';
+
+        return Array.from(allSids).map(function(sid) {
+          var s = CURRICULUM[sid];
+          if (!s) {
+            var saved = (typeof getCustomSubjects==='function') ? getCustomSubjects().find(function(x){return x.id===sid;}) : null;
+            s = saved || { id:sid, title:sid, icon:'📚', color:'#6C63FF', chapters:[] };
+          }
+          var col  = s.color || '#6C63FF';
+          var prog = (typeof calcSubjectProgress==='function') ? calcSubjectProgress(sid) : (APP.progress.subjectProgress[sid]||0);
+
+          // Chapter breakdown
+          var merged = (typeof getSubjectWithUploads==='function') ? getSubjectWithUploads(sid) : s;
+          var chapterRows = (merged.chapters||[]).filter(function(ch){ return (ch.lessons||[]).length > 0; }).map(function(ch) {
+            var chTotal = (ch.lessons||[]).length;
+            var chDone  = 0;
+            (ch.lessons||[]).forEach(function(l) {
+              var a = (typeof getLessonActivity==='function') ? getLessonActivity(sid, l.id) : null;
+              if (a && a.opened) chDone++;
+            });
+            var chPct  = chTotal ? Math.round(chDone/chTotal*100) : 0;
+            var isUp   = ch.aiGenerated || (ch.id && ch.id.startsWith('up-ch-'));
+            return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;padding:6px 10px;border-radius:8px;background:rgba(255,255,255,0.03);cursor:pointer" onclick="toggleChapter(\''+ch.id+'\')">'
+              + '<span style="font-size:0.82rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'
+                + (isUp ? '📂 ' : '📘 ') + (ch.title||'')
+              + '</span>'
+              + '<span style="font-size:0.7rem;color:var(--text-muted);flex-shrink:0">' + chDone + '/' + chTotal + '</span>'
+              + '<div style="width:60px;height:5px;background:rgba(255,255,255,0.07);border-radius:10px;overflow:hidden;flex-shrink:0">'
+                + '<div style="height:100%;width:'+chPct+'%;background:'+col+';border-radius:10px"></div>'
+              + '</div>'
+            + '</div>';
+          }).join('');
+
+          return '<div style="background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:16px;padding:18px;cursor:pointer" onclick="showSubject(\''+sid+'\',\'lessons\')">'
+            + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'
+              + '<div style="font-weight:800;font-size:0.95rem">' + (s.icon||'📚') + ' ' + (s.title||sid) + '</div>'
+              + '<div style="font-weight:800;font-size:1rem;color:'+col+'">' + prog + '%</div>'
+            + '</div>'
+            + '<div style="height:8px;background:rgba(255,255,255,0.07);border-radius:20px;overflow:hidden;margin-bottom:12px">'
+              + '<div style="height:100%;width:'+prog+'%;background:linear-gradient(90deg,'+col+','+col+'aa);border-radius:20px;transition:width 0.5s"></div>'
+            + '</div>'
+            + (chapterRows ? '<div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:6px;font-weight:700">الفصول:</div>' + chapterRows : '')
+          + '</div>';
+        }).join('');
+      })()}
     </div>
   `;
   
@@ -20948,9 +21026,14 @@ function refreshProgressBars() {
   });
 
   // Update APP.progress.subjectProgress for legacy compatibility
-  Object.keys(CURRICULUM).forEach(function(sid) {
+  var allSids2 = new Set(Object.keys(CURRICULUM));
+  ZAD_UPLOADS.getAll().forEach(function(u){ if(u.subjectId) allSids2.add(u.subjectId); });
+  allSids2.forEach(function(sid) {
     APP.progress.subjectProgress[sid] = calcSubjectProgress(sid);
   });
+
+  // Re-render the dashboard chart
+  try { renderProgressChart(); } catch(e) {}
 }
 
 // ── Override getLessonCompletion to use new system (safe) ──────

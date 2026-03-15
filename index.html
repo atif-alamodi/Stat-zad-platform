@@ -10613,15 +10613,22 @@ Identify REAL chapter/topic boundaries, not artificial ones. Max 8 topics.`
     upd('📚', `اكتُشف ${totalLessons} درس/موضوع في الملف`, 20);
 
     const langNote = isEng
-      ? `You are an expert English teacher for Arabic-speaking students.
-RULES: lessonTitle in English. definition/whyLearn/steps/summary in ARABIC (simple, detailed, accurate).
-keyTerms: term in ENGLISH, def in ARABIC. examples: in ENGLISH with Arabic explanation.
-mindMapBranches: ALL in ENGLISH. quiz: questions+options in ENGLISH, explanation in ARABIC.
-Explanations must be DETAILED, SIMPLE and ACCURATE.`
+      ? `You are an expert English language teacher for Arabic-speaking Saudi university students.
+CRITICAL RULES — MUST FOLLOW EXACTLY:
+1. lessonTitle: ENGLISH ONLY
+2. definition, whyLearn, steps, summary: Arabic only (simple, clear, beginner-friendly)
+3. keyTerms: term = ENGLISH, def = Arabic
+4. examples: title = ENGLISH, content = Arabic explanation
+5. mindMapBranches: ALL labels in ENGLISH
+6. quiz.q (question): ENGLISH ONLY — NEVER write in Arabic
+7. quiz.options (all 4 choices): ENGLISH ONLY — NEVER write in Arabic
+8. quiz.hint: ENGLISH ONLY
+9. quiz.explanation: Arabic only (explain why the answer is correct)
+VIOLATION: Writing Arabic in quiz.q or quiz.options is a critical error.`
       : `أنت مدرس خبير في ${subTitle}. اشرح بشكل مبسط جداً ومفصل ودقيق كأنك تشرح لمبتدئ.
 التعريف: 4-6 جمل مفصلة. الأمثلة: تطبيقية من الواقع. الأسئلة: من المحتوى مع شرح وافٍ.`;
 
-    const jsonTemplate = `{
+    const jsonTemplateAR = `{
   "lessonTitle": "عنوان دقيق",
   "definition": "تعريف مفصل وشامل (4-6 جمل مبسطة)",
   "whyLearn": ["أهمية 1", "أهمية 2", "أهمية 3"],
@@ -10637,14 +10644,41 @@ Explanations must be DETAILED, SIMPLE and ACCURATE.`
     {"label":"محور 4","color":"#FFD600","children":["فرع 1","فرع 2"]}
   ],
   "quiz": [
-    {"q":"سؤال 1","options":["صحيح","خطأ1","خطأ2","خطأ3"],"answer":0,"explanation":"شرح مفصل"},
-    {"q":"سؤال 2","options":["صحيح","خطأ1","خطأ2","خطأ3"],"answer":0,"explanation":"شرح"},
-    {"q":"سؤال 3","options":["صحيح","خطأ1","خطأ2","خطأ3"],"answer":0,"explanation":"شرح"},
-    {"q":"سؤال 4","options":["صحيح","خطأ1","خطأ2","خطأ3"],"answer":0,"explanation":"شرح"},
-    {"q":"سؤال 5","options":["صحيح","خطأ1","خطأ2","خطأ3"],"answer":0,"explanation":"شرح"}
+    {"q":"سؤال 1؟","options":["صحيح","خطأ1","خطأ2","خطأ3"],"answer":0,"hint":"تلميح","explanation":"شرح مفصل"},
+    {"q":"سؤال 2؟","options":["صحيح","خطأ1","خطأ2","خطأ3"],"answer":0,"hint":"تلميح","explanation":"شرح"},
+    {"q":"سؤال 3؟","options":["صحيح","خطأ1","خطأ2","خطأ3"],"answer":0,"hint":"تلميح","explanation":"شرح"},
+    {"q":"سؤال 4؟","options":["صحيح","خطأ1","خطأ2","خطأ3"],"answer":0,"hint":"تلميح","explanation":"شرح"},
+    {"q":"سؤال 5؟","options":["صحيح","خطأ1","خطأ2","خطأ3"],"answer":0,"hint":"تلميح","explanation":"شرح"}
   ],
   "summary": "ملخص شامل ومفصل"
 }`;
+
+    const jsonTemplateEN = `{
+  "lessonTitle": "Accurate English Title",
+  "definition": "Detailed definition in Arabic (4-6 simple sentences)",
+  "whyLearn": ["Importance 1 in Arabic", "Importance 2", "Importance 3"],
+  "keyTerms": [{"term":"English Term","def":"تعريف عربي مفصل"},{"term":"Term 2","def":"تعريف"},{"term":"Term 3","def":"تعريف"},{"term":"Term 4","def":"تعريف"},{"term":"Term 5","def":"تعريف"}],
+  "examples": [{"icon":"💡","title":"Example 1 in English","content":"Explanation in Arabic"},{"icon":"📌","title":"Example 2","content":"Explanation"},{"icon":"🔍","title":"Example 3","content":"Explanation"}],
+  "steps": ["Point 1 in Arabic","Point 2","Point 3","Point 4","Point 5"],
+  "properties": ["Property 1 in Arabic","Property 2","Property 3"],
+  "types": ["Type 1 in Arabic","Type 2","Type 3"],
+  "mindMapBranches": [
+    {"label":"Branch 1 EN","color":"#6C63FF","children":["Sub 1 EN","Sub 2 EN","Sub 3 EN"]},
+    {"label":"Branch 2 EN","color":"#FF6584","children":["Sub 1 EN","Sub 2 EN","Sub 3 EN"]},
+    {"label":"Branch 3 EN","color":"#00BFA5","children":["Sub 1 EN","Sub 2 EN"]},
+    {"label":"Branch 4 EN","color":"#FFD600","children":["Sub 1 EN","Sub 2 EN"]}
+  ],
+  "quiz": [
+    {"q":"Question 1 in English?","options":["Correct answer","Wrong option 1","Wrong option 2","Wrong option 3"],"answer":0,"hint":"Helpful hint in English","explanation":"شرح عربي مفصل للإجابة الصحيحة"},
+    {"q":"Question 2 in English?","options":["Correct answer","Wrong 1","Wrong 2","Wrong 3"],"answer":0,"hint":"English hint","explanation":"شرح عربي"},
+    {"q":"Question 3 in English?","options":["Correct","Wrong 1","Wrong 2","Wrong 3"],"answer":0,"hint":"English hint","explanation":"شرح عربي"},
+    {"q":"Question 4 in English?","options":["Correct","Wrong 1","Wrong 2","Wrong 3"],"answer":0,"hint":"English hint","explanation":"شرح عربي"},
+    {"q":"Question 5 in English?","options":["Correct","Wrong 1","Wrong 2","Wrong 3"],"answer":0,"hint":"English hint","explanation":"شرح عربي"}
+  ],
+  "summary": "ملخص شامل بالعربي"
+}`;
+
+    const jsonTemplate = isEng ? jsonTemplateEN : jsonTemplateAR;
 
     // ── STEP 2: Process each topic/lesson ─────────────────────
     const savedLessons = [];

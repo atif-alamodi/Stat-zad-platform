@@ -13200,26 +13200,14 @@ table { display: block; overflow-x: auto; max-width: 100%; }
       <div class="section-title">🧪 المختبر التفاعلي</div>
 
       <!-- Tab Switcher -->
-      <div style="display:flex;gap:10px;margin-bottom:24px;flex-wrap:wrap;">
-        <button id="lab-tab-python" onclick="switchLab('python')" style="
-          padding:10px 22px;border-radius:14px;border:2px solid #3776AB;
-          background:rgba(55,118,171,0.2);color:#6ab0e8;font-size:0.9rem;
-          font-weight:700;cursor:pointer;font-family:var(--font);transition:all 0.2s;
-          display:flex;align-items:center;gap:8px;
-        ">🐍 بيئة Python</button>
-        <button id="lab-tab-excel" onclick="switchLab('excel')" style="
-          padding:10px 22px;border-radius:14px;border:2px solid rgba(255,255,255,0.15);
-          background:rgba(255,255,255,0.05);color:var(--text-muted);font-size:0.9rem;
-          font-weight:700;cursor:pointer;font-family:var(--font);transition:all 0.2s;
-          display:flex;align-items:center;gap:8px;
-        ">📊 بيئة Excel</button>
-        <button id="lab-tab-subjects" onclick="switchLab('subjects')" style="
-          padding:10px 22px;border-radius:14px;border:2px solid rgba(255,255,255,0.15);
-          background:rgba(255,255,255,0.05);color:var(--text-muted);font-size:0.9rem;
-          font-weight:700;cursor:pointer;font-family:var(--font);transition:all 0.2s;
-          display:flex;align-items:center;gap:8px;
-        ">📚 مختبر المواد</button>
+      <div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;">
+        <button id="lab-tab-python" onclick="switchLab('python')" style="padding:9px 18px;border-radius:13px;border:2px solid #3776AB;background:rgba(55,118,171,0.2);color:#6ab0e8;font-size:0.85rem;font-weight:700;cursor:pointer;font-family:var(--font);display:flex;align-items:center;gap:6px">🐍 Python</button>
+        <button id="lab-tab-excel" onclick="switchLab('excel')" style="padding:9px 18px;border-radius:13px;border:2px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.05);color:var(--text-muted);font-size:0.85rem;font-weight:700;cursor:pointer;font-family:var(--font);display:flex;align-items:center;gap:6px">📊 Excel</button>
+        <button id="lab-tab-sim" onclick="switchLab('sim')" style="padding:9px 18px;border-radius:13px;border:2px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.05);color:var(--text-muted);font-size:0.85rem;font-weight:700;cursor:pointer;font-family:var(--font);display:flex;align-items:center;gap:6px">💾 المحاكيات</button>
+        <button id="lab-tab-subjects" onclick="switchLab('subjects')" style="padding:9px 18px;border-radius:13px;border:2px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.05);color:var(--text-muted);font-size:0.85rem;font-weight:700;cursor:pointer;font-family:var(--font);display:flex;align-items:center;gap:6px">📚 مختبر المواد</button>
       </div>
+      <!-- Simulators Panel -->
+      <div id="lab-sim" style="display:none;direction:rtl"></div>
       <!-- Subject Labs Panel -->
       <div id="lab-subjects" style="display:none"></div>
 
@@ -15791,23 +15779,24 @@ setInterval(() => {
 }, 120000);
 
 function switchLab(tab) {
-  var panels = ['python','excel','subjects'];
+  var panels = ['python','excel','sim','subjects'];
   panels.forEach(function(p) {
     var el = document.getElementById('lab-'+p);
     if (el) el.style.display = p === tab ? 'block' : 'none';
   });
 
   var styles = {
-    python:   { active: { border:'#3776AB', bg:'rgba(55,118,171,0.2)', color:'#6ab0e8' } },
-    excel:    { active: { border:'#217346', bg:'rgba(33,115,70,0.2)',   color:'#5cb888' } },
-    subjects: { active: { border:'var(--primary)', bg:'rgba(108,99,255,0.15)', color:'var(--primary)' } }
+    python:   { border:'#3776AB', bg:'rgba(55,118,171,0.2)',       color:'#6ab0e8' },
+    excel:    { border:'#217346', bg:'rgba(33,115,70,0.2)',         color:'#5cb888' },
+    sim:      { border:'#e879f9', bg:'rgba(232,121,249,0.15)',      color:'#e879f9' },
+    subjects: { border:'var(--primary)', bg:'rgba(108,99,255,0.15)', color:'var(--primary)' }
   };
   var inactive = { border:'rgba(255,255,255,0.15)', bg:'rgba(255,255,255,0.05)', color:'var(--text-muted)' };
 
   panels.forEach(function(p) {
     var btn = document.getElementById('lab-tab-'+p);
     if (!btn) return;
-    var st = (p === tab) ? styles[p].active : inactive;
+    var st = (p === tab) ? styles[p] : inactive;
     btn.style.borderColor = st.border;
     btn.style.background  = st.bg;
     btn.style.color       = st.color;
@@ -15815,43 +15804,83 @@ function switchLab(tab) {
 
   if (tab === 'excel' && !xlInitialized) initExcel();
 
+  if (tab === 'sim') {
+    var simPanel = document.getElementById('lab-sim');
+    if (simPanel) simPanel.innerHTML = buildSimulatorsPanel();
+  }
+
   if (tab === 'subjects') {
     var panel = document.getElementById('lab-subjects');
     if (panel) panel.innerHTML = buildSubjectLabsPanel();
   }
 }
 
+// Simulators panel — accessible to ALL students from the main lab
+function buildSimulatorsPanel() {
+  return '<div style="direction:rtl">'
+    + '<div style="font-weight:800;font-size:0.95rem;margin-bottom:16px;color:#e879f9">💾 المحاكيات التفاعلية — لكل الطلاب</div>'
+    + '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px">'
+      + ['💾 محاكي RAM','⚙️ دورة العمليات','📅 جدولة المعالج','🏗️ طبقات OS','📁 نظام الملفات'].map(function(label, i) {
+          var tabs = ['memory','process','sched','layers','fs'];
+          var cols = ['#e879f9','#60a5fa','#34d399','#a78bfa','#fbbf24'];
+          return '<button onclick="oslabSwitch(\'' + tabs[i] + '\')" '
+            + 'style="padding:8px 16px;border-radius:11px;border:1.5px solid '+cols[i]+'40;'
+            + 'background:'+cols[i]+'11;color:'+cols[i]+';font-family:var(--font);font-weight:700;'
+            + 'font-size:0.82rem;cursor:pointer">' + label + '</button>';
+        }).join('')
+    + '</div>'
+    + buildOSLab()
+  + '</div>';
+}
+
 function buildSubjectLabsPanel() {
-  var subjects = Object.values(CURRICULUM);
-  var labSubjects = subjects.filter(function(s) {
-    return ['statistics','python','os','communication','english'].includes(s.id);
-  });
+  // All subjects: built-in + custom + any with uploaded lessons
+  var allSids = new Set(Object.keys(CURRICULUM));
+  ZAD_UPLOADS.getAll().forEach(function(u){ if(u.subjectId) allSids.add(u.subjectId); });
+
+  var labSubjects = Array.from(allSids).map(function(sid) {
+    var s = CURRICULUM[sid];
+    if (!s) {
+      var saved = (typeof getCustomSubjects==='function') ? getCustomSubjects().find(function(x){return x.id===sid;}) : null;
+      s = saved || { id:sid, title:sid, icon:'📚', color:'#6C63FF' };
+    }
+    return s;
+  }).filter(function(s){ return s && s.id; });
+
+  if (!labSubjects.length) return '<div style="text-align:center;padding:30px;color:var(--text-muted)">لا توجد مواد بعد</div>';
 
   var selectedId = window._labSelectedSubject || labSubjects[0].id;
 
-  var selectorHTML = '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px">'
+  var selectorHTML = '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px;overflow-x:auto;padding-bottom:4px">'
     + labSubjects.map(function(s) {
         var active = s.id === selectedId;
-        return '<bonclick="selectSubjectLab('+s.id+')" padding:9px 16px;border-radius:12px;border:1.5px solid '+(active?s.color||'var(--primary)':'rgba(255,255,255,0.1)')+';'
-          + 'background:'+(active?'rgba(108,99,255,0.15)':'rgba(255,255,255,0.04)')+';'
-          + 'color:'+(active?s.color||'var(--primary)':'var(--text-muted)')+';'
-          + 'font-family:var(--font);font-weight:700;font-size:0.82rem;cursor:pointer">'
-          + (s.icon||'📚')+' '+(s.title||s.id)
+        var col = s.color || '#6C63FF';
+        return '<button onclick="selectSubjectLab(\'' + s.id + '\')" '
+          + 'style="flex-shrink:0;padding:7px 14px;border-radius:11px;border:1.5px solid '+(active?col+'99':'rgba(255,255,255,0.12)')+';'
+          + 'background:'+(active?col+'18':'rgba(255,255,255,0.04)')+';'
+          + 'color:'+(active?col:'var(--text-muted)')+';'
+          + 'font-family:var(--font);font-weight:700;font-size:0.8rem;cursor:pointer;white-space:nowrap">'
+          + (s.icon||'📚') + ' ' + (s.title||s.id).slice(0,18)
           + '</button>';
       }).join('')
     + '</div>';
 
   var labHTML = '';
+  var uploads = ZAD_UPLOADS.getAll().filter(function(u){ return u.subjectId===selectedId && u.lesson; });
+  var isStats  = (selectedId==='statistics'||selectedId==='sta104');
+  var isPython = (selectedId==='python');
+
   try {
-    if      (selectedId === 'communication') labHTML = buildCommLab();
-    else if (selectedId === 'english')       labHTML = buildEnglishLab(selectedId);
-    else if (selectedId === 'os')            labHTML = buildOSLab();
-    else if (selectedId === 'statistics')    labHTML = buildStatsLab();
-    else if (selectedId === 'python')        labHTML = buildPythonSubjectLab();
-    else labHTML = buildEmbeddedLab(selectedId);
+    if      (selectedId==='communication') labHTML = buildCommLab();
+    else if (selectedId==='english')       labHTML = buildEnglishLab(selectedId);
+    else if (selectedId==='os')            labHTML = buildOSLab();
+    else if (isStats)   labHTML = buildStatsLabFull(selectedId, uploads);
+    else if (isPython)  labHTML = buildPythonOnlyLab();
+    else if (uploads.length > 0)           labHTML = buildContentLab(selectedId) + '<div style="margin-top:16px">' + buildEmbeddedLab(selectedId) + '</div>';
+    else                                   labHTML = buildEmbeddedLab(selectedId);
   } catch(err) {
-    labHTML = '<div style="color:var(--text-muted);padding:20px;text-align:center">🔬 '
-      + 'مختبر '+selectedId+' — ارفع محتوى من تبويب المادة لتفعيله</div>';
+    labHTML = '<div style="color:var(--text-muted);padding:20px;text-align:center">🔬 ' + (err.message||'خطأ') + '</div>';
+    console.error('Lab error:', err);
   }
 
   return '<div style="direction:rtl">'+selectorHTML+'<div id="lab-subject-content">'+labHTML+'</div></div>';
@@ -15864,7 +15893,8 @@ function selectSubjectLab(subjectId) {
 }
 
 function buildStatsLab() {
-  return buildStatsLabFull('statistics', []);
+  var uploads = ZAD_UPLOADS.getAll().filter(function(u){ return (u.subjectId==='statistics'||u.subjectId==='sta104') && u.lesson; });
+  return buildStatsLabFull('statistics', uploads);
 }
 
 function buildStatsLabFull(subjectId, uploads) {

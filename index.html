@@ -3157,7 +3157,8 @@ function oslabSetAlgo(algo) {
 }
 
 function oslabAddProcess() {
-  _schedProcesses.push({name:'P'+(++_schedProcesses.length+1), arrival:0, burst:3});
+  var n = _schedProcesses.length + 1;
+  _schedProcesses.push({name:'P'+n, arrival:0, burst:3});
   oslabRenderSchedRows();
 }
 
@@ -3165,112 +3166,211 @@ function oslabRenderSchedRows() {
   const container = document.getElementById('sched-rows');
   if (!container) return;
   container.innerHTML = _schedProcesses.map((p,i) => `
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;align-items:center">
-      <input value="${p.name}" onchange="_schedProcesses[${i}].name=this.value"
-        style="padding:7px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.06);color:var(--text);font-family:var(--font);text-align:center;font-size:0.85rem">
-      <input type="number" value="${p.arrival}" min="0" onchange="_schedProcesses[${i}].arrival=+this.value"
-        style="padding:7px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.06);color:var(--text);font-family:var(--font);text-align:center;font-size:0.85rem">
-      <input type="number" value="${p.burst}" min="1" onchange="_schedProcesses[${i}].burst=+this.value"
-        style="padding:7px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.06);color:var(--text);font-family:var(--font);text-align:center;font-size:0.85rem">
-      <button onclick="_schedProcesses.splice(${i},1);oslabRenderSchedRows()" style="width:28px;height:28px;border-radius:8px;border:none;background:rgba(255,82,82,0.15);color:#FF5252;cursor:pointer;font-size:1rem">×</button>
+    <div data-sched-row="${i}" style="background:rgba(255,255,255,0.03);border:1px solid rgba(167,139,250,0.15);border-radius:12px;padding:10px 12px;margin-bottom:8px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <span style="font-size:0.72rem;color:#a78bfa;font-weight:700">العملية ${i+1}</span>
+        <button onclick="_schedProcesses.splice(${i},1);oslabRenderSchedRows()"
+          style="width:24px;height:24px;border-radius:6px;border:none;background:rgba(255,82,82,0.15);color:#FF5252;cursor:pointer;font-size:0.85rem;line-height:1">×</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+        <div>
+          <div style="font-size:0.65rem;color:var(--text-muted);margin-bottom:3px;text-align:center">الاسم</div>
+          <input value="${p.name}" oninput="_schedProcesses[${i}].name=this.value"
+            style="width:100%;box-sizing:border-box;padding:7px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.06);color:var(--text);font-family:var(--font);text-align:center;font-size:0.88rem;outline:none">
+        </div>
+        <div>
+          <div style="font-size:0.65rem;color:var(--text-muted);margin-bottom:3px;text-align:center">وقت الوصول</div>
+          <input type="number" value="${p.arrival}" min="0" oninput="_schedProcesses[${i}].arrival=parseInt(this.value)||0"
+            style="width:100%;box-sizing:border-box;padding:7px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.06);color:var(--text);font-family:var(--font);text-align:center;font-size:0.88rem;outline:none">
+        </div>
+        <div>
+          <div style="font-size:0.65rem;color:var(--text-muted);margin-bottom:3px;text-align:center">وقت التنفيذ</div>
+          <input type="number" value="${p.burst}" min="1" oninput="_schedProcesses[${i}].burst=parseInt(this.value)||1"
+            style="width:100%;box-sizing:border-box;padding:7px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.06);color:var(--text);font-family:var(--font);text-align:center;font-size:0.88rem;outline:none">
+        </div>
+      </div>
     </div>`).join('');
 }
 
 function oslabRunSched() {
-  const procs = _schedProcesses.map(p=>({...p, remaining:p.burst}));
-  let timeline = [];
-  const quantum = parseInt(document.getElementById('sched-quantum')?.value||2);
+  // Read fresh values from inputs before running
+  const rows = document.querySelectorAll('[data-sched-row]');
+  rows.forEach(function(row) {
+    const i   = parseInt(row.dataset.schedRow);
+    const inp = row.querySelectorAll('input');
+    if (inp[0]) _schedProcesses[i].name    = inp[0].value || _schedProcesses[i].name;
+    if (inp[1]) _schedProcesses[i].arrival = parseInt(inp[1].value) || 0;
+    if (inp[2]) _schedProcesses[i].burst   = parseInt(inp[2].value) || 1;
+  });
 
+  const procs   = _schedProcesses.map(function(p){ return Object.assign({}, p, {remaining: p.burst}); });
+  var   timeline = [];
+  const quantum = parseInt((document.getElementById('sched-quantum') || {value:'2'}).value) || 2;
+  var algoName = {fcfs:'FCFS (First Come First Serve)', sjf:'SJF (Shortest Job First)', rr:'Round Robin (Quantum='+quantum+')'}[_schedAlgo];
+
+  // ── FCFS ──────────────────────────────────────────
   if (_schedAlgo === 'fcfs') {
-    let t = 0;
-    [...procs].sort((a,b)=>a.arrival-b.arrival).forEach(p => {
+    var t = 0;
+    procs.slice().sort(function(a,b){return a.arrival-b.arrival;}).forEach(function(p) {
       if (t < p.arrival) t = p.arrival;
       timeline.push({name:p.name, start:t, end:t+p.burst});
       t += p.burst;
     });
+
+  // ── SJF (Non-preemptive) ───────────────────────────
   } else if (_schedAlgo === 'sjf') {
-    let t = 0, done = 0, q = [];
-    const sorted = [...procs].sort((a,b)=>a.arrival-b.arrival);
-    while(done < procs.length) {
-      sorted.forEach(p=>{ if(p.arrival<=t && !p._done && !q.includes(p)) q.push(p); });
-      if(!q.length){t++;continue;}
-      q.sort((a,b)=>a.burst-b.burst);
-      const p=q.shift(); p._done=true; done++;
-      timeline.push({name:p.name, start:t, end:t+p.burst}); t+=p.burst;
+    var t = 0, done = 0;
+    var remaining = procs.slice().sort(function(a,b){return a.arrival-b.arrival;});
+    var ready = [];
+    while (done < procs.length) {
+      // Add all arrived processes to ready queue
+      for (var i = remaining.length - 1; i >= 0; i--) {
+        if (remaining[i].arrival <= t) {
+          ready.push(remaining.splice(i, 1)[0]);
+        }
+      }
+      if (!ready.length) {
+        // CPU idle — jump to next arrival
+        t = remaining.length ? remaining[0].arrival : t + 1;
+        continue;
+      }
+      // Pick shortest burst
+      ready.sort(function(a,b){return a.burst - b.burst;});
+      var p = ready.shift();
+      timeline.push({name:p.name, start:t, end:t+p.burst});
+      t += p.burst;
+      done++;
+      // Add newly arrived processes
+      for (var i = remaining.length - 1; i >= 0; i--) {
+        if (remaining[i].arrival <= t) {
+          ready.push(remaining.splice(i, 1)[0]);
+        }
+      }
     }
+
+  // ── Round Robin ────────────────────────────────────
   } else {
-    let t = 0, done = 0, queue = [], idx = 0;
-    const sorted = [...procs].sort((a,b)=>a.arrival-b.arrival);
-    while(done < procs.length) {
-      while(idx < sorted.length && sorted[idx].arrival <= t) queue.push(sorted[idx++]);
-      if(!queue.length){t++;if(idx<sorted.length) continue; else break;}
-      const p = queue.shift();
-      const run = Math.min(quantum, p.remaining);
+    var t = 0, done = 0, queue = [], idx = 0;
+    var sorted = procs.slice().sort(function(a,b){return a.arrival-b.arrival;});
+    var maxIter = procs.length * 200 + 100; // safety limit
+    var iter = 0;
+    while (done < procs.length && iter++ < maxIter) {
+      while (idx < sorted.length && sorted[idx].arrival <= t) {
+        queue.push(sorted[idx++]);
+      }
+      if (!queue.length) {
+        t = sorted[idx] ? sorted[idx].arrival : t + 1;
+        continue;
+      }
+      var p   = queue.shift();
+      var run = Math.min(quantum, p.remaining);
       timeline.push({name:p.name, start:t, end:t+run});
-      t += run; p.remaining -= run;
-      while(idx < sorted.length && sorted[idx].arrival <= t) queue.push(sorted[idx++]);
-      if(p.remaining > 0) queue.push(p); else done++;
+      t += run;
+      p.remaining -= run;
+      // Newly arrived during this quantum
+      while (idx < sorted.length && sorted[idx].arrival <= t) {
+        queue.push(sorted[idx++]);
+      }
+      if (p.remaining > 0) queue.push(p); else done++;
     }
   }
 
-  const stats = {};
-  _schedProcesses.forEach(p => stats[p.name]={burst:p.burst,arrival:p.arrival,finish:0,wait:0,turnaround:0});
-  timeline.forEach(t=>{ if(t.end > (stats[t.name]?.finish||0)) stats[t.name].finish=t.end; });
-  Object.keys(stats).forEach(n=>{ stats[n].turnaround=stats[n].finish-stats[n].arrival; stats[n].wait=stats[n].turnaround-stats[n].burst; });
+  if (!timeline.length) {
+    var ganttEl = document.getElementById('sched-gantt');
+    if (ganttEl) ganttEl.innerHTML = '<div style="color:#FF5252;padding:10px">خطأ في الحساب — تحقق من البيانات</div>';
+    var res = document.getElementById('sched-results');
+    if (res) res.style.display = 'block';
+    return;
+  }
 
-  const total = timeline[timeline.length-1]?.end || 1;
-  const colors = ['#6C63FF','#00BFA5','#FF7043','#FFD600','#E91E63','#00B0FF'];
-  const colorMap = {};
-  _schedProcesses.forEach((p,i)=>colorMap[p.name]=colors[i%colors.length]);
+  // ── Statistics ────────────────────────────────────
+  var stats = {};
+  _schedProcesses.forEach(function(p) {
+    stats[p.name] = {burst:p.burst, arrival:p.arrival, finish:0, wait:0, turnaround:0, steps:[]};
+  });
+  timeline.forEach(function(seg) {
+    if (stats[seg.name]) {
+      stats[seg.name].finish = Math.max(stats[seg.name].finish, seg.end);
+      stats[seg.name].steps.push(seg.start+'→'+seg.end);
+    }
+  });
+  Object.keys(stats).forEach(function(n) {
+    stats[n].turnaround = stats[n].finish - stats[n].arrival;
+    stats[n].wait       = stats[n].turnaround - stats[n].burst;
+  });
 
-  const gantt = `
-    <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:14px;padding:16px">
-      <div style="font-weight:800;margin-bottom:14px;color:#00BFA5;direction:rtl">📊 مخطط Gantt</div>
-      <div style="display:flex;align-items:stretch;gap:0;border-radius:10px;overflow:hidden;margin-bottom:8px;min-height:48px">
-        ${timeline.map(seg=>`
-          <div style="flex:${seg.end-seg.start};background:${colorMap[seg.name]};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:0.82rem;color:white;min-width:24px;border-left:1px solid rgba(255,255,255,0.15)">
-            ${seg.name}
-          </div>`).join('')}
-      </div>
-      <div style="display:flex;gap:0;font-size:0.72rem;color:var(--text-muted)">
-        ${timeline.map(seg=>`<div style="flex:${seg.end-seg.start};text-align:left;padding-left:3px">${seg.start}</div>`).join('')}
-        <div style="width:24px;text-align:right">${total}</div>
-      </div>
+  var total  = timeline[timeline.length-1].end;
+  var COLORS = ['#6C63FF','#00BFA5','#FF7043','#FFD600','#E91E63','#00B0FF','#FF9800','#4CAF50'];
+  var colorMap = {};
+  _schedProcesses.forEach(function(p,i){ colorMap[p.name] = COLORS[i % COLORS.length]; });
 
-      <!-- Stats table -->
-      <div style="margin-top:16px;overflow-x:auto">
-        <table style="width:100%;border-collapse:collapse;font-size:0.82rem;direction:rtl">
-          <thead>
-            <tr style="color:var(--text-muted);border-bottom:1px solid var(--border)">
-              <th style="padding:8px;text-align:right">العملية</th>
-              <th style="padding:8px;text-align:center">وقت الوصول</th>
-              <th style="padding:8px;text-align:center">وقت التنفيذ</th>
-              <th style="padding:8px;text-align:center">وقت الانتهاء</th>
-              <th style="padding:8px;text-align:center">زمن الدوران</th>
-              <th style="padding:8px;text-align:center">وقت الانتظار</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${Object.entries(stats).map(([name,s])=>`
-              <tr style="border-bottom:1px solid rgba(255,255,255,0.05)">
-                <td style="padding:8px;font-weight:700;color:${colorMap[name]}">${name}</td>
-                <td style="padding:8px;text-align:center">${s.arrival}</td>
-                <td style="padding:8px;text-align:center">${s.burst}</td>
-                <td style="padding:8px;text-align:center">${s.finish}</td>
-                <td style="padding:8px;text-align:center;color:#FFD600">${s.turnaround}</td>
-                <td style="padding:8px;text-align:center;color:#FF7043">${s.wait}</td>
-              </tr>`).join('')}
-          </tbody>
-        </table>
-        <div style="margin-top:10px;display:flex;gap:20px;justify-content:center;font-size:0.83rem;color:var(--text-muted);flex-wrap:wrap">
-          <span>متوسط زمن الدوران: <strong style="color:#FFD600">${(Object.values(stats).reduce((s,v)=>s+v.turnaround,0)/Object.keys(stats).length).toFixed(1)} ms</strong></span>
-          <span>متوسط وقت الانتظار: <strong style="color:#FF7043">${(Object.values(stats).reduce((s,v)=>s+v.wait,0)/Object.keys(stats).length).toFixed(1)} ms</strong></span>
-        </div>
-      </div>
-    </div>`;
+  // ── Gantt chart HTML ──────────────────────────────
+  var ganttHTML =
+    '<div style="font-size:0.8rem;font-weight:700;color:#a78bfa;margin-bottom:8px">خوارزمية: '+algoName+'</div>'
+    // Bars
+    + '<div style="display:flex;align-items:stretch;border-radius:10px;overflow:hidden;min-height:50px;margin-bottom:4px">'
+    + timeline.map(function(seg){
+        var w = seg.end - seg.start;
+        return '<div style="flex:'+w+';background:'+colorMap[seg.name]+';display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:'+Math.max(20,w*8)+'px;border-left:1px solid rgba(255,255,255,0.2);padding:4px 2px">'
+          + '<span style="font-weight:800;font-size:0.8rem;color:white">'+seg.name+'</span>'
+          + '<span style="font-size:0.6rem;color:rgba(255,255,255,0.75)">'+w+'</span>'
+        + '</div>';
+      }).join('')
+    + '</div>'
+    // Time labels
+    + '<div style="display:flex;font-size:0.65rem;color:var(--text-muted);margin-bottom:14px">'
+    + timeline.map(function(seg,i){
+        return '<div style="flex:'+(seg.end-seg.start)+';text-align:left;padding-left:2px;min-width:'+Math.max(20,(seg.end-seg.start)*8)+'px">'+seg.start+'</div>';
+      }).join('')
+    + '<div style="width:20px;text-align:right;font-weight:700;color:#a78bfa">'+total+'</div>'
+    + '</div>';
 
-  const out = document.getElementById('sched-output');
-  if(out) out.innerHTML = gantt;
+  // ── Stats table ────────────────────────────────────
+  var avgTurn = Object.values(stats).reduce(function(s,v){return s+v.turnaround;},0) / Object.keys(stats).length;
+  var avgWait = Object.values(stats).reduce(function(s,v){return s+v.wait;},0) / Object.keys(stats).length;
+
+  var tableHTML =
+    '<div style="overflow-x:auto;margin-top:4px">'
+    + '<table style="width:100%;border-collapse:collapse;font-size:0.8rem;direction:rtl">'
+    + '<thead><tr style="background:rgba(167,139,250,0.1)">'
+    + '<th style="padding:7px 10px;text-align:right;color:#a78bfa">العملية</th>'
+    + '<th style="padding:7px;text-align:center;color:var(--text-muted)">وصول</th>'
+    + '<th style="padding:7px;text-align:center;color:var(--text-muted)">تنفيذ</th>'
+    + '<th style="padding:7px;text-align:center;color:var(--text-muted)">انتهاء</th>'
+    + '<th style="padding:7px;text-align:center;color:#FFD600">دوران</th>'
+    + '<th style="padding:7px;text-align:center;color:#FF7043">انتظار</th>'
+    + (_schedAlgo==='rr' ? '<th style="padding:7px;text-align:center;color:var(--text-muted)">الخطوات</th>' : '')
+    + '</tr></thead><tbody>'
+    + Object.entries(stats).map(function(entry){
+        var n=entry[0], s=entry[1];
+        return '<tr style="border-bottom:1px solid rgba(255,255,255,0.05)">'
+          + '<td style="padding:7px 10px;font-weight:800;color:'+colorMap[n]+'">'+n+'</td>'
+          + '<td style="padding:7px;text-align:center">'+s.arrival+'</td>'
+          + '<td style="padding:7px;text-align:center">'+s.burst+'</td>'
+          + '<td style="padding:7px;text-align:center;font-weight:700">'+s.finish+'</td>'
+          + '<td style="padding:7px;text-align:center;color:#FFD600;font-weight:700">'+s.turnaround+'</td>'
+          + '<td style="padding:7px;text-align:center;color:#FF7043;font-weight:700">'+s.wait+'</td>'
+          + (_schedAlgo==='rr' ? '<td style="padding:7px;text-align:center;font-size:0.65rem;color:var(--text-muted)">'+s.steps.join(' ')+'</td>' : '')
+        + '</tr>';
+      }).join('')
+    + '</tbody></table>'
+    + '<div style="display:flex;gap:20px;justify-content:center;margin-top:10px;flex-wrap:wrap;font-size:0.82rem">'
+    + '<span style="color:var(--text-muted)">متوسط زمن الدوران: <strong style="color:#FFD600">'+avgTurn.toFixed(2)+'</strong></span>'
+    + '<span style="color:var(--text-muted)">متوسط وقت الانتظار: <strong style="color:#FF7043">'+avgWait.toFixed(2)+'</strong></span>'
+    + '<span style="color:var(--text-muted)">كفاءة CPU: <strong style="color:#00BFA5">'+((procs.reduce(function(s,p){return s+p.burst;},0)/total)*100).toFixed(1)+'%</strong></span>'
+    + '</div>'
+    + '</div>';
+
+  // ── Render to the correct DOM elements ──
+  var ganttEl   = document.getElementById('sched-gantt');
+  var tableEl   = document.getElementById('sched-table');
+  var resultsEl = document.getElementById('sched-results');
+  if (ganttEl)   ganttEl.innerHTML   = ganttHTML;
+  if (tableEl)   tableEl.innerHTML   = tableHTML;
+  if (resultsEl) resultsEl.style.display = 'block';
+
+  // Scroll results into view
+  if (resultsEl) setTimeout(function(){ resultsEl.scrollIntoView({behavior:'smooth', block:'nearest'}); }, 100);
 }
 
 function buildOSMemoryPanel() {

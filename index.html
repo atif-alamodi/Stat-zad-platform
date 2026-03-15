@@ -942,6 +942,7 @@ print(f"الأعلى : {df['الدرجة'].max()}")`,
 
   english: {
     id: 'english',
+    lang: 'en',
     title: 'الإنجليزية التطبيقية',
     titleEn: 'Applied English — ELG201',
     icon: '🇺🇸',
@@ -14748,33 +14749,27 @@ function renderExamQuestion() {
   const q = state.questions[state.current];
   const idx = state.current;
   const total = state.questions.length;
-  const isEng = state.subj === 'english';
+  const sid = state.subj;
 
   const pct = (idx / total) * 100;
   const progEl = document.getElementById('quiz-progress');
   if(progEl) progEl.style.width = pct + '%';
   const cntEl = document.getElementById('quiz-counter');
-  if(cntEl) cntEl.textContent = (isEng?'Question ':'السؤال ') + (idx+1) + (isEng?' of ':' من ') + total;
+  if(cntEl) cntEl.textContent = ZAD_LANG.ui('question',sid) + ' ' + (idx+1) + ' / ' + total;
 
   const diffBadge = {
-    easy:   isEng ? 'Easy 🟢'   : 'سهل 🟢',
-    medium: isEng ? 'Medium 🟡' : 'متوسط 🟡',
-    hard:   isEng ? 'Hard 🔴'   : 'صعب 🔴'
-  }[q.difficulty||'medium'] || (isEng?'Medium 🟡':'متوسط 🟡');
-  
+    easy:   ZAD_LANG.ui('easy',sid)+' 🟢',
+    medium: ZAD_LANG.ui('medium',sid)+' 🟡',
+    hard:   ZAD_LANG.ui('hard',sid)+' 🔴'
+  }[q.difficulty||'medium'] || ZAD_LANG.ui('medium',sid)+' 🟡';
   const diffColor = {easy:'rgba(0,191,165,0.15)',medium:'rgba(255,214,0,0.15)',hard:'rgba(255,82,82,0.15)'}[q.difficulty||'medium'];
-  const pageLabel = isEng ? '📄 pg.' : '📄 ص';
-  const hintLabel = isEng ? '💡 Hint' : '💡 تلميح';
-  const nextLabel = isEng ? 'Next →' : 'التالي ←';
-  const endLabel  = isEng ? '🏁 Finish Exam' : '🏁 إنهاء الاختبار';
-  const optLetters = isEng ? ['A','B','C','D'] : ['A','B','C','D'];
-  const textDir = isEng ? 'ltr' : 'rtl';
+  const pageLabel = ZAD_LANG.ui('page', sid);
+  const hintLabel = ZAD_LANG.ui('hint_btn', sid);
+  const nextLabel = idx < total-1 ? ZAD_LANG.ui('next_exam',sid) : ZAD_LANG.ui('finish_exam',sid);
+  const textDir = ZAD_LANG.dir(sid);
 
   document.getElementById('quiz-content').innerHTML = `
-    <div style="
-      background:rgba(255,255,255,0.04);border:1px solid var(--border);
-      border-radius:20px;padding:28px;margin-bottom:16px;
-    ">
+    <div style="background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:20px;padding:28px;margin-bottom:16px;">
       <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center;">
         <span style="background:${diffColor};padding:4px 12px;border-radius:20px;font-size:0.75rem;font-weight:700;">${diffBadge}</span>
         <span style="font-size:0.75rem;color:var(--text-muted);">${pageLabel} ${q.page||'—'}</span>
@@ -14785,19 +14780,10 @@ function renderExamQuestion() {
       <div id="exam-opts">
         ${q.options.map((opt, i) => `
           <div id="exam-opt-${i}" onclick="selectExamOption(${i})"
-            style="
-              display:flex;align-items:center;gap:14px;padding:14px 16px;
-              background:rgba(255,255,255,0.03);border:1.5px solid var(--border);
-              border-radius:14px;margin-bottom:8px;cursor:pointer;
-              transition:all 0.2s;font-size:0.95rem;direction:${textDir};
-            "
+            style="display:flex;align-items:center;gap:14px;padding:14px 16px;background:rgba(255,255,255,0.03);border:1.5px solid var(--border);border-radius:14px;margin-bottom:8px;cursor:pointer;transition:all 0.2s;font-size:0.95rem;direction:${textDir};"
             onmouseenter="if(!this.dataset.locked)this.style.borderColor='var(--primary)'"
             onmouseleave="if(!this.dataset.locked)this.style.borderColor='var(--border)'">
-            <div style="
-              width:30px;height:30px;border-radius:9px;flex-shrink:0;
-              background:rgba(255,255,255,0.07);display:flex;align-items:center;
-              justify-content:center;font-weight:800;font-size:0.8rem;
-            ">${String.fromCharCode(65+i)}</div>
+            <div style="width:30px;height:30px;border-radius:9px;flex-shrink:0;background:rgba(255,255,255,0.07);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:0.8rem;">${String.fromCharCode(65+i)}</div>
             <span>${opt}</span>
           </div>
         `).join('')}
@@ -14807,7 +14793,7 @@ function renderExamQuestion() {
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;">
       <button onclick="showExamHint()" style="flex:1;min-width:60px;padding:12px;background:rgba(255,214,0,0.1);border:1px solid rgba(255,214,0,0.25);border-radius:12px;color:#FFD600;font-family:var(--font);font-weight:700;cursor:pointer;font-size:0.85rem;">${hintLabel}</button>
-      ${idx > 0 ? `<button onclick="prevExamQuestion()" style="flex:1;min-width:80px;padding:12px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:12px;color:var(--text-muted);font-family:var(--font);font-weight:700;cursor:pointer;font-size:0.85rem;">${isEng?'← Prev':'← السابق'}</button>` : ''}
+      ${idx > 0 ? `<button onclick="prevExamQuestion()" style="flex:1;min-width:80px;padding:12px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:12px;color:var(--text-muted);font-family:var(--font);font-weight:700;cursor:pointer;font-size:0.85rem;">${ZAD_LANG.ui('prev_exam', sid)}</button>` : ''}
       <button id="exam-next-btn" onclick="nextExamQuestion()" disabled style="flex:2;min-width:100px;padding:12px;background:var(--primary);border:none;border-radius:12px;color:white;font-family:var(--font);font-weight:800;cursor:pointer;font-size:0.88rem;opacity:0.4;">${nextLabel}</button>
     </div>
   `;
@@ -14816,51 +14802,41 @@ function renderExamQuestion() {
 function selectExamOption(i) {
   const q = examState.questions[examState.current];
   const correct = q.answer;
-  const isEng = examState.subj === 'english';
-  const textDir = isEng ? 'ltr' : 'rtl';
+  const sid = examState.subj;
+  const dir = ZAD_LANG.dir(sid);
 
   document.querySelectorAll('[id^="exam-opt-"]').forEach(el => {
-    el.style.cursor = 'default';
-    el.dataset.locked = '1';
+    el.style.cursor = 'default'; el.dataset.locked = '1';
     el.onmouseenter = null; el.onmouseleave = null;
   });
 
   const selectedEl = document.getElementById('exam-opt-'+i);
   const correctEl  = document.getElementById('exam-opt-'+correct);
-
   if(i === correct) {
     selectedEl.style.background = 'rgba(0,230,118,0.12)';
     selectedEl.style.borderColor = 'var(--success)';
-    selectedEl.style.color = 'var(--success)';
   } else {
     selectedEl.style.background = 'rgba(255,82,82,0.12)';
     selectedEl.style.borderColor = 'var(--danger)';
-    if(correctEl) {
-      correctEl.style.background = 'rgba(0,230,118,0.1)';
-      correctEl.style.borderColor = 'var(--success)';
-    }
+    if(correctEl){ correctEl.style.background='rgba(0,230,118,0.1)'; correctEl.style.borderColor='var(--success)'; }
   }
 
   examState.answers[examState.current] = i;
 
-  // Show explanation
   const exp = document.getElementById('exam-exp-box');
   if(exp) {
     exp.style.display = 'block';
-    exp.style.direction = textDir;
-    const wrongMsg = isEng
-      ? '❌ Wrong. Correct: <strong style="color:var(--success)">' + q.options[correct] + '</strong>. '
-      : '❌ الصحيح: <strong style="color:var(--success)">' + q.options[correct] + '</strong>. ';
-    exp.innerHTML = (i===correct ? (isEng?'✅ Correct! ':'✅ ') : wrongMsg) + (q.explanation||'');
+    exp.style.direction = dir;
+    const wrongMsg = ZAD_LANG.ui('wrong',sid) + '. '
+      + ZAD_LANG.ui('right_ans',sid) + ' <strong style="color:var(--success)">' + q.options[correct] + '</strong>. ';
+    exp.innerHTML = (i===correct ? ZAD_LANG.ui('correct',sid)+' ' : wrongMsg) + (q.explanation||'');
   }
 
-  // Show navigation buttons (no auto-advance)
   const nb = document.getElementById('exam-next-btn');
   if(nb) {
-    nb.disabled = false;
-    nb.style.opacity = '1';
+    nb.disabled = false; nb.style.opacity = '1';
     const isLast = examState.current >= examState.questions.length - 1;
-    nb.textContent = isLast ? (isEng?'🏁 Finish Exam':'🏁 إنهاء الاختبار') : (isEng?'Next →':'التالي ←');
+    nb.textContent = isLast ? ZAD_LANG.ui('finish_exam',sid) : ZAD_LANG.ui('next_exam',sid);
   }
 }
 
@@ -18042,21 +18018,20 @@ function renderAIQuizQuestion() {
   var q = state.questions[state.current];
   if (!q) return buildAIQuizResult();
 
-  var isEng = state.isEnglish || state.subjectId === 'english';
+  var sid = state.subjectId;
   var pct = Math.round((state.current / state.questions.length) * 100);
   var diffColor = q.difficulty==='easy' ? '#66BB6A' : q.difficulty==='hard' ? '#EF5350' : '#FFA726';
-  var diffLabel = q.difficulty==='easy'  ? (isEng?'Easy':'سهل')
-                : q.difficulty==='hard'  ? (isEng?'Hard':'صعب')
-                : (isEng?'Medium':'متوسط');
-  var letters = isEng ? ['A','B','C','D'] : ['أ','ب','ج','د'];
-  var qLabel  = isEng ? 'Question' : 'سؤال';
-  var pageLabel = isEng ? '📄 pg.' : '📄 ص';
+  var diffLabel = q.difficulty==='easy'  ? ZAD_LANG.ui('easy',sid)
+                : q.difficulty==='hard'  ? ZAD_LANG.ui('hard',sid)
+                : ZAD_LANG.ui('medium',sid);
+  var letters = ZAD_LANG.letters(sid);
+  var dir = ZAD_LANG.dir(sid);
 
   var opts = (q.options||[]).map(function(opt, i) {
     return '<div onclick="selectAIQuizOption('+i+')" id="aiqopt-'+i+'"'
       + ' style="padding:12px 16px;border-radius:12px;border:1.5px solid rgba(255,255,255,0.1);'
       + 'background:rgba(255,255,255,0.04);cursor:pointer;transition:all 0.2s;'
-      + 'font-size:0.85rem;margin-bottom:8px;direction:'+(isEng?'ltr':'rtl')+';display:flex;align-items:center;gap:10px">'
+      + 'font-size:0.85rem;margin-bottom:8px;direction:'+dir+';display:flex;align-items:center;gap:10px">'
       + '<span style="width:26px;height:26px;border-radius:50%;background:rgba(108,99,255,0.15);'
       + 'display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:800;'
       + 'color:var(--primary);flex-shrink:0">'+letters[i]+'</span>'
@@ -18068,16 +18043,16 @@ function renderAIQuizQuestion() {
     + '<div style="background:rgba(255,255,255,0.06);border-radius:99px;height:4px;margin-bottom:14px">'
       + '<div style="height:4px;background:linear-gradient(90deg,var(--primary),#a78bfa);width:'+pct+'%;border-radius:99px"></div>'
     + '</div>'
-    + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">'
-      + '<span style="font-size:0.7rem;color:var(--text-muted);font-weight:700">'+qLabel+' '+(state.current+1)+' / '+state.questions.length+'</span>'
+    + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;direction:rtl">'
+      + '<span style="font-size:0.7rem;color:var(--text-muted);font-weight:700">'+ZAD_LANG.ui('question',sid)+' '+(state.current+1)+' / '+state.questions.length+'</span>'
       + '<span style="font-size:0.68rem;padding:2px 8px;border-radius:20px;background:'+diffColor+'18;color:'+diffColor+';border:1px solid '+diffColor+'40">'+diffLabel+'</span>'
       + (q.lesson ? '<span style="font-size:0.68rem;color:var(--text-muted);margin-right:auto">📖 '+q.lesson+'</span>' : '')
-      + (q.page ? '<span style="font-size:0.68rem;padding:2px 8px;border-radius:20px;background:rgba(255,255,255,0.06);color:var(--text-muted)">'+pageLabel+' '+q.page+'</span>' : '')
+      + (q.page ? '<span style="font-size:0.68rem;padding:2px 8px;border-radius:20px;background:rgba(255,255,255,0.06);color:var(--text-muted)">'+ZAD_LANG.ui('page',sid)+' '+q.page+'</span>' : '')
     + '</div>'
-    + '<div style="font-weight:800;font-size:0.92rem;margin-bottom:16px;line-height:1.7;direction:'+(isEng?'ltr':'rtl')+'">'+q.q+'</div>'
+    + '<div style="font-weight:800;font-size:0.92rem;margin-bottom:16px;line-height:1.7;direction:'+dir+'">'+q.q+'</div>'
     + opts
-    + (q.hint ? '<button onclick="document.getElementById(\'quiz-hint-box\').style.display=\'block\';this.style.display=\'none\'" style="margin-top:8px;padding:6px 14px;border-radius:8px;border:1px solid rgba(255,214,0,0.3);background:rgba(255,214,0,0.06);color:#FFD600;font-size:0.78rem;cursor:pointer;font-family:var(--font)">'+(isEng?'💡 Hint':'💡 تلميح')+'</button>' : '')
-    + (q.hint ? '<div id="quiz-hint-box" style="display:none;margin-top:8px;padding:10px;border-radius:10px;background:rgba(255,214,0,0.06);border:1px solid rgba(255,214,0,0.2);font-size:0.8rem;color:#FFD600;direction:'+(isEng?'ltr':'rtl')+'">💡 '+q.hint+'</div>' : '')
+    + (q.hint ? '<button onclick="document.getElementById(\'quiz-hint-box\').style.display=\'block\';this.style.display=\'none\'" style="margin-top:8px;padding:6px 14px;border-radius:8px;border:1px solid rgba(255,214,0,0.3);background:rgba(255,214,0,0.06);color:#FFD600;font-size:0.78rem;cursor:pointer;font-family:var(--font)">'+ZAD_LANG.ui('hint',sid)+'</button>' : '')
+    + (q.hint ? '<div id="quiz-hint-box" style="display:none;margin-top:8px;padding:10px;border-radius:10px;background:rgba(255,214,0,0.06);border:1px solid rgba(255,214,0,0.2);font-size:0.8rem;color:#FFD600;direction:'+dir+'">💡 '+q.hint+'</div>' : '')
     + '<div id="ai-quiz-feedback" style="display:none;margin-top:12px;padding:12px;border-radius:12px;font-size:0.83rem;line-height:1.6"></div>'
     + '<div id="ai-quiz-nav" style="display:none"></div>'
   + '</div>';
@@ -18092,45 +18067,41 @@ function selectAIQuizOption(i) {
   var correct = i === q.answer;
   if (correct) state.score++;
   state.answers.push(i);
-  var isEng = state.isEnglish || state.subjectId === 'english';
+  var sid = state.subjectId;
+  var dir = ZAD_LANG.dir(sid);
 
-  // Color options
+  // Lock and color options
   document.querySelectorAll('[id^="aiqopt-"]').forEach(function(el, idx) {
     el.onclick = null; el.style.cursor = 'default';
     if (idx === q.answer) {
-      el.style.background = 'rgba(102,187,106,0.2)';
-      el.style.borderColor = '#66BB6A';
+      el.style.background = 'rgba(102,187,106,0.2)'; el.style.borderColor = '#66BB6A';
     } else if (idx === i && !correct) {
-      el.style.background = 'rgba(239,83,80,0.15)';
-      el.style.borderColor = '#EF5350';
-    } else {
-      el.style.opacity = '0.45';
-    }
+      el.style.background = 'rgba(239,83,80,0.15)'; el.style.borderColor = '#EF5350';
+    } else { el.style.opacity = '0.45'; }
   });
 
-  // Show feedback
+  // Feedback
   var fb = document.getElementById('ai-quiz-feedback');
   if (fb) {
     fb.style.display = 'block';
+    fb.style.direction = dir;
     fb.style.background = correct ? 'rgba(102,187,106,0.1)' : 'rgba(239,83,80,0.08)';
     fb.style.border = '1.5px solid '+(correct?'rgba(102,187,106,0.35)':'rgba(239,83,80,0.3)');
-    fb.style.direction = isEng ? 'ltr' : 'rtl';
     var h = '<div style="font-weight:800;font-size:0.88rem;margin-bottom:6px;color:'+(correct?'#66BB6A':'#EF5350')+'">'
-      + (correct ? (isEng?'✅ Correct!':'✅ إجابة صحيحة!') : (isEng?'❌ Wrong answer':'❌ إجابة خاطئة'))
-      + '</div>';
-    if (!correct) h += '<div style="font-size:0.83rem;margin-bottom:6px">'+(isEng?'✔️ Correct answer:':'✔️ الصحيح:')+' <strong style="color:#66BB6A">'+(q.options[q.answer]||'')+'</strong></div>';
+      + ZAD_LANG.ui(correct?'correct':'wrong', sid) + '</div>';
+    if (!correct) h += '<div style="font-size:0.83rem;margin-bottom:6px">'+ZAD_LANG.ui('right_ans',sid)+' <strong style="color:#66BB6A">'+(q.options[q.answer]||'')+'</strong></div>';
     if (q.hint) h += '<div style="font-size:0.8rem;color:#FFD600;margin-bottom:5px">💡 '+q.hint+'</div>';
-    if (q.explanation) h += '<div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:5px;line-height:1.6">'+(isEng?'📝 ':'📝 ')+q.explanation+'</div>';
+    if (q.explanation) h += '<div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:5px;line-height:1.6">'+ZAD_LANG.ui('explanation',sid)+' '+q.explanation+'</div>';
     if (q.lesson||q.page) {
       h += '<div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.07);display:flex;flex-wrap:wrap;gap:10px">';
       if (q.lesson) h += '<span>📖 '+q.lesson+'</span>';
-      if (q.page)   h += '<span>'+(isEng?'📄 pg.':'📄 ص')+' '+q.page+'</span>';
+      if (q.page)   h += '<span>'+ZAD_LANG.ui('page',sid)+' '+q.page+'</span>';
       h += '</div>';
     }
     fb.innerHTML = h;
   }
 
-  // Show hint box
+  // Show hint
   var hbox = document.getElementById('quiz-hint-box');
   if (hbox) hbox.style.display = 'block';
   var hbtn = document.querySelector('button[onclick*="quiz-hint-box"]');
@@ -18139,18 +18110,16 @@ function selectAIQuizOption(i) {
   state.current++;
   window._ZAD_AI_QUIZ_SELECTED = -1;
 
-  // Show navigation buttons (Next / Previous) instead of auto-advance
+  // Navigation buttons
   var navArea = document.getElementById('ai-quiz-nav');
   if (navArea) {
     var isLast = state.current >= state.questions.length;
     var hasPrev = state.current > 1;
-    navArea.innerHTML =
-      '<div style="display:flex;gap:8px;margin-top:10px">'
-      + (hasPrev ? '<button onclick="quizGoBack()" style="flex:1;padding:10px;border-radius:12px;border:1px solid var(--border);background:rgba(255,255,255,0.05);cursor:pointer;font-family:var(--font);font-weight:700;font-size:0.85rem;color:var(--text-muted)">'+(isEng?'← Previous':'← السابق')+'</button>' : '<div style="flex:1"></div>')
+    navArea.innerHTML = '<div style="display:flex;gap:8px;margin-top:10px">'
+      + (hasPrev ? '<button onclick="quizGoBack()" style="flex:1;padding:10px;border-radius:12px;border:1px solid var(--border);background:rgba(255,255,255,0.05);cursor:pointer;font-family:var(--font);font-weight:700;font-size:0.85rem;color:var(--text-muted)">'+ZAD_LANG.ui('prev',sid)+'</button>' : '<div style="flex:1"></div>')
       + '<button onclick="quizGoNext()" style="flex:2;padding:10px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--primary),#a78bfa);color:white;cursor:pointer;font-family:var(--font);font-weight:800;font-size:0.88rem">'
-        + (isLast ? (isEng?'🏁 See Results':'🏁 عرض النتيجة') : (isEng?'Next Question →':'السؤال التالي →'))
-      + '</button>'
-    + '</div>';
+        + (isLast ? ZAD_LANG.ui('finish',sid) : ZAD_LANG.ui('next',sid))
+      + '</button></div>';
     navArea.style.display = 'block';
   }
 }
@@ -18180,44 +18149,44 @@ function quizGoBack() {
 function buildAIQuizResult() {
   var state = window._ZAD_AI_QUIZ_STATE;
   if (!state||!state.questions.length) return '';
-  var isEng = state.subjectId === 'english';
+  var sid = state.subjectId;
+  var dir = ZAD_LANG.dir(sid);
   var total = state.questions.length;
   var pct = Math.round((state.score/total)*100);
   var col = pct>=70?'#66BB6A':pct>=50?'#FFA726':'#EF5350';
   var emoji = pct>=90?'🏆':pct>=70?'⭐':pct>=50?'👍':'💪';
-  var msg = isEng
-    ? (pct>=90?'Excellent! Outstanding!':pct>=70?'Very Good! Keep it up!':pct>=50?'Good, keep practicing!':'Review the material again.')
-    : (pct>=90?'ممتاز! أداء رائع':pct>=70?'جيد جداً! استمر':pct>=50?'جيد، يمكنك تحسينه':'راجع المادة مجدداً');
+  var msg = pct>=90 ? ZAD_LANG.ui('excellent',sid)
+          : pct>=70 ? ZAD_LANG.ui('very_good',sid)
+          : pct>=50 ? ZAD_LANG.ui('good',sid)
+          : ZAD_LANG.ui('study_more',sid);
 
-  if (typeof trackQuizCompleted==='function') trackQuizCompleted(state.subjectId, pct);
+  if (typeof trackQuizCompleted==='function') trackQuizCompleted(sid, pct);
 
   var reviewHTML = state.questions.map(function(q,i) {
-    var ua = state.answers[i];
-    var ok = ua===q.answer;
-    return '<div style="padding:12px;border-radius:12px;border:1px solid '+(ok?'rgba(102,187,106,0.2)':'rgba(239,83,80,0.2)')+';background:'+(ok?'rgba(102,187,106,0.05)':'rgba(239,83,80,0.05)')+';margin-bottom:8px;direction:'+(isEng?'ltr':'rtl')+'">'
+    var ua = state.answers[i]; var ok = ua===q.answer;
+    return '<div style="padding:12px;border-radius:12px;border:1px solid '+(ok?'rgba(102,187,106,0.2)':'rgba(239,83,80,0.2)')+';background:'+(ok?'rgba(102,187,106,0.05)':'rgba(239,83,80,0.05)')+';margin-bottom:8px;direction:'+dir+'">'
       + '<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px">'
         + '<span style="font-size:1rem;flex-shrink:0">'+(ok?'✅':'❌')+'</span>'
         + '<div style="font-size:0.83rem;font-weight:700;line-height:1.5;flex:1">'+(i+1)+'. '+q.q+'</div>'
       + '</div>'
-      + (!ok?'<div style="font-size:0.78rem;color:#66BB6A;margin-bottom:4px">'+(isEng?'✔️ Answer:':'✔️ الصحيح:')+' '+(q.options[q.answer]||'')+'</div>':'')
+      + (!ok?'<div style="font-size:0.78rem;color:#66BB6A;margin-bottom:4px">'+ZAD_LANG.ui('right_ans',sid)+' '+(q.options[q.answer]||'')+'</div>':'')
       + (q.explanation?'<div style="font-size:0.76rem;color:var(--text-muted);margin-bottom:4px">'+q.explanation+'</div>':'')
       + '<div style="font-size:0.7rem;color:var(--text-muted);display:flex;gap:10px;flex-wrap:wrap">'
         + (q.lesson?'<span>📖 '+q.lesson+'</span>':'')
-        + (q.page?'<span>'+(isEng?'📄 pg.':'📄 ص')+' '+q.page+'</span>':'')
-      + '</div>'
-    + '</div>';
+        + (q.page?'<span>'+ZAD_LANG.ui('page',sid)+' '+q.page+'</span>':'')
+      + '</div></div>';
   }).join('');
 
-  return '<div style="direction:'+(isEng?'ltr':'rtl')+'">'
+  return '<div style="direction:'+dir+'">'
     + '<div style="text-align:center;padding:24px;background:rgba(255,255,255,0.03);border-radius:18px;margin-bottom:16px">'
       + '<div style="font-size:3rem;margin-bottom:6px">'+emoji+'</div>'
       + '<div style="font-size:2.5rem;font-weight:900;color:'+col+';margin-bottom:4px">'+pct+'%</div>'
-      + '<div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:4px">'+state.score+(isEng?' correct out of ':' صحيح من ')+total+'</div>'
+      + '<div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:4px">'+state.score+' '+ZAD_LANG.ui('score_of',sid)+' '+total+'</div>'
       + '<div style="font-size:0.88rem;font-weight:700;color:'+col+'">'+msg+'</div>'
     + '</div>'
     + '<div style="display:flex;gap:8px;margin-bottom:18px">'
-      + '<button onclick="window._ZAD_AI_QUIZ_STATE.current=0;window._ZAD_AI_QUIZ_STATE.score=0;window._ZAD_AI_QUIZ_STATE.answers=[];window._ZAD_AI_QUIZ_SELECTED=-1;document.getElementById(\'ai-quiz-q-area\').innerHTML=renderAIQuizQuestion()" style="flex:1;padding:11px;border-radius:12px;border:none;cursor:pointer;background:linear-gradient(135deg,var(--primary),#a78bfa);color:white;font-family:var(--font);font-weight:800;font-size:0.85rem">'+(isEng?'🔄 Retry Quiz':'🔄 إعادة الاختبار')+'</button>'
-      + '<button onclick="document.getElementById(\'quiz-review\').style.display=document.getElementById(\'quiz-review\').style.display===\'none\'?\'block\':\'none\'" style="flex:1;padding:11px;border-radius:12px;border:1px solid var(--border);background:rgba(255,255,255,0.04);cursor:pointer;font-family:var(--font);font-weight:700;font-size:0.85rem;color:var(--text-muted)">'+(isEng?'📋 Review Answers':'📋 مراجعة الإجابات')+'</button>'
+      + '<button onclick="window._ZAD_AI_QUIZ_STATE.current=0;window._ZAD_AI_QUIZ_STATE.score=0;window._ZAD_AI_QUIZ_STATE.answers=[];window._ZAD_AI_QUIZ_SELECTED=-1;document.getElementById(\'ai-quiz-q-area\').innerHTML=renderAIQuizQuestion()" style="flex:1;padding:11px;border-radius:12px;border:none;cursor:pointer;background:linear-gradient(135deg,var(--primary),#a78bfa);color:white;font-family:var(--font);font-weight:800;font-size:0.85rem">'+ZAD_LANG.ui('retry',sid)+'</button>'
+      + '<button onclick="document.getElementById(\'quiz-review\').style.display=document.getElementById(\'quiz-review\').style.display===\'none\'?\'block\':\'none\'" style="flex:1;padding:11px;border-radius:12px;border:1px solid var(--border);background:rgba(255,255,255,0.04);cursor:pointer;font-family:var(--font);font-weight:700;font-size:0.85rem;color:var(--text-muted)">'+ZAD_LANG.ui('review',sid)+'</button>'
     + '</div>'
     + '<div id="quiz-review" style="display:none">'+reviewHTML+'</div>'
   + '</div>';
@@ -21093,6 +21062,86 @@ function downloadStudySchedule(subjectId) {
   URL.revokeObjectURL(a.href);
   showToast('⬇️ تم تحميل جدول المذاكرة', 'success');
 }
+
+// ════════════════════════════════════════════════════════════════════
+// ZAD LANGUAGE SUPPORT MODULE
+// Detects subject language and provides localized UI strings
+// Usage: ZAD_LANG.get(subjectId) → 'en' | 'ar'
+//        ZAD_LANG.ui('next', subjectId) → 'Next →' | 'التالي ←'
+// ════════════════════════════════════════════════════════════════════
+var ZAD_LANG = (function() {
+
+  // Subjects that use English
+  var EN_SUBJECTS = ['english'];
+
+  // Check if a subject is English-language
+  function isEnglish(subjectId) {
+    if (!subjectId) return false;
+    if (EN_SUBJECTS.indexOf(subjectId) > -1) return true;
+    // Also check CURRICULUM lang field
+    var subj = (typeof CURRICULUM !== 'undefined') ? CURRICULUM[subjectId] : null;
+    return subj && subj.lang === 'en';
+  }
+
+  // UI string dictionary
+  var STRINGS = {
+    // Quiz UI
+    question:    { en: 'Question',     ar: 'سؤال' },
+    of:          { en: 'of',           ar: 'من' },
+    easy:        { en: 'Easy',         ar: 'سهل' },
+    medium:      { en: 'Medium',       ar: 'متوسط' },
+    hard:        { en: 'Hard',         ar: 'صعب' },
+    hint:        { en: '💡 Hint',      ar: '💡 تلميح' },
+    page:        { en: '📄 pg.',       ar: '📄 ص' },
+    lesson_lbl:  { en: '📖 Lesson:',   ar: '📖' },
+    correct:     { en: '✅ Correct!',  ar: '✅ إجابة صحيحة!' },
+    wrong:       { en: '❌ Wrong',     ar: '❌ إجابة خاطئة' },
+    right_ans:   { en: '✔️ Correct answer:', ar: '✔️ الصحيح:' },
+    explanation: { en: '📝 Explanation:', ar: '📝 الشرح:' },
+    next:        { en: 'Next →',       ar: 'السؤال التالي →' },
+    prev:        { en: '← Previous',   ar: '← السابق' },
+    finish:      { en: '🏁 Finish',    ar: '🏁 عرض النتيجة' },
+    retry:       { en: '🔄 Retry',     ar: '🔄 إعادة الاختبار' },
+    review:      { en: '📋 Review',    ar: '📋 مراجعة الإجابات' },
+    score_of:    { en: 'correct out of', ar: 'صحيح من' },
+    excellent:   { en: 'Excellent! Outstanding!', ar: 'ممتاز! أداء رائع' },
+    very_good:   { en: 'Very Good! Keep it up!', ar: 'جيد جداً! استمر' },
+    good:        { en: 'Good, keep practicing!', ar: 'جيد، يمكنك تحسينه' },
+    study_more:  { en: 'Review the material.', ar: 'راجع المادة مجدداً' },
+    no_questions:{ en: 'No questions yet. Upload content or complete lessons.', ar: 'لا توجد أسئلة بعد. ارفع محتوى أو أكمل الدروس.' },
+    // Option letters
+    letters:     { en: ['A','B','C','D'], ar: ['أ','ب','ج','د'] },
+    // Direction
+    dir:         { en: 'ltr', ar: 'rtl' },
+    // Exam generator
+    q_counter:   { en: 'Question {n} of {total}', ar: 'السؤال {n} من {total}' },
+    hint_btn:    { en: '💡 Hint', ar: '💡 تلميح' },
+    next_exam:   { en: 'Next →', ar: 'التالي ←' },
+    prev_exam:   { en: '← Prev', ar: '← السابق' },
+    finish_exam: { en: '🏁 Finish Exam', ar: '🏁 إنهاء الاختبار' },
+  };
+
+  function get(subjectId) {
+    return isEnglish(subjectId) ? 'en' : 'ar';
+  }
+
+  function ui(key, subjectId) {
+    var lang = get(subjectId);
+    var entry = STRINGS[key];
+    if (!entry) return key;
+    return entry[lang] || entry['ar'] || key;
+  }
+
+  function letters(subjectId) {
+    return isEnglish(subjectId) ? STRINGS.letters.en : STRINGS.letters.ar;
+  }
+
+  function dir(subjectId) {
+    return isEnglish(subjectId) ? 'ltr' : 'rtl';
+  }
+
+  return { isEnglish: isEnglish, get: get, ui: ui, letters: letters, dir: dir };
+})();
 </script>
 
 

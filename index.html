@@ -10693,40 +10693,63 @@ async function analyzeAndGenerate(text, subjectId, fileName) {
     const _textIsEnglish = _latinChars > _arabicChars * 2;
     const isEng = _enSubjects.indexOf(subjectId) > -1 || _textIsEnglish;
 
-    upd('🔍', 'تحليل هيكل الملف واكتشاف الدروس...', 10);
+    upd('🔍', 'تحليل هيكل الملف واكتشاف الدروس...', 8);
 
-    // ── STEP 1: Detect chapters/lessons structure ──────────────
-    let structure = null;
-    try {
-      upd('🔍', 'تحليل هيكل الملف...', 12);
-      const structResp = await zadFetch({
-        model: 'llama-3.3-70b-versatile',
-        max_tokens: 1200,
-        system: 'Respond with valid JSON only. No markdown. Base your analysis ONLY on the provided text.',
-        messages: [{
-          role: 'user',
-          content: 'Analyze this educational text and detect its structure. The text may be in Arabic or English.\nText (first 8000 chars):\n' + clean.slice(0, 8000) + '\n\nReturn ONLY valid JSON (no markdown):\n{"chapterTitle":"main title of the document","hasMultipleTopics":true/false,"topics":[{"title":"Lesson/Topic title","startHint":"first 5 words of this section"}]}\nRules: max 10 topics. If single topic set hasMultipleTopics:false and topics:[{"title":"auto","startHint":""}]. Extract REAL titles found in the text — do not invent. Respond in the same language as the document.'
-        }]
-      });
-      const structData = await structResp.json();
-      const sText = (structData.content && structData.content[0] && structData.content[0].text) || '';
-      structure = repairAndParseJSON(sText.trim());
-    } catch(stepErr) {
-      console.warn('Structure detection skipped:', stepErr.message);
-      structure = null;
+    // ── STEP 1: Multi-pass structure detection across FULL document ──
+    // Scan in 8000-char windows with overlap to catch all topics
+    const SCAN_CHUNK  = 8000;
+    const SCAN_OVERLAP = 500;
+    const allTopics   = [];
+    let detectedChapterTitle = fileName.replace(/\.[^.]+$/, '');
+    const seenTitles  = new Set();
+
+    const numScans = Math.ceil(clean.length / (SCAN_CHUNK - SCAN_OVERLAP));
+    upd('🔍', `مسح ${numScans} قسم للعثور على جميع الدروس...`, 10);
+
+    for (let si = 0; si < numScans; si++) {
+      const scanStart = si * (SCAN_CHUNK - SCAN_OVERLAP);
+      const scanEnd   = Math.min(scanStart + SCAN_CHUNK, clean.length);
+      const scanText  = clean.slice(scanStart, scanEnd);
+      const isFirst   = si === 0;
+      const pctScan   = 10 + (si / numScans) * 12;
+      upd('🔍', `اكتشاف الهيكل: ${si+1}/${numScans}...`, pctScan);
+
+      try {
+        const sR = await zadFetch({
+          model: 'llama-3.3-70b-versatile',
+          max_tokens: 1000,
+          system: 'Respond with valid JSON only. No markdown.',
+          messages: [{ role: 'user', content:
+            'List ALL lesson/topic/section titles found in this text. No limit on number.\n' +
+            'Text:\n' + scanText + '\n\n' +
+            'Return JSON: {' +
+            (isFirst ? '"chapterTitle":"doc main title",' : '') +
+            '"topics":[{"title":"Exact title","startHint":"first 6 words of that section"}]}\n' +
+            'Rules: only real titles from the text. No invented titles. Same language as text.'
+          }]
+        });
+        const sD = await sR.json();
+        const sT = (sD.content && sD.content[0] && sD.content[0].text) || '';
+        const sP = repairAndParseJSON(sT.trim());
+        if (sP) {
+          if (isFirst && sP.chapterTitle && sP.chapterTitle !== 'auto') {
+            detectedChapterTitle = sP.chapterTitle;
+          }
+          (sP.topics || []).forEach(function(t) {
+            if (t.title && !seenTitles.has(t.title.trim())) {
+              seenTitles.add(t.title.trim());
+              allTopics.push({ title: t.title.trim(), startHint: t.startHint || '' });
+            }
+          });
+        }
+      } catch(scanErr) {
+        console.warn('Scan', si, 'failed:', scanErr.message);
+      }
     }
 
-    const topics = (structure && structure.topics && structure.topics.length > 1 && structure.hasMultipleTopics)
-      ? structure.topics
-      : null;
-
-    // Use detected chapter title as file display name
-    const detectedChapterTitle = (structure && structure.chapterTitle && structure.chapterTitle !== 'auto')
-      ? structure.chapterTitle
-      : fileName.replace(/\.[^.]+$/, '');
-
-    const totalLessons = topics ? topics.length : 1;
-    upd('📚', `اكتُشف ${totalLessons} درس/موضوع في الملف`, 20);
+    const topics = allTopics.length > 1 ? allTopics : null;
+    const totalLessons = topics ? topics.length : Math.max(1, Math.ceil(clean.length / 15000));
+    upd('📚', `اكتُشف ${topics ? topics.length : 'محتوى'} في الملف — جارٍ المعالجة...`, 22);
 
     const langNote = isEng
       ? `You are an educational content extractor. Extract and simplify content FROM THE PROVIDED TEXT ONLY.
@@ -10773,18 +10796,29 @@ LANGUAGE RULES:
         const pct = 25 + (ti / topics.length) * 65;
         upd('📖', `معالجة الدرس ${ti+1}/${topics.length}: ${topic.title}...`, pct);
 
-        // Find section text
+        // Find section text using startHint, then cut to next section
         let sectionStart = 0;
         if (topic.startHint && topic.startHint.length > 3) {
-          const hint = clean.indexOf(topic.startHint);
-          if (hint > 0) sectionStart = hint;
-        } else if (ti > 0) {
+          const hintIdx = clean.indexOf(topic.startHint);
+          if (hintIdx >= 0) sectionStart = hintIdx;
+          else sectionStart = Math.floor((ti / topics.length) * clean.length);
+        } else {
           sectionStart = Math.floor((ti / topics.length) * clean.length);
         }
-        const sectionEnd = ti < topics.length - 1
-          ? Math.floor(((ti+1) / topics.length) * clean.length)
-          : clean.length;
-        const sectionText = clean.slice(sectionStart, Math.min(sectionEnd, sectionStart + CHUNK));
+
+        // End = next topic's startHint position, or proportional, max 12000 chars
+        let sectionEnd = clean.length;
+        if (ti < topics.length - 1) {
+          const nextHint = topics[ti+1].startHint;
+          if (nextHint && nextHint.length > 3) {
+            const nextIdx = clean.indexOf(nextHint, sectionStart + 100);
+            if (nextIdx > sectionStart) sectionEnd = nextIdx;
+          }
+          if (sectionEnd === clean.length) {
+            sectionEnd = Math.floor(((ti+1) / topics.length) * clean.length);
+          }
+        }
+        const sectionText = clean.slice(sectionStart, Math.min(sectionEnd, sectionStart + 12000));
 
         const topicPrompt = `${langNote}\n\n⚠️ تعليمات مهمة: استخدم المحتوى من النص التالي فقط. لا تضف معلومات خارجية.\n\nموضوع هذا الدرس: "${topic.title}"\n\n=== النص المصدر (استخرج منه فقط) ===\n${sectionText}\n=== نهاية النص ===\n\nأجب بـ JSON صالح فقط:\n${jsonTemplate}`;
 
@@ -10840,8 +10874,8 @@ LANGUAGE RULES:
     } else {
       // Single lesson - process in chunks
       upd('📡', 'تحليل الملف...', 30);
-      const chunkSize = 20000; // Large chunks, no limit
-      const numChunks = Math.ceil(clean.length / chunkSize); // No chunk limit
+      const chunkSize = 15000; // balanced size for thorough coverage
+      const numChunks = Math.ceil(clean.length / chunkSize);
       console.log('[ZAD] numChunks:', numChunks, 'chunkSize:', chunkSize);
       const allResults = [];
 

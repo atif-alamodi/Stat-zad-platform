@@ -2058,15 +2058,19 @@ async function elabRunPy() {
   try {
     const instantRes = runJsFallback(code, _collectedVals);
     if (instantRes !== null) {
-
       out.innerHTML = buildPyOutput(instantRes, code);
       if (btn) { btn.textContent = '▶ تشغيل'; btn.disabled = false; }
       return;
     }
   } catch(e) {
-    out.innerHTML = buildPyError(e.message, code);
-    if (btn) { btn.textContent = '▶ تشغيل'; btn.disabled = false; }
-    return;
+    if (e.message === '__NEEDS_INPUT__') {
+      // Code needs input — let it fall through to Pyodide or input dialog
+      // Don't show error, just continue
+    } else {
+      out.innerHTML = buildPyError(e.message, code);
+      if (btn) { btn.textContent = '▶ تشغيل'; btn.disabled = false; }
+      return;
+    }
   }
 
   if (!_elabPyReady && typeof pyodide !== 'undefined' && pyodide && pyReady) {
@@ -16552,6 +16556,10 @@ function runJsFallback(code, inputValues) {
       return null;
     },
     input: (prompt) => {
+      // If no input value provided, signal that we need real input
+      if (inputValues.length === 0) {
+        throw new Error('__NEEDS_INPUT__');
+      }
       if (prompt !== undefined) out.push(String(prompt));
       const val = inputValues[inputIdx] !== undefined ? String(inputValues[inputIdx++]) : '';
       return val;
@@ -17611,29 +17619,68 @@ function detectInputCalls(code) {
 function collectInputs(prompts) {
   return new Promise(resolve => {
     _pyInputResolve = resolve;
+    const modal  = document.getElementById('py-input-modal');
     const fields = document.getElementById('py-input-fields');
-    if (!fields) { resolve(prompts.map(() => '')); return; }
-    
-    fields.innerHTML = prompts.map((p, i) => `
-      <div>
-        ${p ? `<div style="font-size:0.78rem;color:#6ab0e8;margin-bottom:5px;font-family:'Fira Code',monospace;direction:ltr;text-align:left">${escHtml(p)}</div>` : `<div style="font-size:0.78rem;color:rgba(255,255,255,0.4);margin-bottom:5px;">مدخل ${i+1}</div>`}
-        <input type="text" data-idx="${i}" autocomplete="off"
-          placeholder="اكتب القيمة هنا..."
-          style="width:100%;background:#0d1117;border:1.5px solid rgba(108,99,255,0.35);
-                 border-radius:10px;padding:10px 14px;color:white;font-size:0.9rem;
-                 font-family:'Fira Code',monospace;outline:none;box-sizing:border-box;
-                 direction:ltr;text-align:left;transition:border-color 0.2s,box-shadow 0.2s;"
-          onkeydown="if(event.key==='Enter'){event.preventDefault();
-            const nxt=document.querySelector('#py-input-fields input[data-idx=\\'${i+1}\\']');
-            nxt?nxt.focus():pyInputConfirm();}">
-      </div>
-    `).join('');
-    
-    document.getElementById('py-input-modal').style.display = 'flex';
-    const first = fields.querySelector('input[data-idx="0"]');
-    if (first) setTimeout(() => first.focus(), 60);
+
+    if (modal && fields) {
+      // Rich modal (section-lab)
+      fields.innerHTML = prompts.map((p, i) => `
+        <div>
+          ${p ? `<div style="font-size:0.78rem;color:#6ab0e8;margin-bottom:5px;font-family:'Fira Code',monospace;direction:ltr;text-align:left">${escHtml(p)}</div>` : `<div style="font-size:0.78rem;color:rgba(255,255,255,0.4);margin-bottom:5px;">مدخل ${i+1}</div>`}
+          <input type="text" data-idx="${i}" autocomplete="off" placeholder="أدخل القيمة..."
+            style="width:100%;background:#0d1117;border:1.5px solid rgba(108,99,255,0.35);border-radius:10px;padding:10px 14px;color:white;font-size:0.9rem;font-family:'Fira Code',monospace;outline:none;box-sizing:border-box;direction:ltr;text-align:left;"
+            onkeydown="if(event.key==='Enter'){event.preventDefault();const nxt=document.querySelector('#py-input-fields input[data-idx=\'${i+1}\']');nxt?nxt.focus():pyInputConfirm();}">
+        </div>`).join('');
+      modal.style.display = 'flex';
+      const first = fields.querySelector('input[data-idx="0"]');
+      if (first) setTimeout(() => first.focus(), 60);
+    } else {
+      // Embedded lab — inline dialog
+      _showElabInputDialog(prompts, resolve);
+    }
   });
 }
+
+function _showElabInputDialog(prompts, resolve) {
+  var old = document.getElementById('elab-input-dialog');
+  if (old) old.remove();
+  var count = prompts.length;
+
+  var fieldsHTML = prompts.map(function(p, i) {
+    return '<div style="margin-bottom:10px">'
+      + (p ? '<div style="font-size:0.78rem;color:#6ab0e8;margin-bottom:4px;font-family:monospace;direction:ltr;text-align:left">' + escHtml(p) + '</div>' : '<div style="font-size:0.75rem;color:#aaa;margin-bottom:4px">مدخل '+(i+1)+':</div>')
+      + '<input id="elab-inp-'+i+'" type="text" autocomplete="off" placeholder="أدخل القيمة..." '
+        + 'style="width:100%;box-sizing:border-box;background:#0d1117;border:1.5px solid rgba(108,99,255,0.5);border-radius:10px;padding:9px 14px;color:white;font-size:0.88rem;font-family:monospace;outline:none;direction:ltr;text-align:left" '
+        + 'onkeydown="if(event.key===\'Enter\'){var n=document.getElementById(\'elab-inp-'+(i+1)+'\');if(n)n.focus();else document.getElementById(\'elab-inp-ok\').click()}">'
+      + '</div>';
+  }).join('');
+
+  var dlg = document.createElement('div');
+  dlg.id = 'elab-input-dialog';
+  dlg.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.82);display:flex;align-items:center;justify-content:center;padding:20px;direction:rtl';
+  dlg.innerHTML = '<div style="background:#1C1917;border:1.5px solid rgba(108,99,255,0.4);border-radius:16px;padding:20px;max-width:400px;width:100%">'
+    + '<div style="font-weight:800;margin-bottom:14px;color:#6ab0e8;font-size:0.9rem">⌨️ Python يطلب مدخلات:</div>'
+    + fieldsHTML
+    + '<div style="display:flex;gap:8px;margin-top:8px">'
+      + '<button id="elab-inp-ok" style="flex:1;padding:10px;border-radius:10px;border:none;background:linear-gradient(135deg,#3776AB,#1a4a7a);color:white;font-family:var(--font);font-weight:800;cursor:pointer">▶ تأكيد وتشغيل</button>'
+      + '<button id="elab-inp-cancel" style="padding:10px 16px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text-muted);font-family:var(--font);cursor:pointer">إلغاء</button>'
+    + '</div>'
+  + '</div>';
+  document.body.appendChild(dlg);
+
+  document.getElementById('elab-inp-ok').onclick = function() {
+    var vals = [];
+    for (var i = 0; i < count; i++) {
+      var el = document.getElementById('elab-inp-' + i);
+      vals.push(el ? el.value : '');
+    }
+    dlg.remove();
+    resolve(vals);
+  };
+  document.getElementById('elab-inp-cancel').onclick = function() { dlg.remove(); resolve(null); };
+  setTimeout(function() { var f = document.getElementById('elab-inp-0'); if (f) f.focus(); }, 80);
+}
+
 
 function escHtml(s) {
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');

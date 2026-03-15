@@ -13895,9 +13895,9 @@ function buildLessonsTab(subject, subjectId) {
     chapHtml += [
       '<div class="chapter-item'+_chOpen+'" id="ch-'+safeChId+'"'+_chStyle+'>',
         '<div class="chapter-header"',
-          ' onclick="toggleChapter(''+safeChId+'')"',
-          ' oncontextmenu="event.preventDefault();showDeleteChapterConfirm(''+subjectId+'',''+safeChId+'',''+safeChTitle+'');"',
-          ' ontouchstart="startLongPress(event,'__ch__'+safeChId+'','',''+subjectId+'',''+safeChTitle+'');" ontouchend="clearLongPress()" ontouchmove="clearLongPress()"',
+          ' onclick="toggleChapter(\\''+safeChId+'\\')"',
+          ' oncontextmenu="event.preventDefault();showDeleteChapterConfirm(\\''+subjectId+'\\',\\''+safeChId+'\\',\\''+safeChTitle+'\\')"',
+          ' ontouchstart="startLongPress(event,\\'__ch__'+safeChId+'\\',\\'\\',\\''+subjectId+'\\',\\''+safeChTitle+'\\')" ontouchend="clearLongPress()" ontouchmove="clearLongPress()"',
         '>',
           // Subject icon badge with ordinal number below it
           '<div class="chapter-num" style="background:linear-gradient(135deg,'+subjColor+','+subjColor+'99);flex-direction:column;gap:0;padding:4px 6px;font-size:0.7rem;width:44px;height:44px">',

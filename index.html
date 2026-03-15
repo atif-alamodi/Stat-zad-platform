@@ -13268,6 +13268,90 @@ function showSection(name) {
   }
 }
 
+function showSubject(subjectId, activeTab) {
+  if (!subjectId) return;
+  APP.currentSubject = subjectId;
+  activeTab = activeTab || 'lessons';
+  APP.lastSubjectTab = activeTab;
+
+  var subject = CURRICULUM[subjectId] || { id: subjectId, title: subjectId, icon: '📚', chapters: [] };
+
+  showSection('subject-detail');
+  var container = document.getElementById('subject-detail-content');
+  if (!container) return;
+
+  // Try to push to history for back button
+  try { history.pushState({ zad: 'subject', sid: subjectId, tab: activeTab }, '', '#subject-' + subjectId); } catch(ex) {}
+
+  var TABS = [
+    { id: 'lessons',  icon: '📖', label: 'الدروس' },
+    { id: 'cards',    icon: '🃏', label: 'بطاقات المعلومات' },
+    { id: 'mindmaps', icon: '🧠', label: 'الخرائط الذهنية' },
+    { id: 'lab',      icon: '✏️', label: 'المختبر' },
+    { id: 'adaptive', icon: '🧬', label: 'مستواك الذكي' },
+    { id: 'homework', icon: '✏️', label: 'تصحيح الواجبات' },
+    { id: 'upload',   icon: '📤', label: 'رفع محتوى' }
+  ];
+
+  var tabsHTML = TABS.map(function(t) {
+    var active = t.id === activeTab;
+    return '<button onclick="showSubject(\'' + subjectId + '\',\'' + t.id + '\')"'
+      + ' style="flex:1;min-width:72px;padding:9px 12px;border-radius:11px;border:none;cursor:pointer;'
+      + 'font-family:var(--font);font-size:0.82rem;font-weight:700;transition:all 0.2s;'
+      + (active ? 'background:linear-gradient(135deg,var(--primary),var(--secondary));color:white;box-shadow:0 4px 14px rgba(108,99,255,0.3)'
+               : 'background:transparent;color:var(--text-muted)') + '">'
+      + t.icon + '\n' + t.label + '</button>';
+  }).join('');
+
+  var body = '';
+  try {
+    if (activeTab === 'lessons')  body = buildLessonsTab(subject, subjectId);
+    if (activeTab === 'cards')    body = buildInfoCards(subject, subjectId);
+    if (activeTab === 'mindmaps') body = buildAllMindMaps(subject, subjectId);
+    if (activeTab === 'adaptive') body = buildAdaptiveDashboard(subjectId);
+    if (activeTab === 'lab') {
+      var _labUps = ZAD_UPLOADS.getAll().filter(function(u){ return u.subjectId===subjectId&&u.lesson; });
+      if (_labUps.length>0) {
+        var _origLab = '';
+        if (subjectId==='communication') _origLab=buildCommLab();
+        else if (subjectId==='english')  _origLab=buildEnglishLab();
+        else if (subjectId==='os')       _origLab=buildOSLab();
+        else _origLab=buildEmbeddedLab(subjectId);
+        body = buildContentLab(subjectId)+'<div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)"><div style="font-weight:800;font-size:0.85rem;margin-bottom:12px;color:var(--text-muted)">🔬 المختبر التقني</div>'+_origLab+'</div>';
+      } else if (subjectId==='communication') body=buildCommLab();
+      else if (subjectId==='english') body=buildEnglishLab();
+      else if (subjectId==='os')      body=buildOSLab();
+      else body=buildEmbeddedLab(subjectId);
+    }
+    if (activeTab === 'upload')   body = buildUploadTab(subjectId);
+    if (activeTab === 'homework') body = buildHomeworkTool(subjectId);
+  } catch(tabErr) {
+    body = '<div style="padding:20px;color:var(--text-muted)">خطأ في تحميل التبويب: ' + tabErr.message + '</div>';
+    console.error('Tab error:', tabErr);
+  }
+
+  container.innerHTML = '<div style="direction:rtl">'
+    + '<div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;flex-wrap:wrap">'
+      + '<button class="back-btn" onclick="showSection(\'dashboard\')">←</button>'
+      + '<div style="flex:1;min-width:0">'
+        + '<div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:2px">' + (subject.icon||'📚') + ' ' + (subject.title||subjectId) + '</div>'
+      + '</div>'
+      + '<button onclick="showSubjectProfileModal(\'' + subjectId + '\')" style="padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.05);cursor:pointer;font-size:0.78rem;color:var(--text-muted);font-weight:700">✏️ تعديل</button>'
+    + '</div>'
+    + '<div style="font-size:1.4rem;font-weight:900;margin-bottom:6px;text-align:center">' + (subject.icon||'📚') + ' ' + (subject.title||subjectId) + '</div>'
+    + '<div style="font-size:0.8rem;color:var(--text-muted);text-align:center;margin-bottom:18px;line-height:1.6">' + (subject.description||'') + '</div>'
+    + '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:18px;overflow-x:auto;padding-bottom:4px">' + tabsHTML + '</div>'
+    + '<div id="subject-tab-body">' + body + '</div>'
+  + '</div>';
+
+  if (typeof trackUserActivity === 'function') trackUserActivity('مادة: ' + (subject.title||subjectId));
+  if (typeof pingWorker === 'function') pingWorker('subject-' + subjectId);
+  if (APP.student && APP.student.email) {
+    try { saveLocation({ type: 'subject', subjectId: subjectId, tab: activeTab }); } catch(e) {}
+  }
+}
+
+
 function openSidebar() {
   document.getElementById('sidebar').classList.add('open');
   const ov = document.getElementById('sidebar-overlay');
@@ -19657,44 +19741,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // ── Handle Android back button + browser history ─────────────
-(function() {
-  // Push a state on each navigation so back button goes within app
-  var _navStack = [];
-
-  var _origShowSection = window.showSection;
-  window.showSection = function(name) {
-    if (_origShowSection) _origShowSection(name);
-    _navStack.push({ type: 'section', name: name });
-    try { history.pushState({ zad: 'section', name: name }, '', '#' + name); } catch(e) {}
-  };
-
-  var _origShowSubject = window.showSubject;
-  window.showSubject = function(sid, tab) {
-    if (_origShowSubject) _origShowSubject(sid, tab);
-    _navStack.push({ type: 'subject', sid: sid, tab: tab });
-    try { history.pushState({ zad: 'subject', sid: sid, tab: tab }, '', '#subject-' + sid); } catch(e) {}
-  };
-
-  // Handle back button
-  window.addEventListener('popstate', function(e) {
-    var state = e.state;
-    if (!state || !state.zad) {
-      // Back to dashboard
-      try { showSection('dashboard'); } catch(ex) {}
-      return;
-    }
-    if (state.zad === 'subject') {
-      try { showSubject(state.sid, state.tab || 'lessons'); } catch(ex) {}
-    } else if (state.zad === 'lesson') {
-      try { openLesson(state.subjectId, state.lessonId); } catch(ex) {}
-    } else if (state.zad === 'section') {
-      try { if (_origShowSection) _origShowSection(state.name); } catch(ex) {}
-    }
-  });
-
-  // Initial state
-  try { history.replaceState({ zad: 'section', name: 'dashboard' }, '', '#dashboard'); } catch(e) {}
-})();
+;
 
 
 // ── Safe Android back button handler ─────────────────────────
@@ -19823,16 +19870,39 @@ function devShowUploadArea() {
 async function devLoadFile(input) {
   var file = input.files[0];
   if (!file) return;
-  var t = document.getElementById('dev-sum-title');
+  var t  = document.getElementById('dev-sum-title');
   var tx = document.getElementById('dev-sum-text');
   var st = document.getElementById('dev-upload-status');
-  if (t && !t.value) t.value = file.name.replace(/\.[^/.]+$/,'');
+  if (t && !t.value) t.value = file.name.replace(/\.[^/.]+$/, '');
   if (st) st.innerHTML = '⏳ قراءة الملف...';
   try {
-    var text = file.name.split('.').pop().toLowerCase() === 'pdf' ? await extractPdfText(file) : await file.text();
+    var ext = file.name.split('.').pop().toLowerCase();
+    var text = '';
+    if (ext === 'pdf') {
+      text = await extractPdfText(file);
+    } else if (['docx','doc','odt','rtf','pptx','ppt'].includes(ext)) {
+      text = await extractDocxText(file);
+    } else if (['xlsx','xls','csv'].includes(ext)) {
+      text = await extractSpreadsheetText(file);
+    } else if (['jpg','jpeg','png','gif','webp','bmp','heic'].includes(ext)) {
+      if (st) st.innerHTML = '🖼️ الصور لا يمكن قراءتها كنص - استخدم PDF أو TXT';
+      return;
+    } else {
+      // Try as text for all other types
+      try {
+        text = await file.text();
+      } catch(e2) {
+        var buf = await file.arrayBuffer();
+        text = new TextDecoder('utf-8', {fatal:false}).decode(buf);
+      }
+    }
+    text = (text||'').replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+    if (!text.trim()) { if(st) st.innerHTML='❌ لم يُستخرج نص من الملف'; return; }
     if (tx) tx.value = text;
-    if (st) st.innerHTML = '✅ ' + text.length.toLocaleString() + ' حرف';
-  } catch(e) { if (st) st.innerHTML = '❌ ' + e.message; }
+    if (st) st.innerHTML = '✅ قُرئ ' + text.length.toLocaleString() + ' حرف';
+  } catch(e) {
+    if (st) st.innerHTML = '❌ خطأ: ' + e.message;
+  }
 }
 
 async function devProcessAndSave() {

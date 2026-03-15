@@ -1750,43 +1750,59 @@ CURRICULUM['english'] = {
   ],
 };
 
-function generateQuiz(subjectId, count = 10, difficulty = 'mixed') {
+function generateQuiz(subjectId, count, difficulty) {
+  count = count || 10;
+  difficulty = difficulty || 'mixed';
   const subject = (getSubjectWithUploads(subjectId) || CURRICULUM[subjectId]);
   if (!subject) return [];
 
   const allQuestions = [];
-  subject.chapters.forEach((ch, ci) => {
-    ch.lessons.forEach((lesson, li) => {
+  subject.chapters.forEach(function(ch, ci) {
+    (ch.lessons||[]).forEach(function(lesson, li) {
       if (lesson.quiz) {
-        lesson.quiz.forEach((q, qi) => {
-
+        lesson.quiz.forEach(function(q, qi) {
           let diff = 'medium';
           if (ci === 0) diff = 'easy';
           else if (ci >= subject.chapters.length - 2) diff = 'hard';
-          
+
+          // Shuffle options and update correct answer index
+          var origAnswer = q.answer || 0;
+          var indices = q.options.map(function(_,i){ return i; });
+          // Fisher-Yates shuffle
+          for (var k = indices.length - 1; k > 0; k--) {
+            var j = Math.floor(Math.random() * (k + 1));
+            var tmp = indices[k]; indices[k] = indices[j]; indices[j] = tmp;
+          }
+          var shuffledOptions = indices.map(function(i){ return q.options[i]; });
+          var newAnswerIdx = indices.indexOf(origAnswer);
+
           allQuestions.push({
-            ...q,
-            lesson: lesson.title,
-            chapter: ch.title,
-            page: ch.pages,
-            difficulty: diff,
-            subjectId: subjectId,
-            subjectTitle: subject.title,
-            id: `${subjectId}_ch${ci}_l${li}_q${qi}`
+            q:           q.q,
+            options:     shuffledOptions,
+            answer:      newAnswerIdx,
+            hint:        q.hint || '',
+            explanation: q.explanation || '',
+            page:        q.page || ch.pages || '',
+            lesson:      lesson.title || '',
+            chapter:     ch.title || '',
+            difficulty:  diff,
+            subjectId:   subjectId,
+            subjectTitle: subject.title || '',
+            id: subjectId + '_ch' + ci + '_l' + li + '_q' + qi
           });
         });
       }
     });
   });
 
-  let filtered = allQuestions;
-  if (difficulty === 'easy') filtered = allQuestions.filter(q => q.difficulty === 'easy');
-  else if (difficulty === 'hard') filtered = allQuestions.filter(q => q.difficulty === 'hard');
-  else if (difficulty === 'medium') filtered = allQuestions.filter(q => q.difficulty === 'medium');
-
+  var filtered = allQuestions;
+  if (difficulty === 'easy')   filtered = allQuestions.filter(function(q){ return q.difficulty === 'easy'; });
+  else if (difficulty === 'hard')   filtered = allQuestions.filter(function(q){ return q.difficulty === 'hard'; });
+  else if (difficulty === 'medium') filtered = allQuestions.filter(function(q){ return q.difficulty === 'medium'; });
   if (filtered.length < count) filtered = allQuestions;
 
-  const shuffled = [...filtered].sort(() => Math.random() - 0.5);
+  // Shuffle question order
+  var shuffled = filtered.slice().sort(function(){ return Math.random() - 0.5; });
   return shuffled.slice(0, Math.min(count, shuffled.length));
 }
 

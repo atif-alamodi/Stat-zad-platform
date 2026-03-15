@@ -17859,103 +17859,74 @@ function renderAIQuizQuestion() {
     + (q.hint ? '<div id="quiz-hint-box" style="display:none;margin-top:8px;padding:10px;border-radius:10px;background:rgba(255,214,0,0.06);border:1px solid rgba(255,214,0,0.2);font-size:0.8rem;color:#FFD600;direction:rtl">💡 '+q.hint+'</div>' : '')
     // Feedback area
     + '<div id="ai-quiz-feedback" style="display:none;margin-top:12px;padding:12px;border-radius:12px;font-size:0.83rem;line-height:1.6"></div>'
-  + '</div>'
-  + '<button onclick="submitAIQuiz()" style="width:100%;padding:12px;border-radius:12px;border:none;'
-    + 'cursor:pointer;background:linear-gradient(135deg,var(--primary),#a78bfa);color:white;'
-    + 'font-family:var(--font);font-size:0.88rem;font-weight:800">تأكيد الإجابة ←</button>';
+  + '</div>';
 }
 
 window._ZAD_AI_QUIZ_SELECTED = -1;
 
 function selectAIQuizOption(i) {
-  document.querySelectorAll('[id^="aiqopt-"]').forEach(function(el) {
-    el.style.background = 'rgba(255,255,255,0.04)';
-    el.style.borderColor = 'rgba(255,255,255,0.12)';
-    el.dataset.selected = '';
-  });
-  var el = document.getElementById('aiqopt-'+i);
-  if (el) {
-    el.style.background = 'rgba(108,99,255,0.18)';
-    el.style.borderColor = 'rgba(108,99,255,0.6)';
-    el.dataset.selected = '1';
-  }
-  window._ZAD_AI_QUIZ_SELECTED = i;
-}
-
-function submitAIQuiz() {
-  var selected = window._ZAD_AI_QUIZ_SELECTED;
   var state = window._ZAD_AI_QUIZ_STATE;
-  if (selected === undefined || selected < 0) return showToast('اختر إجابة أولاً', 'error');
+  if (!state) return;
   var q = state.questions[state.current];
-  var correct = selected === q.answer;
+  var correct = i === q.answer;
   if (correct) state.score++;
-  state.answers.push(selected);
+  state.answers.push(i);
 
-  // Color options
-  document.querySelectorAll('[id^="aiqopt-"]').forEach(function(el, i) {
+  // Color all options
+  document.querySelectorAll('[id^="aiqopt-"]').forEach(function(el, idx) {
     el.onclick = null;
-    if (i === q.answer) {
-      el.style.background = 'rgba(102,187,106,0.18)';
+    el.style.cursor = 'default';
+    if (idx === q.answer) {
+      el.style.background = 'rgba(102,187,106,0.2)';
       el.style.borderColor = '#66BB6A';
-    } else if (i === selected && !correct) {
-      el.style.background = 'rgba(239,83,80,0.14)';
+      el.querySelector && el.querySelector('span') && (el.querySelectorAll('span')[0].style.background = '#66BB6A', el.querySelectorAll('span')[0].style.color = 'white');
+    } else if (idx === i && !correct) {
+      el.style.background = 'rgba(239,83,80,0.15)';
       el.style.borderColor = '#EF5350';
     } else {
-      el.style.opacity = '0.5';
+      el.style.opacity = '0.45';
     }
   });
 
-  // Rich feedback
+  // Show rich feedback
   var fb = document.getElementById('ai-quiz-feedback');
   if (fb) {
     fb.style.display = 'block';
     fb.style.background = correct ? 'rgba(102,187,106,0.1)' : 'rgba(239,83,80,0.08)';
     fb.style.border = '1.5px solid ' + (correct ? 'rgba(102,187,106,0.35)' : 'rgba(239,83,80,0.3)');
     var fbHTML = '<div style="font-weight:800;font-size:0.88rem;margin-bottom:6px;color:'+(correct?'#66BB6A':'#EF5350')+'">'
-      + (correct ? '✅ إجابة صحيحة!' : '❌ إجابة خاطئة')
-      + '</div>';
+      + (correct ? '✅ إجابة صحيحة!' : '❌ إجابة خاطئة') + '</div>';
     if (!correct) {
-      fbHTML += '<div style="font-size:0.83rem;margin-bottom:6px">'
-        + '✔️ الإجابة الصحيحة: <strong style="color:#66BB6A">'+(q.options[q.answer]||'')+'</strong></div>';
+      fbHTML += '<div style="font-size:0.83rem;margin-bottom:6px">✔️ الصحيح: <strong style="color:#66BB6A">'+(q.options[q.answer]||'')+'</strong></div>';
     }
-    if (q.hint) {
-      fbHTML += '<div style="font-size:0.8rem;color:#FFD600;margin-bottom:5px">💡 التلميح: '+q.hint+'</div>';
-    }
-    if (q.explanation) {
-      fbHTML += '<div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:5px;line-height:1.6">📝 الشرح: '+q.explanation+'</div>';
-    }
-    if (q.lesson || q.chapter || q.page) {
+    if (q.hint)        fbHTML += '<div style="font-size:0.8rem;color:#FFD600;margin-bottom:5px">💡 '+q.hint+'</div>';
+    if (q.explanation) fbHTML += '<div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:5px;line-height:1.6">📝 '+q.explanation+'</div>';
+    if (q.lesson || q.page) {
       fbHTML += '<div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.07);display:flex;flex-wrap:wrap;gap:10px">';
-      if (q.lesson)  fbHTML += '<span>📖 الدرس: '+q.lesson+'</span>';
-      if (q.chapter) fbHTML += '<span>📂 الفصل: '+q.chapter+'</span>';
-      if (q.page)    fbHTML += '<span>📄 الصفحة: '+q.page+'</span>';
+      if (q.lesson)  fbHTML += '<span>📖 '+q.lesson+'</span>';
+      if (q.chapter) fbHTML += '<span>📂 '+q.chapter+'</span>';
+      if (q.page)    fbHTML += '<span>📄 ص '+q.page+'</span>';
       fbHTML += '</div>';
     }
     fb.innerHTML = fbHTML;
   }
 
-  // Hide hint button
-  var hb = document.querySelector('button[onclick*="quiz-hint-box"]');
-  if (hb) hb.style.display = 'none';
+  // Show hint box if present
   var hbox = document.getElementById('quiz-hint-box');
-  if (hbox) { hbox.style.display = 'block'; }
+  if (hbox) hbox.style.display = 'block';
+  var hbtn = document.querySelector('button[onclick*="quiz-hint-box"]');
+  if (hbtn) hbtn.style.display = 'none';
 
   state.current++;
   window._ZAD_AI_QUIZ_SELECTED = -1;
 
-  // Disable confirm button
-  var confirmBtn = document.querySelector('button[onclick="submitAIQuiz()"]');
-  if (confirmBtn) {
-    confirmBtn.disabled = true;
-    confirmBtn.style.opacity = '0.5';
-    confirmBtn.textContent = state.current >= state.questions.length ? '⏳ النتيجة...' : '⏭️ السؤال التالي...';
-  }
-
   setTimeout(function() {
     var area = document.getElementById('ai-quiz-q-area');
     if (area) area.innerHTML = renderAIQuizQuestion();
-  }, state.current >= state.questions.length ? 1200 : 2200);
+  }, state.current >= state.questions.length ? 1200 : 2000);
 }
+
+
 
 function buildAIQuizResult() {
   var state = window._ZAD_AI_QUIZ_STATE;

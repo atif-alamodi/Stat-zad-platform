@@ -6182,28 +6182,28 @@ function buildEnglishLab(subjectId) {
           box-shadow:0 8px 20px rgba(33,150,243,0.35)">🇬🇧</div>
         <div style="flex:1">
           <div style="font-weight:900;font-size:1.05rem;margin-bottom:4px">
-            مختبر الإنجليزية التطبيقية — ELG201
+            Applied English Lab — ELG201
           </div>
           <div style="font-size:0.8rem;color:var(--text-muted)">
-            مصمّم للمبتدئين تماماً — من الحروف وصولاً إلى المحادثة 🚀
+            Designed for all levels — from Basics to Conversation 🚀
           </div>
         </div>
         <div style="display:flex;flex-direction:column;gap:5px;text-align:center">
           <div style="font-size:0.68rem;padding:4px 12px;border-radius:20px;
             background:rgba(33,150,243,0.15);border:1px solid rgba(33,150,243,0.3);
-            color:#42A5F5;font-weight:700">🤖 مدعوم بالذكاء الاصطناعي</div>
+            color:#42A5F5;font-weight:700">🤖 AI-Powered</div>
           <div style="font-size:0.68rem;padding:4px 12px;border-radius:20px;
             background:rgba(0,188,212,0.12);border:1px solid rgba(0,188,212,0.25);
-            color:#26C6DA;font-weight:700">📊 7 أدوات تفاعلية</div>
+            color:#26C6DA;font-weight:700">📊 7 Interactive Tools</div>
         </div>
       </div>
 
       <!-- Progress row -->
       <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">
         ${[
-          {icon:'🔤',label:'الحروف والأصوات',id:'alphabet'},
-          {icon:'📖',label:'المفردات',id:'vocab'},
-          {icon:'⏰',label:'الأزمنة',id:'tense'},
+          {icon:'🔤',label:'Letters & Sounds',id:'alphabet'},
+          {icon:'📖',label:'Vocabulary',id:'vocab'},
+          {icon:'⏰',label:'Verb Tenses',id:'tense'},
           {icon:'🏗️',label:'بناء الجملة',id:'builder'},
           {icon:'💬',label:'المحادثة',id:'convo'},
           {icon:'📐',label:'مصحّح القواعد',id:'grammar'},
@@ -14679,6 +14679,17 @@ function startExam() {
 
 function renderExamQuestion() {
   const state = examState;
+  const isEng = state.subj === 'english';
+  const EL = {
+    q:    isEng ? 'Question' : 'السؤال',
+    easy: isEng ? 'Easy 🟢' : 'سهل 🟢',
+    med:  isEng ? 'Medium 🟡' : 'متوسط 🟡',
+    hard: isEng ? 'Hard 🔴' : 'صعب 🔴',
+    page: isEng ? 'pg.' : 'ص',
+    next: isEng ? 'Next →' : 'التالي ←',
+    end:  isEng ? '🏁 Finish Exam' : '🏁 إنهاء الاختبار',
+    hint: isEng ? '💡 Hint' : '💡 تلميح',
+  };
   const q = state.questions[state.current];
   const idx = state.current;
   const total = state.questions.length;
@@ -14687,9 +14698,9 @@ function renderExamQuestion() {
   const progEl = document.getElementById('quiz-progress');
   if(progEl) progEl.style.width = pct + '%';
   const cntEl = document.getElementById('quiz-counter');
-  if(cntEl) cntEl.textContent = `السؤال ${idx+1} من ${total}`;
+  if(cntEl) cntEl.textContent = `${EL.q} ${idx+1} / ${total}`;
 
-  const diffBadge = {easy:'سهل 🟢',medium:'متوسط 🟡',hard:'صعب 🔴'}[q.difficulty||'medium'] || 'متوسط';
+  const diffBadge = {easy:EL.easy,medium:EL.med,hard:EL.hard}[q.difficulty||'medium'] || EL.med;
   const diffColor = {easy:'rgba(0,191,165,0.15)',medium:'rgba(255,214,0,0.15)',hard:'rgba(255,82,82,0.15)'}[q.difficulty||'medium'];
 
   document.getElementById('quiz-content').innerHTML = `
@@ -17934,13 +17945,27 @@ function buildAIQuizUI(subject, subjectId) {
 function renderAIQuizQuestion() {
   var state = window._ZAD_AI_QUIZ_STATE;
   if (!state) return '';
+  var isEng = state.subjectId === 'english';
+  var L = {
+    easy:    isEng ? 'Easy'   : 'سهل',
+    medium:  isEng ? 'Medium' : 'متوسط',
+    hard:    isEng ? 'Hard'   : 'صعب',
+    qOf:     isEng ? 'Question' : 'سؤال',
+    of:      isEng ? 'of'     : 'من',
+    hint:    isEng ? '💡 Hint' : L.hint,
+    lesson:  isEng ? '📖 Lesson:' : '📖 ',
+    chapter: isEng ? '📂 Chapter:' : '📂 ',
+    page:    isEng ? '📄 Page' : L.page,
+    letters: isEng ? ['A','B','C','D'] : ['أ','ب','ج','د'],
+    confirm: isEng ? 'Check Answer →' : 'تأكيد الإجابة ←',
+  };
   if (state.current >= state.questions.length) return buildAIQuizResult();
   var q = state.questions[state.current];
   if (!q) return buildAIQuizResult();
 
   var pct = Math.round((state.current / state.questions.length) * 100);
   var diffColor = q.difficulty==='easy' ? '#66BB6A' : q.difficulty==='hard' ? '#EF5350' : '#FFA726';
-  var diffLabel = q.difficulty==='easy' ? 'سهل' : q.difficulty==='hard' ? 'صعب' : 'متوسط';
+  var diffLabel = q.difficulty==='easy' ? L.easy : q.difficulty==='hard' ? L.hard : L.medium;
 
   var opts = (q.options||[]).map(function(opt, i) {
     return '<div onclick="selectAIQuizOption('+i+')" id="aiqopt-'+i+'"'
@@ -17949,7 +17974,7 @@ function renderAIQuizQuestion() {
       + 'font-size:0.85rem;margin-bottom:8px;direction:rtl;display:flex;align-items:center;gap:10px">'
       + '<span style="width:26px;height:26px;border-radius:50%;background:rgba(108,99,255,0.15);'
       + 'display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:800;'
-      + 'color:var(--primary);flex-shrink:0">'+['أ','ب','ج','د'][i]+'</span>'
+      + 'color:var(--primary);flex-shrink:0">'+L.letters[i]+'</span>'
       + '<span>'+opt+'</span>'
       + '</div>';
   }).join('');
@@ -17982,6 +18007,17 @@ window._ZAD_AI_QUIZ_SELECTED = -1;
 
 function selectAIQuizOption(i) {
   var state = window._ZAD_AI_QUIZ_STATE;
+  var isEng = state && state.subjectId === 'english';
+  var FL = {
+    correct: isEng ? '✅ Correct answer!' : '✅ إجابة صحيحة!',
+    wrong:   isEng ? '❌ Wrong answer' : '❌ إجابة خاطئة',
+    rightAns: isEng ? '✔️ Correct answer:' : '✔️ الصحيح:',
+    hint_lbl: isEng ? '💡 Hint:' : '💡 التلميح:',
+    expl_lbl: isEng ? '📝 Explanation:' : '📝 الشرح:',
+    lesson_lbl: isEng ? '📖 Lesson:' : '📖',
+    chap_lbl: isEng ? '📂 Chapter:' : '📂',
+    page_lbl: isEng ? '📄 Page' : '📄 ص',
+  };
   if (!state) return;
   var q = state.questions[state.current];
   var correct = i === q.answer;
@@ -18011,7 +18047,7 @@ function selectAIQuizOption(i) {
     fb.style.background = correct ? 'rgba(102,187,106,0.1)' : 'rgba(239,83,80,0.08)';
     fb.style.border = '1.5px solid ' + (correct ? 'rgba(102,187,106,0.35)' : 'rgba(239,83,80,0.3)');
     var fbHTML = '<div style="font-weight:800;font-size:0.88rem;margin-bottom:6px;color:'+(correct?'#66BB6A':'#EF5350')+'">'
-      + (correct ? '✅ إجابة صحيحة!' : '❌ إجابة خاطئة') + '</div>';
+      + (correct ? FL.correct : FL.wrong) + '</div>';
     if (!correct) {
       fbHTML += '<div style="font-size:0.83rem;margin-bottom:6px">✔️ الصحيح: <strong style="color:#66BB6A">'+(q.options[q.answer]||'')+'</strong></div>';
     }
@@ -18046,16 +18082,28 @@ function selectAIQuizOption(i) {
 
 function buildAIQuizResult() {
   var state = window._ZAD_AI_QUIZ_STATE;
+  var isEng = state && state.subjectId === 'english';
+  var RL = {
+    perfect: isEng ? 'Excellent! Outstanding performance' : 'ممتاز! أداء رائع',
+    good:    isEng ? 'Very Good! Keep it up' : 'جيد جداً! استمر',
+    ok:      isEng ? 'Good, you can improve' : 'جيد، يمكنك تحسينه',
+    retry:   isEng ? 'Review the material again' : 'راجع المادة مجدداً',
+    correct: isEng ? 'correct out of' : 'صحيح من',
+    review:  isEng ? '📋 Review Answers' : RL.review,
+    retry_btn: isEng ? '🔄 Retry Quiz' : RL.retry_btn,
+    lesson_lbl: isEng ? '📖 Lesson:' : '📖',
+    chapter_lbl: isEng ? '📂 Chapter:' : '📂',
+    page_lbl: isEng ? '📄 Page' : '📄 ص',
+    correct_lbl: isEng ? '✔️ Correct answer:' : '✔️ الصحيح:',
+    explain_lbl: isEng ? '📝 Explanation:' : '📝 الشرح:',
+  };
   if (!state || !state.questions.length) return '';
   var total = state.questions.length;
   var score = state.score;
   var pct = Math.round((score / total) * 100);
   var col = pct>=70 ? '#66BB6A' : pct>=50 ? '#FFA726' : '#EF5350';
   var emoji = pct>=90?'🏆':pct>=70?'⭐':pct>=50?'👍':'💪';
-  var msg = pct>=90?'ممتاز! أداء رائع'
-           :pct>=70?'جيد جداً! استمر'
-           :pct>=50?'جيد، يمكنك تحسينه'
-           :'راجع المادة مجدداً';
+  var msg = pct>=90 ? RL.perfect : pct>=70 ? RL.good : pct>=50 ? RL.ok : RL.retry;
 
   // Track quiz completion
   if (typeof trackQuizCompleted === 'function') trackQuizCompleted(state.subjectId, pct);

@@ -13231,44 +13231,44 @@ table { display: block; overflow-x: auto; max-width: 100%; }
               background:var(--surface);border:1px solid var(--border);color:var(--text);
               padding:6px 12px;border-radius:8px;font-family:var(--font);font-size:0.82rem;cursor:pointer;
             ">
-              <option value="">📋 قوالب جاهزة...</option>
+                            <option value="">📋 قوالب جاهزة...</option>
               <optgroup label="── BASICS الأساسيات ──">
                 <option value="hello">👋 مرحبا بالعالم</option>
                 <option value="variables">📦 المتغيرات</option>
                 <option value="arithmetic">➕ العمليات الحسابية</option>
-                <option value="constants">🔒 الثوابت Constants</option>
-                <option value="conditions">🔀 الشروط if/elif/else</option>
+                <option value="constants">🔒 الثوابت</option>
+                <option value="conditions">🔀 الشروط if/elif</option>
                 <option value="strings">🔤 النصوص Strings</option>
               </optgroup>
-              <optgroup label="── DATA STRUCTURES ──">
+              <optgroup label="── Data Structures ──">
                 <option value="lists">📋 القوائم Lists</option>
-                <option value="dicts">🗂️ القواميس Dicts</option>
-                <option value="tuples_sets">🔷 Tuple / Set</option>
-                <option value="data_structures_adv">🏗️ Stack / Queue / Tree</option>
+                <option value="dicts">📖 القواميس Dicts</option>
+                <option value="tuples_sets">🔷 Tuple & Set</option>
+                <option value="data_structures_adv">🏗️ Stack/Queue/Tree</option>
               </optgroup>
-              <optgroup label="── FUNCTIONS & OOP ──">
+              <optgroup label="── Functions & OOP ──">
                 <option value="functions">⚙️ الدوال Functions</option>
                 <option value="loops">🔄 الحلقات Loops</option>
-                <option value="oop">🏛️ البرمجة الكائنية OOP</option>
-                <option value="advanced_fn">⚡ Lambda / Generator / Decorator</option>
+                <option value="oop">🏛️ OOP الكائنية</option>
+                <option value="advanced_fn">⚡ Lambda/Generator/Decorator</option>
               </optgroup>
-              <optgroup label="── ERROR HANDLING & MODULES ──">
-                <option value="exceptions">🛡️ الاستثناءات try/except</option>
-                <option value="imports">📦 المكتبات import</option>
+              <optgroup label="── Error Handling & Modules ──">
+                <option value="exceptions">🛡️ Exceptions</option>
+                <option value="imports">📦 import المكتبات</option>
                 <option value="comprehensions">🗜️ Comprehensions</option>
               </optgroup>
-              <optgroup label="── PROJECTS مشاريع ──">
-                <option value="project_calc">🧮 آلة حاسبة متكاملة</option>
-                <option value="project_student">🎓 نظام إدارة الطلاب</option>
-                <option value="project_game">🎮 لعبة تخمين الرقم</option>
+              <optgroup label="── Projects مشاريع ──">
+                <option value="project_calc">🧮 آلة حاسبة</option>
+                <option value="project_student">🎓 نظام الطلاب</option>
+                <option value="project_game">🎮 لعبة تخمين</option>
               </optgroup>
-              <optgroup label="── ML / AI ──">
+              <optgroup label="── ML/AI ──">
                 <option value="ml_basics">🤖 الانحدار الخطي</option>
               </optgroup>
-              <optgroup label="── REFERENCE مرجع ──">
-                <option value="errors">🐛 أنواع الأخطاء الكاملة</option>
+              <optgroup label="── Reference مرجع ──">
+                <option value="errors">🐛 أنواع الأخطاء</option>
                 <option value="numpy">🔢 Numpy</option>
-                <option value="builtins">📚 كل دوال Python (70+)</option>
+                <option value="builtins">📚 كل الدوال المدمجة</option>
               </optgroup>
               </select>
             <button onclick="clearPyEditor()" style="
@@ -17114,2042 +17114,855 @@ async function initPyodide() {
 
 const PY_TEMPLATES = {
 
-  /* ══ BASICS ══ */
+  /* BASICS */
 
-  hello: `# ╔══════════════════════════════════════╗
-# ║   مرحبا بالعالم - Hello World       ║
-# ║   أول برنامج في Python              ║
-# ╚══════════════════════════════════════╝
-#
-# print() = الدالة الأساسية لطباعة أي شيء على الشاشة
-# تقبل: نصوص، أرقام، متغيرات، أو أي قيمة
+  hello: `print("=" * 30)
+print("   مرحبا بالعالم!")
+print("   Python في المتصفح!")
+print("=" * 30)
+x = 10
+y = 3
+print(f"\\n{x} + {y} = {x+y}")
+print(f"{x} * {y} = {x*y}")
+print(f"{x} ** {y} = {x**y}")`,
 
-print("مرحبا بالعالم!")          # طباعة نص مباشر
-print("Python يعمل في المتصفح!") # يمكن طباعة أي نص
-print()                           # سطر فارغ
-
-# print() مع sep و end
-print("واحد", "اثنان", "ثلاثة", sep=" | ")  # الفاصل بين القيم
-print("لا سطر جديد", end=" <<< ")            # بدل السطر الجديد
-print("هنا")
-
-# طباعة أرقام وعمليات مباشرة
-print(10 + 5)       # يحسب أولاً ثم يطبع
-print(2 ** 8)       # 2 أس 8
-
-# f-string: أسهل طريقة لدمج متغير مع نص
-اسم = "عاطف"
-سنة = 2025
-print(f"أهلاً {اسم}! السنة {سنة}")
-
-# طباعة أشكال
-for i in range(1, 6):
-    print("*" * i)
-`,
-
-  variables: `# ╔══════════════════════════════════════╗
-# ║       المتغيرات - Variables         ║
-# ╚══════════════════════════════════════╝
-#
-# المتغير = صندوق في ذاكرة الحاسب يحفظ قيمة
-# القاعدة: اسم_المتغير = القيمة
-# Python يحدد النوع تلقائياً (Dynamic Typing)
-
-# ── 1. الأنواع الأساسية ──────────────────────────
-اسم   = "عاطف"       # str  = نص  (بين " " أو ' ')
-عمر   = 25            # int  = عدد صحيح
-طول   = 1.75          # float= عدد عشري
-طالب  = True          # bool = منطقي (True أو False فقط)
-فارغ  = None          # None = بدون قيمة (مثل null)
-
-print("── الأنواع الأساسية ──")
-print(f"  اسم   = {اسم!r:15}  type = {type(اسم).__name__}")
-print(f"  عمر   = {عمر!r:15}  type = {type(عمر).__name__}")
-print(f"  طول   = {طول!r:15}  type = {type(طول).__name__}")
-print(f"  طالب  = {طالب!r:15}  type = {type(طالب).__name__}")
-print(f"  فارغ  = {فارغ!r:15}  type = {type(فارغ).__name__}")
-
-# ── 2. تحديث المتغير ─────────────────────────────
-print("\\n── تحديث المتغير ──")
-print(f"  قبل: عمر = {عمر}")
-عمر = 26              # يمكن تغيير القيمة في أي وقت
-print(f"  بعد: عمر = {عمر}")
-
-عمر += 1              # اختصار لـ  عمر = عمر + 1
-print(f"  عمر += 1  -> {عمر}")
-
-# ── 3. تحويل الأنواع (Casting) ────────────────────
-# أحياناً نحتاج تحويل نوع إلى آخر
-print("\\n── تحويل الأنواع ──")
-رقم_نص = "42"
-print(f"  int('42')       = {int('42')}      # نص -> صحيح")
-print(f"  float('3.14')   = {float('3.14')}   # نص -> عشري")
-print(f"  str(100)        = {str(100)!r}     # رقم -> نص")
-print(f"  bool(0)         = {bool(0)}   # 0 -> False")
-print(f"  bool(1)         = {bool(1)}    # أي رقم غير 0 -> True")
-print(f"  bool('')        = {bool('')}   # نص فارغ -> False")
-print(f"  bool('hello')   = {bool('hello')}    # نص غير فارغ -> True")
-
-# ── 4. تعيين متعدد ───────────────────────────────
-print("\\n── تعيين متعدد ──")
-x = y = z = 0          # نفس القيمة لعدة متغيرات
-print(f"  x=y=z=0  ->  {x}, {y}, {z}")
-
-a, b, c = 10, 20, 30   # قيم مختلفة دفعة واحدة
-print(f"  a,b,c = 10,20,30  ->  {a}, {b}, {c}")
-
-# تبديل قيمتين (بدون متغير مؤقت)
+  variables: `print("=" * 35)
+print("   المتغيرات في Python")
+print("=" * 35)
+# str=نص  int=صحيح  float=عشري  bool=منطقي  None=فارغ
+اسم, عمر, طول, طالب, فارغ = "عاطف", 25, 1.75, True, None
+print("  المتغير          القيمة       النوع")
+for n, v in [("اسم",اسم),("عمر",عمر),("طول",طول),("طالب",طالب),("فارغ",فارغ)]:
+    print(f"  {n:10} = {str(v):15} type={type(v).__name__}")
+print("\\n-- تغيير المتغير --")
+رقم = 5
+print(f"  قبل: {رقم}")
+رقم += 10
+print(f"  بعد += 10: {رقم}")
+print("\\n-- تعيين متعدد --")
+a, b, c = 1, 2, 3
+print(f"  a={a}, b={b}, c={c}")
 a, b = b, a
-print(f"  بعد تبديل a,b  ->  {a}, {b}")
-`,
+print(f"  بعد التبديل: a={a}, b={b}")
+print("\\n-- تحويل الانواع --")
+print(f"  int('42')     = {int('42')}")
+print(f"  float('3.14') = {float('3.14')}")
+print(f"  str(100)      = '{str(100)}'")
+print(f"  bool(0)={bool(0)}  bool(5)={bool(5)}")`,
 
-  arithmetic: `# ╔══════════════════════════════════════╗
-# ║    العمليات الحسابية والمنطقية      ║
-# ╚══════════════════════════════════════╝
+  arithmetic: `print("=" * 38)
+print("   العمليات الحسابية")
+print("=" * 38)
+x, y = 17, 5
+for name, expr, result in [
+    ("الجمع",       f"{x}+{y}",     x+y),
+    ("الطرح",       f"{x}-{y}",     x-y),
+    ("الضرب",       f"{x}*{y}",     x*y),
+    ("قسمة",        f"{x}/{y}",     round(x/y,4)),
+    ("قسمة صحيحة", f"{x}//{y}",    x//y),
+    ("الباقي",      f"{x}%{y}",     x%y),
+    ("الاس",        f"{x}**2",      x**2),
+    ("جذر تربيعي", f"{x}**0.5",    round(x**0.5,4)),
+]:
+    print(f"  {name:12} {expr:8} = {result}")
+print("\\n-- المقارنة --")
+for op in [f"{x}>{y}",f"{x}=={y}",f"{x}!={y}",f"{x}>={y}"]:
+    print(f"  {op} = {eval(op)}")
+print("\\n-- المنطق and/or/not --")
+print(f"  True and False = {True and False}")
+print(f"  True or False  = {True or False}")
+print(f"  not True       = {not True}")
+print("\\n-- العمليات المختصرة --")
+n = 20
+n += 5; print(f"  n+=5  -> {n}")
+n -= 3; print(f"  n-=3  -> {n}")
+n *= 2; print(f"  n*=2  -> {n}")
+n //= 4; print(f"  n//=4 -> {n}")`,
 
-x, y = 20, 6
-
-# ── 1. العمليات الحسابية الأساسية ────────────────
-print("── العمليات الحسابية ──")
-print(f"  {x} + {y}   = {x+y}      # جمع")
-print(f"  {x} - {y}   = {x-y}      # طرح")
-print(f"  {x} * {y}   = {x*y}     # ضرب")
-print(f"  {x} / {y}   = {x/y:.4f}  # قسمة (تعطي float دائماً)")
-print(f"  {x} // {y}  = {x//y}      # قسمة صحيحة (تقريب للأسفل)")
-print(f"  {x} %  {y}  = {x%y}       # باقي القسمة (modulo)")
-print(f"  {x} ** 3 = {x**3}   # الأس (20 مكعب)")
-print(f"  2  ** 10 = {2**10}   # (مفيد جداً في حساب الذاكرة)")
-
-# ── 2. اختصارات التحديث ──────────────────────────
-print("\\n── اختصارات التحديث ──")
-n = 100
-print(f"  n = {n}")
-n += 15;  print(f"  n += 15  ->  {n}")  # n = n + 15
-n -= 5;   print(f"  n -= 5   ->  {n}")  # n = n - 5
-n *= 2;   print(f"  n *= 2   ->  {n}")  # n = n * 2
-n //= 3;  print(f"  n //= 3  ->  {n}")  # n = n // 3
-
-# ── 3. المقارنة (تعطي True أو False) ─────────────
-print("\\n── المقارنة ──")
-a, b = 10, 20
-comparisons = [
-    (f"{a} >  {b}", a >  b),
-    (f"{a} <  {b}", a <  b),
-    (f"{a} >= {a}", a >= a),
-    (f"{a} <= {b}", a <= b),
-    (f"{a} == {a}", a == a),  # == للمقارنة (مش = التعيين)
-    (f"{a} != {b}", a != b),
-]
-for expr, result in comparisons:
-    print(f"  {expr:12}  ->  {result}")
-
-# ── 4. العمليات المنطقية ─────────────────────────
-print("\\n── المنطقية (and / or / not) ──")
-print(f"  True  and True  = {True  and True }")   # كلاهما True
-print(f"  True  and False = {True  and False}")   # واحد False يكفي
-print(f"  False or  True  = {False or  True }")   # واحد True يكفي
-print(f"  False or  False = {False or  False}")   # كلاهما False
-print(f"  not True        = {not True       }")   # عكس القيمة
-print(f"  not False       = {not False      }")
-
-# ── 5. دوال الرياضيات ────────────────────────────
-import math
-print("\\n── دوال math ──")
-print(f"  abs(-42)      = {abs(-42)}")
-print(f"  round(3.7)    = {round(3.7)}")
-print(f"  round(3.1415,2) = {round(3.1415,2)}")
-print(f"  math.sqrt(144) = {math.sqrt(144)}")
-print(f"  math.ceil(3.1) = {math.ceil(3.1)}")
-print(f"  math.floor(3.9)= {math.floor(3.9)}")
-`,
-
-  constants: `# ╔══════════════════════════════════════╗
-# ║     الثوابت - Constants             ║
-# ╚══════════════════════════════════════╝
-#
-# الثابت = متغير لا يتغير طوال البرنامج
-# الاتفاق في Python: اكتب اسمه بحروف كبيرة كلها
-# Python لا يُجبر على هذا، لكنه الاتفاق المتعارف عليه
-
-import math
-
-# ── ثوابت علمية ──────────────────────────────────
-PI          = 3.14159265    # النسبة التقريبية
-E           = 2.71828182    # أساس اللوغاريتم الطبيعي
-GRAVITY     = 9.80665       # الجاذبية الأرضية م/ث²
-SPEED_LIGHT = 299_792_458   # سرعة الضوء م/ث (الـ _ للقراءة فقط)
-ABSOLUTE_ZERO = -273.15     # الصفر المطلق درجة مئوية
-
-# ── ثوابت التطبيق ─────────────────────────────────
-APP_NAME    = "منصة زاد"
-VERSION     = "2.5"
-MAX_RETRY   = 3
-PASS_SCORE  = 60            # درجة النجاح
-TAX_RATE    = 0.15          # ضريبة 15%
-
-print("── الثوابت العلمية ──")
-consts = [("PI", PI), ("E", E), ("GRAVITY", GRAVITY),
-          ("SPEED_LIGHT", f"{SPEED_LIGHT:,}"), ("ABSOLUTE_ZERO", ABSOLUTE_ZERO)]
-for name, val in consts:
-    print(f"  {name:15} = {val}")
-
-print("\\n── ثوابت التطبيق ──")
-app_consts = [("APP_NAME",APP_NAME),("VERSION",VERSION),
-              ("MAX_RETRY",MAX_RETRY),("PASS_SCORE",PASS_SCORE),("TAX_RATE",TAX_RATE)]
-for name, val in app_consts:
-    print(f"  {name:15} = {val}")
-
-# ── توظيف الثوابت في حسابات ──────────────────────
-print("\\n── توظيف عملي ──")
+  constants: `print("=" * 40)
+print("   الثوابت Constants")
+print("   الاتفاق: حروف كبيرة كلها")
+print("=" * 40)
+PI           = 3.14159265358979
+GRAVITY      = 9.8
+SPEED_LIGHT  = 299_792_458
+MAX_STUDENTS = 40
+APP_NAME     = "منصة زاد التعليمية"
+VERSION      = "2.0"
+consts = [("PI",PI,"π"),("GRAVITY",GRAVITY,"جاذبية م/ث²"),
+          ("SPEED_LIGHT",SPEED_LIGHT,"سرعة الضوء م/ث"),
+          ("MAX_STUDENTS",MAX_STUDENTS,"أقصى طلاب"),
+          ("APP_NAME",APP_NAME,"اسم التطبيق"),
+          ("VERSION",VERSION,"الإصدار")]
+for n,v,desc in consts:
+    print(f"  {n:15} = {str(v):20} # {desc}")
+print("\\n-- استخدام الثوابت --")
 r = 7
-area    = PI * r ** 2
-perimeter = 2 * PI * r
-print(f"  دائرة r={r}: مساحة={area:.3f}  محيط={perimeter:.3f}")
+print(f"  دائرة r={r}:")
+print(f"    المحيط  = 2*PI*r = {2*PI*r:.4f}")
+print(f"    المساحة = PI*r^2 = {PI*r**2:.4f}")
+grade = 75
+print(f"\\n  درجة {grade}: {'ناجح' if grade >= 60 else 'راسب'} (MIN_PASS=60)")`,
 
-price = 500
-tax   = price * TAX_RATE
-total = price + tax
-print(f"  سعر={price} ريال + ضريبة {TAX_RATE*100:.0f}% = {total:.0f} ريال")
-
-درجة = 75
-نجاح = درجة >= PASS_SCORE
-print(f"  درجة {درجة} {'ناجح ✓' if نجاح else 'راسب ✗'} (الحد={PASS_SCORE})")
-
-# ── ثوابت Python المدمجة ──────────────────────────
-print("\\n── ثوابت Python المدمجة ──")
-print(f"  math.pi  = {math.pi:.10f}")
-print(f"  math.e   = {math.e:.10f}")
-print(f"  math.inf = {math.inf}  (اللانهاية)")
-print(f"  True     = {True}  (الثابت المنطقي)")
-print(f"  False    = {False}  (الثابت المنطقي)")
-print(f"  None     = {None}   (القيمة الفارغة)")
-`,
-
-  conditions: `# ╔══════════════════════════════════════╗
-# ║    الشروط - if / elif / else        ║
-# ╚══════════════════════════════════════╝
-#
-# الشروط تتحكم في مسار البرنامج:
-# if  = إذا كان الشرط صحيحاً نفذ هذا
-# elif= وإلا إذا كان هذا الشرط صحيحاً
-# else= وإلا (في كل حالة أخرى)
-# التنبه: المسافة البادئة (4 مسافات) ضرورية!
-
-# ── 1. if / elif / else ──────────────────────────
-print("── تقدير الدرجات ──")
-for درجة in [98, 87, 73, 64, 42]:
-    if   درجة >= 90:  تقدير, رمز = "ممتاز",   "A+"
-    elif درجة >= 80:  تقدير, رمز = "جيد جدا", "B"
-    elif درجة >= 70:  تقدير, رمز = "جيد",     "C"
-    elif درجة >= 60:  تقدير, رمز = "مقبول",   "D"
-    else:             تقدير, رمز = "راسب",    "F"
-    bar = "█" * (درجة//10)
-    print(f"  {درجة:3}%  {رمز:3}  {تقدير:8}  {bar}")
-
-# ── 2. Ternary (شرط في سطر واحد) ─────────────────
-# القيمة = قيمة_أولى if الشرط else قيمة_ثانية
-print("\\n── Ternary Operator ──")
-for x in [0, 7, 12, 15, 22]:
-    نوع   = "زوجي" if x % 2 == 0 else "فردي"
-    حجم   = "كبير" if x > 10 else "صغير"
-    print(f"  {x:3}  ->  {نوع:6}  {حجم}")
-
-# ── 3. and / or / not ────────────────────────────
-print("\\n── الشروط المركبة (and/or/not) ──")
-عمر = 20
-لديه_هوية = True
-مسجل = False
-
-if عمر >= 18 and لديه_هوية:
-    print("  يمكنه الدخول ✓")
-
-if مسجل or عمر < 15:
-    print("  استثناء")
+  conditions: `print("=" * 38)
+print("   الشروط if / elif / else")
+print("=" * 38)
+print("-- تقدير الدرجات --")
+for درجة in [98, 87, 74, 63, 45]:
+    if درجة >= 90:   label = "A ممتاز"
+    elif درجة >= 80: label = "B جيد جداً"
+    elif درجة >= 70: label = "C جيد"
+    elif درجة >= 60: label = "D مقبول"
+    else:             label = "F راسب"
+    bar = chr(9608) * (درجة//10)
+    print(f"  {درجة:3}% -> {label:12} {bar}")
+print("\\n-- Ternary شرط في سطر --")
+for x in [7, 0, -3, 12]:
+    kind = "موجب" if x>0 else ("سالب" if x<0 else "صفر")
+    print(f"  {x:4} -> {kind}")
+print("\\n-- and / or / in --")
+age, licensed = 20, True
+if age >= 18 and licensed:
+    print("  يمكنه القيادة ✓")
+langs = ["Python","Java","Rust"]
+for lang in ["Python","C++","Rust"]:
+    status = "مدعوم" if lang in langs else "غير مدعوم"
+    print(f"  {lang:8}: {status}")
+print("\\n-- شرط داخل شرط (Nested) --")
+grade, attend = 85, 90
+if grade >= 60:
+    if attend >= 75:
+        print(f"  ناجح: درجة={grade}% حضور={attend}% ✓")
+    else:
+        print(f"  رسب بسبب الغياب رغم درجة {grade}%")
 else:
-    print("  ادفع الرسوم")
+    print(f"  رسب: الدرجة {grade}% < 60%")`,
 
-if not مسجل:
-    print("  يجب التسجيل أولاً")
+  strings: `print("=" * 35)
+print("   النصوص Strings")
+print("=" * 35)
+text = "Python لغة برمجة رائعة"
+print(f"النص: '{text}'")
+print(f"الطول: {len(text)}")
+print("\\n-- الأحرف والشرائح --")
+print(f"  [0]     = '{text[0]}'")
+print(f"  [-1]    = '{text[-1]}'")
+print(f"  [0:6]   = '{text[0:6]}'")
+print(f"  [::-1]  = '{text[::-1]}'")
+print("\\n-- دوال النصوص --")
+ops = [
+    ("upper",     text.upper()),
+    ("lower",     text.lower()),
+    ("replace",   text.replace("رائعة","مذهلة")),
+    ("split",     text.split()),
+    ("find(P)",   text.find("P")),
+    ("count(ا)",  text.count("ا")),
+    ("startswith",text.startswith("Python")),
+    ("in",        "Python" in text),
+]
+for n, v in ops:
+    print(f"  .{n:12}: {v}")
+print("\\n-- تنظيف النصوص --")
+dirty = "   مرحبا   "
+print(f"  الاصلي  : '{dirty}'")
+print(f"  strip() : '{dirty.strip()}'")
+print("\\n-- f-string احترافي --")
+name, grade = "عاطف", 92.567
+balance = 15000000
+print(f"  {name:>10} | درجة={grade:.2f}% | رصيد={balance:,}")
+print(f"  {'★'*5} | {42:010d} | {0.876:.1%}")`,
 
-# ── 4. in / not in ───────────────────────────────
-print("\\n── in / not in ──")
-مواد_مسجلة = ["Python", "إحصاء", "أنظمة"]
-for مادة in ["Python", "Java", "إحصاء", "C++"]:
-    if مادة in مواد_مسجلة:
-        print(f"  {مادة:10}  مسجل ✓")
-    else:
-        print(f"  {مادة:10}  غير مسجل ✗")
+  /* DATA STRUCTURES */
 
-# ── 5. الشروط المتداخلة (Nested) ──────────────────
-print("\\n── شروط متداخلة ──")
-def تصنيف_طالب(درجة, حضور):
-    if درجة >= 60:
-        if حضور >= 80:
-            return "ناجح ومنتظم ✓"
-        else:
-            return "ناجح لكن غياب كثير ⚠"
-    else:
-        if حضور >= 80:
-            return "راسب لكن منتظم - إعادة"
-        else:
-            return "راسب وغياب - حرمان"
+  lists: `print("=" * 38)
+print("   القوائم Lists []")
+print("=" * 38)
+# القائمة = مجموعة عناصر مرتبة قابلة للتغيير
+# الفهرس يبدأ من 0
+numbers = [5, 3, 8, 1, 9, 2, 7, 4, 6]
+texts   = ["Python", "Java", "C++", "Rust"]
+mixed   = [1, "hello", True, 3.14, None]
+print(f"  numbers: {numbers}")
+print(f"  texts  : {texts}")
+print(f"  mixed  : {mixed}")
+print("\\n-- الوصول والشرائح --")
+print(f"  [0]     = {numbers[0]}    (أول)")
+print(f"  [-1]    = {numbers[-1]}    (آخر)")
+print(f"  [1:4]   = {numbers[1:4]}  (من 1 حتى 3)")
+print(f"  [-3:]   = {numbers[-3:]}  (آخر 3)")
+print(f"  [::-1]  = {numbers[::-1]} (معكوس)")
+print("\\n-- العمليات --")
+lst = [10, 20, 30]
+lst.append(40);      print(f"  append(40): {lst}")
+lst.insert(1, 15);   print(f"  insert(1,15): {lst}")
+lst.extend([50,60]); print(f"  extend: {lst}")
+lst.remove(15);      print(f"  remove(15): {lst}")
+v = lst.pop();       print(f"  pop()={v}: {lst}")
+print("\\n-- دوال مفيدة --")
+arr = [5,3,8,1,9,2,7,4,6]
+print(f"  len={len(arr)} max={max(arr)} min={min(arr)} sum={sum(arr)}")
+print(f"  sorted asc : {sorted(arr)}")
+print(f"  sorted desc: {sorted(arr, reverse=True)}")
+print(f"  8 in arr   : {8 in arr}")
+print(f"  count(5)   : {arr.count(5)}")
+print("\\n-- List Comprehension --")
+squares = [x**2 for x in range(1, 9)]
+evens   = [x for x in range(20) if x%2==0]
+print(f"  squares 1-8 : {squares}")
+print(f"  evens <=20  : {evens}")`,
 
-cases = [(85,90), (75,60), (55,85), (45,50)]
-for درجة, حضور in cases:
-    print(f"  درجة={درجة} حضور={حضور}%  ->  {تصنيف_طالب(درجة,حضور)}")
-
-# ── 6. match (Python 3.10+) ───────────────────────
-print("\\n── match/case (مثل switch) ──")
-for يوم in [1, 5, 6, 7, 9]:
-    match يوم:
-        case 1: print(f"  اليوم {يوم}: الإثنين")
-        case 5: print(f"  اليوم {يوم}: الجمعة")
-        case 6 | 7: print(f"  اليوم {يوم}: عطلة نهاية الأسبوع")
-        case _: print(f"  اليوم {يوم}: يوم عادي")
-`,
-
-  strings: `# ╔══════════════════════════════════════╗
-# ║       النصوص - Strings             ║
-# ╚══════════════════════════════════════╝
-#
-# النص (str) = سلسلة من الحروف محاطة بـ " " أو ' ' أو \\"\\"\\"
-# النصوص لا تتغير بعد الإنشاء (Immutable)
-# الفهرسة تبدأ من 0
-
-نص = "Python أروع لغة برمجة في العالم"
-
-# ── 1. الخصائص الأساسية ─────────────────────────
-print("── الخصائص الأساسية ──")
-print(f"  النص    : {نص!r}")
-print(f"  len()   : {len(نص)}   (عدد الحروف)")
-print(f"  [0]     : {نص[0]!r}  (الحرف الأول)")
-print(f"  [-1]    : {نص[-1]!r}  (الحرف الأخير)")
-print(f"  [0:6]   : {نص[0:6]!r}  (أول 6 حروف)")
-print(f"  [7:11]  : {نص[7:11]!r} (الموضع 7 حتى 11)")
-print(f"  [::-1]  : {نص[::-1]!r}  (عكس النص)")
-
-# ── 2. التحويل ───────────────────────────────────
-print("\\n── التحويل ──")
-print(f"  upper()    : {نص.upper()}")
-print(f"  lower()    : {نص.lower()}")
-print(f"  title()    : {'hello world'.title()}")
-print(f"  capitalize : {'hello'.capitalize()}")
-print(f"  swapcase() : {'HeLLo'.swapcase()}")
-
-# ── 3. البحث ─────────────────────────────────────
-print("\\n── البحث ──")
-print(f"  find('Python')    : {نص.find('Python')}   (الموضع، -1 إذا لم يجد)")
-print(f"  count('ا')        : {نص.count('ا')}    (عدد المرات)")
-print(f"  'Python' in نص    : {'Python' in نص}")
-print(f"  startswith('Py') : {نص.startswith('Py')}")
-print(f"  endswith('لم')   : {نص.endswith('لم')}")
-
-# ── 4. التعديل ───────────────────────────────────
-print("\\n── التعديل ──")
-print(f"  replace()  : {نص.replace('Python', 'Zad')}")
-print(f"  split()    : {نص.split()[:3]}...")
-print(f"  join()     : {' - '.join(['واحد','اثنان','ثلاثة'])}")
-print(f"  strip()    : {'   مسافات   '.strip()!r}")
-print(f"  lstrip()   : {'   مسافات   '.lstrip()!r}")
-print(f"  rstrip()   : {'   مسافات   '.rstrip()!r}")
-
-# ── 5. التنسيق (f-string) ────────────────────────
-print("\\n── f-string التنسيق ──")
-اسم = "عاطف"
-درجة = 92.5678
-رقم = 1500000
-print(f"  {{اسم}}            : {اسم}")
-print(f"  {{درجة:.2f}}       : {درجة:.2f}   (عشريان)")
-print(f"  {{درجة:08.2f}}     : {درجة:08.2f} (بصفر للتكملة)")
-print(f"  {{رقم:,}}          : {رقم:,}  (فاصل الآلاف)")
-print(f"  {{اسم:>10}}        : {اسم:>10!r} (محاذاة يمين)")
-print(f"  {{اسم:<10}}        : {اسم:<10!r} (محاذاة يسار)")
-print(f"  {{اسم:^10}}        : {اسم:^10!r} (توسيط)")
-print(f"  {{10:05d}}          : {10:05d} (رقم بأصفار)")
-
-# ── 6. نصوص متعددة الأسطر ────────────────────────
-print("\\n── نصوص متعددة الأسطر ──")
-نص_طويل = \\"\\"\\"
-السطر الأول
-    السطر الثاني (بمسافة بادئة)
-السطر الثالث
-\\"\\"\\"
-print(نص_طويل)
-
-# ── 7. أحرف خاصة (Escape) ────────────────────────
-print("── أحرف خاصة ──")
-print("  سطر جديد:\\nهنا")
-print("  tab:\\tهنا")
-print("  اقتباس: \\"نص\\"")
-print("  شرطة مائلة: C:\\\\Users\\\\Desktop")
-`,
-
-  /* ══ DATA STRUCTURES ══ */
-
-  lists: `# ╔══════════════════════════════════════╗
-# ║       القوائم - Lists               ║
-# ╚══════════════════════════════════════╝
-#
-# القائمة (list) = تجميع عدة قيم في متغير واحد
-# - مرتبة (محتفظة بالترتيب)
-# - قابلة للتغيير (يمكن إضافة/حذف/تعديل)
-# - تقبل أنواعاً مختلطة
-# - الفهرسة تبدأ من 0
-# التعريف: اسم = [قيمة1, قيمة2, قيمة3]
-
-# ── 1. إنشاء القوائم ─────────────────────────────
-أرقام  = [1, 2, 3, 4, 5]
-نصوص   = ["Python", "Java", "C++", "Rust"]
-مختلط  = [1, "hello", True, 3.14, None]
-فارغة  = []
-مكررة  = [0] * 5              # [0, 0, 0, 0, 0]
-نطاق   = list(range(1, 11))   # [1..10]
-
-print("── إنشاء القوائم ──")
-print(f"  أرقام  : {أرقام}")
-print(f"  نصوص   : {نصوص}")
-print(f"  مختلط  : {مختلط}")
-print(f"  مكررة  : {مكررة}")
-print(f"  نطاق   : {نطاق}")
-
-# ── 2. الوصول للعناصر ───────────────────────────
-print("\\n── الوصول (Indexing & Slicing) ──")
-lst = [10, 20, 30, 40, 50, 60, 70]
-print(f"  القائمة     : {lst}")
-print(f"  lst[0]      = {lst[0]}   (الأول)")
-print(f"  lst[-1]     = {lst[-1]}   (الأخير)")
-print(f"  lst[2]      = {lst[2]}   (الموضع 2)")
-print(f"  lst[1:4]    = {lst[1:4]}  (من 1 حتى 4 غير مشمول)")
-print(f"  lst[:3]     = {lst[:3]}     (أول 3)")
-print(f"  lst[4:]     = {lst[4:]}     (من 4 للنهاية)")
-print(f"  lst[::2]    = {lst[::2]}  (كل عنصر ثاني)")
-print(f"  lst[::-1]   = {lst[::-1]}  (عكس)")
-
-# ── 3. إضافة وحذف ────────────────────────────────
-print("\\n── الإضافة والحذف ──")
-nums = [3, 1, 4, 1, 5]
-print(f"  البداية     : {nums}")
-nums.append(9);           print(f"  append(9)   : {nums}  # أضف للنهاية")
-nums.insert(0, 0);        print(f"  insert(0,0) : {nums}  # أضف في موضع")
-nums.extend([7, 8]);      print(f"  extend([7,8]): {nums}  # أضف قائمة")
-nums.remove(1);           print(f"  remove(1)   : {nums}  # احذف أول تكرار")
-val = nums.pop();         print(f"  pop()={val}      : {nums}  # احذف الأخير وأرجعه")
-val = nums.pop(0);        print(f"  pop(0)={val}     : {nums}  # احذف الموضع 0")
-del nums[2];              print(f"  del nums[2] : {nums}  # احذف موضع 2")
-
-# ── 4. البحث والمعلومات ──────────────────────────
-print("\\n── البحث والمعلومات ──")
-data = [5, 3, 8, 1, 9, 2, 7, 4, 6, 8, 3]
-print(f"  القائمة      : {data}")
-print(f"  len()        = {len(data)}    (الطول)")
-print(f"  count(8)     = {data.count(8)}     (عدد مرات 8)")
-print(f"  index(9)     = {data.index(9)}     (موضع 9)")
-print(f"  9 in data    = {9 in data}")
-print(f"  100 in data  = {100 in data}")
-
-# ── 5. الإحصاء ───────────────────────────────────
-print("\\n── الإحصاء ──")
-print(f"  max()  = {max(data)}")
-print(f"  min()  = {min(data)}")
-print(f"  sum()  = {sum(data)}")
-print(f"  mean   = {sum(data)/len(data):.2f}")
-
-# ── 6. الترتيب ───────────────────────────────────
-print("\\n── الترتيب ──")
-nums = [5, 3, 8, 1, 9, 2]
-print(f"  الأصل         : {nums}")
-print(f"  sorted()      : {sorted(nums)}          # نسخة جديدة")
-print(f"  sorted(rev)   : {sorted(nums, reverse=True)} # تنازلي")
-nums_copy = nums.copy()
-nums_copy.sort();    print(f"  .sort()       : {nums_copy}          # يعدل في مكانها")
-nums_copy.reverse(); print(f"  .reverse()    : {nums_copy}          # يعكس في مكانها")
-
-# ── 7. نسخ القائمة ───────────────────────────────
-print("\\n── نسخ القائمة (مهم!) ──")
-أصل = [1, 2, 3]
-مرجع = أصل          # نفس القائمة! التغيير يؤثر على الأصل
-نسخة = أصل.copy()   # نسخة مستقلة
-مرجع.append(4)
-print(f"  أصل    : {أصل}  (تأثر بسبب مرجع)")
-print(f"  مرجع   : {مرجع}")
-print(f"  نسخة   : {نسخة}  (لم تتأثر)")
-
-# ── 8. List Comprehension ────────────────────────
-print("\\n── List Comprehension ──")
-# طريقة سريعة لإنشاء قائمة
-مربعات   = [x**2 for x in range(1, 8)]
-أزواج    = [x for x in range(20) if x % 2 == 0]
-حروف     = [c.upper() for c in "python"]
-مضاعفة  = [x*2 for x in أرقام if x > 2]
-
-print(f"  مربعات 1-7    : {مربعات}")
-print(f"  أزواج 0-19    : {أزواج}")
-print(f"  أحرف كبيرة    : {حروف}")
-print(f"  مضاعف >2      : {مضاعفة}")
-`,
-
-  dicts: `# ╔══════════════════════════════════════╗
-# ║     القواميس - Dictionaries         ║
-# ╚══════════════════════════════════════╝
-#
-# القاموس (dict) = تخزين البيانات بشكل مفتاح: قيمة
-# - كل مفتاح فريد
-# - الوصول بالمفتاح وليس بالرقم
-# - مرن جداً وسريع
-# التعريف: اسم = {"مفتاح": قيمة, ...}
-
-# ── 1. إنشاء القواميس ────────────────────────────
-print("── إنشاء القواميس ──")
-# طريقة 1: مباشرة
-طالب = {
-    "اسم":     "عاطف",
-    "عمر":     25,
-    "مادة":    "Python",
-    "درجة":    92.5,
-    "ناجح":    True
+  dicts: `print("=" * 38)
+print("   القواميس Dictionaries {}")
+print("=" * 38)
+# القاموس = بيانات منظمة كـ مفتاح: قيمة
+# سريع جداً في البحث O(1)
+student = {
+    "name"  : "عاطف",
+    "age"   : 25,
+    "course": "Python",
+    "grades": [85, 92, 88],
+    "active": True,
 }
-print(f"  طالب: {طالب}")
-
-# طريقة 2: dict()
-بلد = dict(اسم="السعودية", عاصمة="الرياض", سكان=35_000_000)
-print(f"  بلد: {بلد}")
-
-# طريقة 3: من قائمتين
-مفاتيح = ["أ", "ب", "ج"]
-قيم    = [1, 2, 3]
-مزدوج = dict(zip(مفاتيح, قيم))
-print(f"  مزدوج: {مزدوج}")
-
-# ── 2. الوصول للقيم ─────────────────────────────
-print("\\n── الوصول للقيم ──")
-print(f"  طالب['اسم']     = {طالب['اسم']}")
-print(f"  طالب['درجة']    = {طالب['درجة']}")
-# get() آمن - لا يرمي خطأ إذا المفتاح غير موجود
-print(f"  get('عمر')      = {طالب.get('عمر')}")
-print(f"  get('عنوان')    = {طالب.get('عنوان')}    (غير موجود -> None)")
-print(f"  get('عنوان','?')= {طالب.get('عنوان', 'غير محدد')}")
-
-# ── 3. التعديل ───────────────────────────────────
-print("\\n── الإضافة والتعديل والحذف ──")
-info = {"x": 1, "y": 2}
-print(f"  البداية         : {info}")
-info["z"] = 3;            print(f"  أضف z=3        : {info}")
-info["x"] = 100;          print(f"  عدّل x=100     : {info}")
-info.update({"a":4,"b":5}); print(f"  update{{a,b}}   : {info}")
-del info["y"];            print(f"  del y          : {info}")
-val = info.pop("z");      print(f"  pop(z)={val}      : {info}")
-val2 = info.setdefault("c", 99); print(f"  setdefault(c,99)={val2}: {info}")
-
-# ── 4. التكرار على القاموس ───────────────────────
-print("\\n── التكرار (Iteration) ──")
-شخص = {"اسم":"عاطف","عمر":25,"مدينة":"جدة","مهنة":"مبرمج"}
-
-print("  for key:")
-for k in شخص:
-    print(f"    {k}: {شخص[k]}")
-
-print("  for value:")
-for v in شخص.values():
-    print(f"    {v}")
-
-print("  for key,value:")
-for k, v in شخص.items():
-    print(f"    {k:8} -> {v}")
-
-# ── 5. العمليات المفيدة ──────────────────────────
-print("\\n── العمليات المفيدة ──")
-d = {"a":1,"b":2,"c":3,"d":4}
-print(f"  len()          = {len(d)}")
-print(f"  keys()         = {list(d.keys())}")
-print(f"  values()       = {list(d.values())}")
-print(f"  items()        = {list(d.items())}")
-print(f"  'a' in d       = {'a' in d}")
-print(f"  'z' in d       = {'z' in d}")
-print(f"  'd' not in d   = {'d' not in d}")
-
-# ── 6. قاموس مركب (Nested) ───────────────────────
-print("\\n── قاموس مركب ──")
-جامعة = {
-    "اسم": "الجامعة السعودية الإلكترونية",
-    "أقسام": {
-        "برمجة": {"طلاب": 200, "سنوات": 4},
-        "إحصاء": {"طلاب": 150, "سنوات": 3}
-    },
-    "مدن": ["الرياض", "جدة", "الدمام"]
+print(f"  القاموس: {student}")
+print("\\n-- الوصول --")
+print(f"  name     = {student['name']}")
+print(f"  age      = {student['age']}")
+print(f"  get city = {student.get('city','جدة')}")  # آمن!
+print("\\n-- التعديل --")
+student["city"] = "جدة"
+student["age"]  = 26
+print(f"  أضفنا city: {student['city']}")
+print(f"  غيرنا age : {student['age']}")
+print("\\n-- التصفح --")
+print(f"  keys   : {list(student.keys())}")
+print(f"  values : {list(student.values())}")
+for k, v in student.items():
+    print(f"  {k:8} : {v}")
+print("\\n-- قاموس متداخل --")
+uni = {
+    "عاطف": {"gpa":3.8, "dept":"AI"},
+    "سارة": {"gpa":3.9, "dept":"CS"},
 }
-print(f"  اسم الجامعة: {جامعة['اسم']}")
-print(f"  طلاب برمجة : {جامعة['أقسام']['برمجة']['طلاب']}")
-print(f"  المدن       : {جامعة['مدن']}")
+for name, info in uni.items():
+    print(f"  {name}: GPA={info['gpa']} dept={info['dept']}")
+print("\\n-- Dict Comprehension --")
+grades = {"عاطف":85,"سارة":92,"محمد":78,"نورة":95}
+passed = {k:v for k,v in grades.items() if v>=80}
+labels = {k:("A" if v>=90 else "B" if v>=80 else "C") for k,v in grades.items()}
+print(f"  passed : {passed}")
+print(f"  labels : {labels}")`,
 
-# ── 7. Dict Comprehension ────────────────────────
-print("\\n── Dict Comprehension ──")
-طلاب = {"عاطف":85, "سارة":92, "محمد":78, "نورة":65, "خالد":55}
-ناجحون  = {k:v for k,v in طلاب.items() if v >= 60}
-تقدير   = {k:("A" if v>=90 else "B" if v>=80 else "C" if v>=70 else "D" if v>=60 else "F")
-            for k,v in طلاب.items()}
-مربعات  = {x: x**2 for x in range(1, 6)}
+  tuples_sets: `print("=" * 38)
+print("   Tuple () & Set {}")
+print("=" * 38)
+print("== Tuple - لا يتغير بعد الانشاء ==")
+point = (3, 7)
+rgb   = (255, 128, 0)
+months= ("يناير","فبراير","مارس","أبريل","مايو","يونيو")
+print(f"  point = {point}")
+print(f"  rgb   = {rgb}")
+print(f"  months[2] = {months[2]}")
+print("\\n  Unpacking (فك الحزمة):")
+x, y = point
+r, g, b = rgb
+print(f"  x={x}, y={y}")
+print(f"  r={r}, g={g}, b={b}")
+print(f"\\n  len={len(months)}  first='{months[0]}'  last='{months[-1]}'")
+print(f"  'مارس' in months: {'مارس' in months}")
+print("\\n== Set - بدون تكرار، غير مرتب ==")
+s1 = {1,2,3,4,5}
+s2 = {3,4,5,6,7}
+print(f"  s1 = {sorted(s1)}")
+print(f"  s2 = {sorted(s2)}")
+print(f"  union    |: {sorted(s1|s2)}")
+print(f"  intersect&: {sorted(s1&s2)}")
+print(f"  diff     -: {sorted(s1-s2)}")
+dupes = [1,2,2,3,3,3,4,4,4,4,5]
+print(f"\\n  إزالة تكرار {dupes}:")
+print(f"  -> {sorted(set(dupes))}")
+s = set()
+s.add(10); s.add(20); s.add(10)
+print(f"\\n  add(10) مرتين: {s}")`,
 
-print(f"  كل الطلاب  : {طلاب}")
-print(f"  الناجحون   : {ناجحون}")
-print(f"  التقدير    : {تقدير}")
-print(f"  مربعات     : {مربعات}")
-`,
-
-  tuples_sets: `# ╔══════════════════════════════════════╗
-# ║    Tuple و Set - مجموعات خاصة       ║
-# ╚══════════════════════════════════════╝
-
-# ── 1. Tuple (القيم الثابتة) ─────────────────────
-# مثل القائمة لكن لا يتغير بعد الإنشاء (Immutable)
-# استخدامه: إحداثيات، RGB، بيانات ثابتة
-print("── Tuple (لا يتغير) ──")
-نقطة    = (3, 7)
-ألوان   = ("أحمر", "أخضر", "أزرق")
-إحداثي  = (10, 20, 30)
-وحيد    = (42,)          # Tuple بعنصر واحد يحتاج فاصلة
-
-print(f"  نقطة    : {نقطة}")
-print(f"  ألوان   : {ألوان}")
-print(f"  len     : {len(إحداثي)}")
-print(f"  [0]     : {نقطة[0]}")
-print(f"  [-1]    : {ألوان[-1]}")
-print(f"  [1:]    : {ألوان[1:]}")
-
-# Unpacking (مفيد جداً)
-print("\\n── Unpacking ──")
-x, y    = نقطة
-print(f"  x,y = نقطة  ->  x={x}, y={y}")
-
-r, g, b = ألوان
-print(f"  r,g,b = ألوان  ->  {r}, {g}, {b}")
-
-أول, *وسط, آخر = [1, 2, 3, 4, 5]
-print(f"  أول,*وسط,آخر = [1..5]  ->  {أول}, {وسط}, {آخر}")
-
-# ── 2. Set (المجموعة) ────────────────────────────
-# مجموعة بدون عناصر مكررة، غير مرتبة
-print("\\n── Set (بدون تكرار) ──")
-s1 = {1, 2, 3, 4, 5}
-s2 = {3, 4, 5, 6, 7}
-print(f"  s1  : {s1}")
-print(f"  s2  : {s2}")
-
-# العمليات المنطقية
-print(f"  اتحاد       (|)  : {sorted(s1 | s2)}")   # جميع العناصر
-print(f"  تقاطع       (&)  : {sorted(s1 & s2)}")   # المشتركة فقط
-print(f"  فرق         (-)  : {sorted(s1 - s2)}")   # في s1 وليست s2
-print(f"  فرق متماثل (^)  : {sorted(s1 ^ s2)}")   # غير المشتركة
-
-# إزالة التكرار من قائمة
-print("\\n── إزالة التكرار ──")
-قائمة_مكررة = [1, 3, 2, 1, 4, 3, 2, 5, 1, 4]
-print(f"  الأصل    : {قائمة_مكررة}")
-print(f"  set()    : {set(قائمة_مكررة)}")
-print(f"  مرتبة    : {sorted(set(قائمة_مكررة))}")
-
-# Set Comprehension
-print("\\n── Set Comprehension ──")
-مربعات = {x**2 for x in range(-5, 6)}
-print(f"  مربعات -5..5  : {sorted(مربعات)}")
-
-# ── 3. مقارنة بين أنواع التجميع ──────────────────
-print("\\n── مقارنة الأنواع ──")
-print("  list  [1,2,3]   : مرتب، قابل للتغيير، يقبل تكرار")
-print("  tuple (1,2,3)   : مرتب، ثابت، يقبل تكرار")
-print("  set   {1,2,3}   : غير مرتب، قابل للتغيير، لا تكرار")
-print("  dict  {k:v}     : مفتاح:قيمة، قابل للتغيير، مفاتيح فريدة")
-`,
-
-  data_structures_adv: `# ╔══════════════════════════════════════╗
-# ║   هياكل البيانات المتقدمة           ║
-# ║   Stack / Queue / BST               ║
-# ╚══════════════════════════════════════╝
-
-# ── 1. Stack (كومة - LIFO) ───────────────────────
-# Last In First Out = آخر ما دخل أول ما يخرج
-# مثل: كومة صحون، زر الرجوع في المتصفح
-print("── Stack (LIFO - آخر داخل = أول خارج) ──")
+  data_structures_adv: `print("=" * 40)
+print("  Stack / Queue / LinkedList / BST")
+print("=" * 40)
+print("== Stack LIFO ==")
 stack = []
-print("  دفع العناصر (push):")
-for x in [10, 20, 30, 40, 50]:
-    stack.append(x)               # push
-    print(f"    push({x:2}) -> {stack}")
-
-print("  سحب العناصر (pop):")
+print("  push: ", end="")
+for x in [1,2,3,4,5]:
+    stack.append(x)
+    print(x, end=" ")
+print(f"\\n  Stack={stack}")
+print("  pop : ", end="")
 while stack:
-    val = stack.pop()             # pop
-    print(f"    pop() = {val:2}  | الكومة: {stack}")
-
-# ── 2. Queue (طابور - FIFO) ──────────────────────
-# First In First Out = أول ما دخل أول ما يخرج
-# مثل: الطوابير، طباعة الملفات
-print("\\n── Queue (FIFO - أول داخل = أول خارج) ──")
+    print(stack.pop(), end=" ")
+print()
+print("\\n== Queue FIFO ==")
 from collections import deque
-queue = deque()
-
-print("  دخول الطابور (enqueue):")
-for اسم in ["عاطف", "سارة", "محمد", "نورة"]:
-    queue.append(اسم)
-    print(f"    {اسم:8} دخل  | الطابور: {list(queue)}")
-
-print("  خروج الطابور (dequeue):")
-while queue:
-    اسم = queue.popleft()
-    print(f"    {اسم:8} خرج | الطابور: {list(queue)}")
-
-# ── 3. Binary Search Tree ────────────────────────
-# شجرة ثنائية للبحث - كل عقدة: أصغر يسار، أكبر يمين
-print("\\n── Binary Search Tree (BST) ──")
+q = deque()
+names = ["عاطف","سارة","محمد"]
+for n in names: q.append(n); print(f"  enqueue {n} -> {list(q)}")
+while q: print(f"  dequeue {q.popleft()} -> {list(q)}")
+print("\\n== Linked List ==")
 class Node:
-    def __init__(self, val):
-        self.val  = val
-        self.left = None    # الأصغر
-        self.right= None    # الأكبر
-
+    def __init__(self, v): self.v=v; self.next=None
+class LL:
+    def __init__(self): self.head=None
+    def append(self, v):
+        node=Node(v)
+        if not self.head: self.head=node; return
+        cur=self.head
+        while cur.next: cur=cur.next
+        cur.next=node
+    def show(self):
+        cur,res=[],self.head
+        while res: cur.append(str(res.v)); res=res.next
+        print("  "+" -> ".join(cur)+" -> None")
+ll=LL()
+for v in [10,20,30,40,50]: ll.append(v)
+ll.show()
+print("\\n== BST ==")
+class N:
+    def __init__(self,v): self.v=v; self.l=self.r=None
 class BST:
-    def __init__(self): self.root = None
-
-    def insert(self, val):
-        # إدراج بشكل متكرر
-        def _ins(node, val):
-            if not node: return Node(val)   # موضع فارغ
-            if val < node.val:
-                node.left  = _ins(node.left,  val)  # اذهب يساراً
-            else:
-                node.right = _ins(node.right, val)  # اذهب يميناً
-            return node
-        self.root = _ins(self.root, val)
-
+    def __init__(self): self.root=None
+    def insert(self,v):
+        def ins(n,v): 
+            if not n: return N(v)
+            if v<n.v: n.l=ins(n.l,v)
+            else: n.r=ins(n.r,v)
+            return n
+        self.root=ins(self.root,v)
     def inorder(self):
-        # In-order traversal = يعطي العناصر مرتبة
-        result = []
-        def _go(node):
-            if node:
-                _go(node.left)
-                result.append(node.val)
-                _go(node.right)
-        _go(self.root); return result
+        res=[]
+        def go(n):
+            if n: go(n.l); res.append(n.v); go(n.r)
+        go(self.root); return res
+t=BST()
+for v in [5,3,7,1,4,6,8]: t.insert(v)
+print(f"  insert [5,3,7,1,4,6,8]")
+print(f"  inorder (مرتب): {t.inorder()}")`,
 
-    def search(self, val):
-        node = self.root
-        while node:
-            if val == node.val: return True
-            elif val < node.val: node = node.left
-            else: node = node.right
-        return False
+  /* FUNCTIONS & OOP */
 
-tree = BST()
-nums = [5, 3, 7, 1, 4, 6, 8, 2]
-print(f"  إدراج: {nums}")
-for n in nums: tree.insert(n)
-print(f"  in-order (مرتب): {tree.inorder()}")
-for v in [4, 9, 6]:
-    print(f"  search({v})  = {tree.search(v)}")
-`,
+  functions: `print("=" * 38)
+print("   الدوال Functions")
+print("=" * 38)
+# def = تعريف دالة  return = القيمة المرجعة
+def greet(name):
+    print(f"  أهلاً {name}!")
 
-  /* ══ FUNCTIONS & OOP ══ */
+def square(x):
+    return x ** 2
 
-  functions: `# ╔══════════════════════════════════════╗
-# ║       الدوال - Functions            ║
-# ╚══════════════════════════════════════╝
-#
-# الدالة = مجموعة من الأوامر لها اسم، تُنفذ عند الاستدعاء
-# فوائدها: إعادة الاستخدام، تنظيم الكود، سهولة الصيانة
-# def اسم_الدالة(المعاملات):
-#     المحتوى (بمسافة 4)
-#     return النتيجة
+def hello(name, greeting="مرحبا"):
+    return f"{greeting}، {name}!"
 
-# ── 1. دالة بسيطة ────────────────────────────────
-def مرحبا():
-    \\"\\"\\"دالة بدون معاملات\\"\\"\\"\\ 
-    print("مرحباً بالعالم!")
+def stats(nums):
+    n=len(nums); s=sorted(nums)
+    return sum(nums)/n, s[n//2], min(nums), max(nums)
 
-# ── 2. دالة بمعاملات ─────────────────────────────
-def مجموع(أ, ب):
-    \\"\\"\\"تجمع عددين وترجع النتيجة\\"\\"\\"\\ 
-    return أ + ب
-
-# ── 3. قيمة افتراضية ─────────────────────────────
-def أهلاً(اسم, تحية="أهلاً"):
-    \\"\\"\\"التحية لها قيمة افتراضية\\"\\"\\"\\ 
-    return f"{تحية} {اسم}!"
-
-# ── 4. إرجاع متعدد ───────────────────────────────
-def إحصاء_سريع(lst):
-    \\"\\"\\"ترجع عدة قيم دفعة واحدة\\"\\"\\"\\ 
-    return min(lst), max(lst), sum(lst)/len(lst)
-
-# ── 5. *args: عدد غير محدد ───────────────────────
-def مجموع_كل(*args):
-    \\"\\"\\"تقبل أي عدد من الأرقام\\"\\"\\"\\ 
-    print(f"  args = {args}  type={type(args).__name__}")
+def sum_all(*args):
     return sum(args)
 
-# ── 6. **kwargs: معاملات مسماة ───────────────────
-def طباعة_بيانات(**kwargs):
-    \\"\\"\\"تقبل معاملات مسماة\\"\\"\\"\\ 
-    for k, v in kwargs.items():
-        print(f"  {k}: {v}")
+def student_info(**kw):
+    for k,v in kw.items(): print(f"  {k}: {v}")
 
-# ── تجربة كل الدوال ──────────────────────────────
-print("── دالة بسيطة ──")
-مرحبا()
+print("-- اختبار الدوال --")
+greet("عاطف")
+print(f"  square(7)   = {square(7)}")
+print(f"  square(12)  = {square(12)}")
+print(f"  {hello('محمد')}")
+print(f"  {hello('نورة', 'السلام عليكم')}")
+arr=[5,3,8,1,9,2,7]
+mean,median,mn,mx=stats(arr)
+print(f"  stats{arr}:")
+print(f"    mean={mean:.2f} median={median} min={mn} max={mx}")
+print(f"  sum_all(1,2,3,4,5) = {sum_all(1,2,3,4,5)}")
+print("\\n-- kwargs --")
+student_info(name="عاطف", age=25, course="Python")
+print("\\n-- دالة كقيمة --")
+def apply(fn, lst): return [fn(x) for x in lst]
+print(f"  apply(square,[1,2,3,4]): {apply(square,[1,2,3,4])}")`,
 
-print("\\n── دالة بمعاملات ──")
-print(f"  مجموع(3, 7) = {مجموع(3, 7)}")
-print(f"  مجموع(10, -3) = {مجموع(10, -3)}")
-
-print("\\n── قيمة افتراضية ──")
-print(f"  {أهلاً('عاطف')}")          # يستخدم الافتراضي
-print(f"  {أهلاً('سارة', 'يا هلا')}")  # يستخدم المحدد
-
-print("\\n── إرجاع متعدد ──")
-data = [5, 3, 8, 1, 9, 2, 7]
-mn, mx, avg = إحصاء_سريع(data)
-print(f"  data = {data}")
-print(f"  min={mn}  max={mx}  avg={avg:.2f}")
-
-print("\\n── *args ──")
-for nums in [(1,2), (1,2,3,4), (10,20,30,40,50)]:
-    total = مجموع_كل(*nums)
-    print(f"  مجموع{nums} = {total}")
-
-print("\\n── **kwargs ──")
-طباعة_بيانات(اسم="عاطف", عمر=25, مادة="Python", درجة=92)
-
-# ── 7. دوال داخل دوال ────────────────────────────
-print("\\n── دوال داخل دوال ──")
-def ضرب_بعدد(n):
-    \\"\\"\\"ترجع دالة تضرب بـ n\\"\\"\\"\\ 
-    def الدالة_الداخلية(x):
-        return x * n
-    return الدالة_الداخلية   # نرجع الدالة نفسها!
-
-ضرب3 = ضرب_بعدد(3)
-ضرب5 = ضرب_بعدد(5)
-print(f"  ضرب3(7)  = {ضرب3(7)}")
-print(f"  ضرب5(7)  = {ضرب5(7)}")
-print(f"  نتائج 1-5: {[ضرب3(i) for i in range(1,6)]}")
-
-# ── 8. الدوال هي كائنات ──────────────────────────
-print("\\n── الدوال ككائنات ──")
-def تطبيق(دالة, قائمة):
-    return [دالة(x) for x in قائمة]
-
-def تربيع(x): return x ** 2
-def مكعب(x): return x ** 3
-
-nums = [1, 2, 3, 4, 5]
-print(f"  الأرقام  : {nums}")
-print(f"  مربعات   : {تطبيق(تربيع, nums)}")
-print(f"  مكعبات   : {تطبيق(مكعب, nums)}")
-`,
-
-  loops: `# ╔══════════════════════════════════════╗
-# ║       الحلقات - Loops               ║
-# ╚══════════════════════════════════════╝
-#
-# الحلقة = تكرار مجموعة من الأوامر
-# for  = عدد معروف من التكرارات
-# while= تكرار حتى يصبح الشرط خاطئاً
-
-# ── 1. for + range() ─────────────────────────────
-print("── for + range() ──")
-# range(stop)         = 0, 1, ..., stop-1
-# range(start, stop)  = start, ..., stop-1
-# range(start,stop,step) = بخطوة معينة
-for i in range(5):
-    print(f"  {i}", end=" ")
+  loops: `print("=" * 38)
+print("   الحلقات Loops")
+print("=" * 38)
+print("== for + range ==")
+for i in range(1,8):
+    print(f"  {i}: {'#'*i}")
+print("\\n== for + enumerate ==")
+subjects = ["Python🐍","الاحصاء📊","الانظمة💻","التواصل🗣️"]
+for i, s in enumerate(subjects, 1):
+    print(f"  {i}. {s}")
+print("\\n== for + zip ==")
+names = ["عاطف","سارة","محمد","نورة"]
+grades = [92, 88, 75, 97]
+for n, g in zip(names, grades):
+    print(f"  {n:8}: {g}% {'*'*(g//10)}")
+print("\\n== while ==")
+balance = 100; buys = [30,25,10,50]
+print(f"  الرصيد: {balance}")
+for b in buys:
+    if balance >= b:
+        balance -= b; print(f"  اشترى {b:3} -> رصيد={balance}")
+    else:
+        print(f"  لا يكفي {b}!"); break
+print("\\n== break و continue ==")
+print("  1-10 بدون 5:")
+for n in range(1,11):
+    if n == 5: continue
+    if n == 8: break
+    print(f"  {n}", end=" ")
 print()
+print("\\n== جدول ضرب 5 ==")
+for i in range(1,11):
+    print(f"  5 x {i:2} = {5*i:2}")`,
 
-for i in range(2, 10, 2):    # زوجي
-    print(f"  {i}", end=" ")
-print()
+  oop: `print("=" * 40)
+print("   البرمجة الكائنية OOP")
+print("=" * 40)
+class Student:
+    school = "الجامعة السعودية الالكترونية"
+    count = 0
+    def __init__(self, name, num, major):
+        self.name=name; self.num=num; self.major=major
+        self.grades=[]; Student.count+=1
+    def add_grade(self, g): self.grades.append(g)
+    def average(self): return sum(self.grades)/len(self.grades) if self.grades else 0
+    def grade_label(self):
+        avg=self.average()
+        if avg>=90: return "A ممتاز"
+        elif avg>=80: return "B جيد جداً"
+        elif avg>=70: return "C جيد"
+        elif avg>=60: return "D مقبول"
+        else: return "F راسب"
+    def __str__(self): return f"Student({self.name}, {self.num})"
 
-for i in range(10, 0, -1):   # عكسي
-    print(f"  {i}", end=" ")
-print()
+print("== إنشاء الكائنات ==")
+s1 = Student("عاطف","2024001","AI")
+s2 = Student("سارة","2024002","CS")
+for g in [85,92,88,90]: s1.add_grade(g)
+for g in [95,97,93]:     s2.add_grade(g)
+print(f"  {s1}  avg={s1.average():.1f}  {s1.grade_label()}")
+print(f"  {s2}  avg={s2.average():.1f}  {s2.grade_label()}")
+print(f"  عدد الطلاب: {Student.count}")
+print("\\n== Inheritance الوراثة ==")
+class Animal:
+    def __init__(self, name): self.name=name
+    def speak(self): return "..."
+class Dog(Animal):
+    def speak(self): return f"{self.name}: هاو هاو! 🐕"
+class Cat(Animal):
+    def speak(self): return f"{self.name}: مياو~ 🐱"
+class Bird(Animal):
+    def speak(self): return f"{self.name}: تغريد~ 🐦"
+print("== Polymorphism ==")
+animals = [Dog("ريكس"), Cat("مشمش"), Bird("طائر"), Dog("بودي")]
+for a in animals:
+    print(f"  {a.speak()}")
+    print(f"  isinstance(Animal): {isinstance(a, Animal)}")`,
 
-# ── 2. for على التجميعات ─────────────────────────
-print("\\n── for على القوائم والنصوص والقواميس ──")
-فواكه = ["تفاح", "برتقال", "موز", "عنب"]
-for فاكهة in فواكه:
-    print(f"  {فاكهة}")
-
-print()
-for حرف in "Python":
-    print(f"  {حرف}", end=" ")
-print()
-
-print()
-طالب = {"اسم":"عاطف","درجة":92,"مادة":"Python"}
-for مفتاح, قيمة in طالب.items():
-    print(f"  {مفتاح}: {قيمة}")
-
-# ── 3. enumerate() ───────────────────────────────
-print("\\n── enumerate() (الرقم مع القيمة) ──")
-مواد = ["Python","إحصاء","أنظمة","مهارات"]
-for رقم, مادة in enumerate(مواد, start=1):
-    print(f"  {رقم}. {مادة}")
-
-# ── 4. zip() ─────────────────────────────────────
-print("\\n── zip() (دمج قائمتين) ──")
-أسماء = ["عاطف","سارة","محمد","نورة"]
-درجات = [92, 88, 75, 95]
-مدن   = ["جدة","الرياض","الدمام","مكة"]
-for اسم, درجة, مدينة in zip(أسماء, درجات, مدن):
-    شريط = "█" * (درجة//10)
-    print(f"  {اسم:8} {درجة}%  {مدينة}  {شريط}")
-
-# ── 5. while ─────────────────────────────────────
-print("\\n── while ──")
-# يستمر طالما الشرط صحيح
-عداد = 1
-مجموع = 0
-while عداد <= 10:
-    مجموع += عداد
-    عداد  += 1
-print(f"  مجموع 1 إلى 10 = {مجموع}")
-
-# while مع تجمع
-رقم = 256
-خطوات = 0
-print(f"  {رقم}", end="")
-while رقم > 1:
-    رقم //= 2
-    خطوات += 1
-    print(f" -> {رقم}", end="")
-print(f"  ({خطوات} خطوات)")
-
-# ── 6. break / continue / else ───────────────────
-print("\\n── break / continue / else ──")
-# break   = أوقف الحلقة فوراً
-# continue= تجاوز هذه التكرار
-# else    = ينفذ إذا انتهت الحلقة بدون break
-
-print("  الأرقام بدون 4 و 7:")
-for i in range(1, 11):
-    if i == 4: continue   # تجاوز 4
-    if i == 7: break      # توقف عند 7
-    print(f"  {i}", end=" ")
-print()
-
-# بحث في قائمة
-هدف = 7
-for x in [3, 1, 4, 1, 5, 9, 7, 2]:
-    if x == هدف:
-        print(f"  وجدت {هدف}!")
-        break
-else:
-    print(f"  {هدف} غير موجود")  # ينفذ فقط إذا ما وجدنا
-
-# ── 7. حلقات متداخلة ─────────────────────────────
-print("\\n── حلقات متداخلة (جدول ضرب) ──")
-for i in range(1, 5):
-    for j in range(1, 5):
-        print(f"  {i}×{j}={i*j:2}", end="  ")
-    print()
-`,
-
-  oop: `# ╔══════════════════════════════════════╗
-# ║    البرمجة الكائنية - OOP           ║
-# ╚══════════════════════════════════════╝
-#
-# Class = قالب لإنشاء كائنات (مثل البلوبرينت)
-# Object = نسخة من الكلاس
-# الأعمدة الأربعة: Encapsulation, Inheritance,
-#                  Polymorphism, Abstraction
-
-# ── 1. الكلاس الأساسي ────────────────────────────
-class مصباح:
-    \\"\\"\\"كلاس بسيط يمثل مصباحاً كهربائياً\\"\\"\\"\\ 
-    # Class Variable: مشترك بين كل الكائنات
-    عدد_المصابيح = 0
-
-    def __init__(self, لون="أبيض", شدة=100):
-        # Instance Variables: خاصة بكل كائن
-        self.لون    = لون
-        self.شدة   = شدة
-        self.مضاء  = False
-        مصباح.عدد_المصابيح += 1
-
-    def أضئ(self):
-        self.مضاء = True
-        return f"المصباح {self.لون} يضيء ({self.شدة}%)"
-
-    def أطفئ(self):
-        self.مضاء = False
-        return f"المصباح {self.لون} مطفأ"
-
-    def اضبط_الشدة(self, قيمة):
-        self.شدة = max(0, min(100, قيمة))  # بين 0 و100
-
-    def __str__(self):           # ما يظهر عند print()
-        حالة = "مضاء" if self.مضاء else "مطفأ"
-        return f"مصباح({self.لون}, {self.شدة}%, {حالة})"
-
-    def __repr__(self):           # تمثيل رسمي
-        return f"مصباح(لون={self.لون!r}, شدة={self.شدة})"
-
-print("── الكلاس الأساسي ──")
-م1 = مصباح()                      # قيم افتراضية
-م2 = مصباح("أصفر", 75)
-م3 = مصباح("أحمر", 50)
-
-print(م1)
-print(م2.أضئ())
-م3.اضبط_الشدة(80)
-print(م3)
-print(f"عدد المصابيح: {مصباح.عدد_المصابيح}")
-
-# ── 2. الوراثة (Inheritance) ─────────────────────
-print("\\n── الوراثة ──")
-class جهاز:
-    \\"\\"\\"الكلاس الأب\\"\\"\\"\\ 
-    def __init__(self, اسم, واط):
-        self.اسم  = اسم
-        self.واط  = واط
-        self.يعمل = False
-    def شغّل(self): self.يعمل = True;  return f"{self.اسم} يعمل ✓"
-    def أوقف(self): self.يعمل = False; return f"{self.اسم} متوقف"
-    def استهلاك_ساعة(self, ساعات): return self.واط * ساعات / 1000
-
-class مكيّف(جهاز):              # يرث من جهاز
-    def __init__(self, اسم, واط, درجة=22):
-        super().__init__(اسم, واط)  # استدعاء الأب
-        self.الدرجة = درجة
-    def ضبط_درجة(self, د):
-        self.الدرجة = د
-        return f"الدرجة ضُبطت على {د}°"
-    def __str__(self):
-        return f"مكيّف({self.اسم}, {self.الدرجة}°, {'✓' if self.يعمل else '✗'})"
-
-class ثلاجة(جهاز):
-    def __init__(self, اسم, واط, درجة=-4):
-        super().__init__(اسم, واط)
-        self.درجة_التجميد = درجة
-    def __str__(self):
-        return f"ثلاجة({self.اسم}, {self.درجة_التجميد}°)"
-
-أجهزة = [مكيّف("سامسونج", 1500), ثلاجة("LG", 200), مكيّف("هايسنس", 1800, 24)]
-for جهاز_ in أجهزة:
-    print(f"  {جهاز_}")
-    print(f"    {جهاز_.شغّل()}")
-    print(f"    استهلاك 8 ساعات: {جهاز_.استهلاك_ساعة(8):.2f} كيلوواط")
-
-# ── 3. Polymorphism ───────────────────────────────
-print("\\n── Polymorphism (نفس الدالة سلوك مختلف) ──")
-class شكل:
-    def مساحة(self): return 0
-    def __str__(self): return f"{type(self).__name__}: مساحة={self.مساحة():.2f}"
-
-class دائرة(شكل):
-    def __init__(self, r): self.r = r
-    def مساحة(self): return 3.14159 * self.r ** 2
-
-class مستطيل(شكل):
-    def __init__(self, ط, ع): self.ط=ط; self.ع=ع
-    def مساحة(self): return self.ط * self.ع
-
-class مثلث(شكل):
-    def __init__(self, ق, ار): self.ق=ق; self.ار=ار
-    def مساحة(self): return 0.5 * self.ق * self.ار
-
-أشكال = [دائرة(5), مستطيل(4,6), مثلث(3,8), دائرة(2)]
-for ش in أشكال:
-    print(f"  {ش}")
-print(f"  أكبر مساحة: {max(أشكال, key=lambda s: s.مساحة())}")
-`,
-
-  advanced_fn: `# ╔══════════════════════════════════════╗
-# ║  Lambda / Generator / Decorator     ║
-# ╚══════════════════════════════════════╝
-
-# ── 1. Lambda (دوال مجهولة) ──────────────────────
-# lambda معاملات: تعبير واحد فقط
-# مثالية للدوال القصيرة المستخدمة مرة واحدة
-print("── Lambda ──")
-مربع    = lambda x: x**2
-مجموع2  = lambda a, b: a + b
-تصنيف   = lambda d: "ناجح" if d >= 60 else "راسب"
-نسبة    = lambda x, n: round(x/n*100, 1)
-
-print(f"  مربع(7)         = {مربع(7)}")
-print(f"  مجموع2(3,4)     = {مجموع2(3,4)}")
-print(f"  تصنيف(75)       = {تصنيف(75)}")
-print(f"  تصنيف(45)       = {تصنيف(45)}")
-print(f"  نسبة(15,20)     = {نسبة(15,20)}%")
-
-# lambda مع sorted()
-print("\\n  lambda مع sorted:")
-طلاب = [("عاطف",85),("سارة",92),("محمد",55),("نورة",78)]
-بالدرجة  = sorted(طلاب, key=lambda x: x[1], reverse=True)
-بالاسم   = sorted(طلاب, key=lambda x: x[0])
-print(f"  الأصل   : {طلاب}")
-print(f"  بالدرجة : {بالدرجة}")
-print(f"  بالاسم  : {بالاسم}")
-
-# lambda مع map() و filter()
-print("\\n  lambda مع map/filter:")
-أرقام = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-مضاعفة  = list(map(lambda x: x*2, أرقام))
-أزواج   = list(filter(lambda x: x%2==0, أرقام))
-كبيرة   = list(filter(lambda x: x>5, أزواج))
-print(f"  أرقام    : {أرقام}")
-print(f"  مضاعفة   : {مضاعفة}")
-print(f"  أزواج    : {أزواج}")
-print(f"  كبيرة    : {كبيرة}")
-
-# ── 2. Generator ─────────────────────────────────
-# المولد = يعطي قيمة في كل مرة (لا يخزن الكل)
-# مفيد لقوائم كبيرة جداً لتوفير الذاكرة
-print("\\n── Generator (yield) ──")
-def فيبوناتشي(n):
-    \\"\\"\\"مولد متتالية فيبوناتشي\\"\\"\\"\\ 
+  advanced_fn: `print("=" * 40)
+print("  Lambda / Generator / Decorator")
+print("=" * 40)
+print("== Lambda ==")
+square  = lambda x: x**2
+greet   = lambda name: f"أهلاً {name}!"
+classify= lambda d: "ناجح✓" if d>=60 else "راسب✗"
+print(f"  square(7)    = {square(7)}")
+print(f"  greet(عاطف) = {greet('عاطف')}")
+students = [("عاطف",85),("سارة",92),("محمد",55)]
+sorted_s = sorted(students, key=lambda x: x[1], reverse=True)
+print(f"  sorted by grade: {sorted_s}")
+for n,d in students: print(f"  {n}: {classify(d)}")
+mapped  = list(map(lambda x:(x[0],f"{x[1]}%"), students))
+filtered= list(filter(lambda x: x[1]>=60, students))
+print(f"  map %: {mapped}")
+print(f"  filter>=60: {filtered}")
+print("\\n== Generator ==")
+def fibonacci(n):
     a, b = 0, 1
     for _ in range(n):
-        yield a          # yield = أعطِ هذه القيمة والتوقف مؤقتاً
-        a, b = b, a + b  # ثم استمر من هنا في المرة التالية
-
-def أرقام_أولية(حد):
-    \\"\\"\\"مولد الأرقام الأولية\\"\\"\\"\\ 
-    def أولي(n):
-        if n < 2: return False
-        for i in range(2, int(n**0.5)+1):
-            if n % i == 0: return False
-        return True
-    for n in range(2, حد+1):
-        if أولي(n):
-            yield n
-
-print(f"  فيبوناتشي 10 : {list(فيبوناتشي(10))}")
-print(f"  أولية حتى 30 : {list(أرقام_أولية(30))}")
-
-# Generator Expression (مثل list comprehension لكن lazy)
-gen_expr = (x**2 for x in range(1000000))  # لا يحسب الكل فوراً
-print(f"  أول 5 مربعات: {[next(gen_expr) for _ in range(5)]}")
-
-# ── 3. Decorator ─────────────────────────────────
-# Decorator = دالة تغلّف دالة أخرى لتضيف وظيفة
-# يُستخدم كثيراً في Flask, Django, FastAPI
-print("\\n── Decorator (@) ──")
-def مؤقت_الدالة(func):
-    \\"\\"\\"يقيس وقت تنفيذ الدالة\\"\\"\\"\\ 
-    import time
+        yield a
+        a, b = b, a+b
+def squares_gen(n):
+    for i in range(1, n+1):
+        yield i**2
+gen = fibonacci(10)
+print(f"  fibonacci(10): {list(gen)}")
+print(f"  squares 1-8  : {list(squares_gen(8))}")
+print(f"  sum x^2 1-100: {sum(x**2 for x in range(1,101))}")
+print("\\n== Decorator ==")
+def logger(fn):
     def wrapper(*args, **kwargs):
-        بداية = time.time()
-        نتيجة = func(*args, **kwargs)
-        نهاية = time.time()
-        print(f"  [وقت] {func.__name__}: {(نهاية-بداية)*1000:.3f} ms")
-        return نتيجة
+        print(f"  [{fn.__name__}] args={args}")
+        result = fn(*args, **kwargs)
+        print(f"  [{fn.__name__}] result={result}")
+        return result
     return wrapper
+@logger
+def multiply(x, y): return x * y
+@logger
+def add(x, y): return x + y
+multiply(4, 5)
+add(3, 7)`,
 
-def يسجل_الاستدعاء(func):
-    \\"\\"\\"يسجل كل مرة تُستدعى الدالة\\"\\"\\"\\ 
-    استدعاءات = [0]
-    def wrapper(*args, **kwargs):
-        استدعاءات[0] += 1
-        print(f"  [تسجيل] {func.__name__} - استدعاء #{استدعاءات[0]}")
-        return func(*args, **kwargs)
-    return wrapper
+  /* ERRORS & MODULES */
 
-@مؤقت_الدالة
-@يسجل_الاستدعاء
-def جمع_قائمة(lst):
-    return sum(lst)
-
-نتيجة = جمع_قائمة(list(range(10000)))
-print(f"  النتيجة: {نتيجة}")
-`,
-
-  /* ══ ERROR HANDLING ══ */
-
-  exceptions: `# ╔══════════════════════════════════════╗
-# ║   الاستثناءات - try/except          ║
-# ╚══════════════════════════════════════╝
-#
-# الاستثناء = خطأ يحدث أثناء التشغيل
-# try    = جرب تنفيذ هذا
-# except = إذا حدث خطأ افعل هذا
-# else   = إذا نجح بدون خطأ افعل هذا
-# finally= افعل هذا دائماً (بخطأ أو بدون)
-
-# ── 1. try/except الأساسي ────────────────────────
-print("── try/except الأساسي ──")
-def قسمة_آمنة(x, y):
-    try:
-        نتيجة = x / y
-        return نتيجة
-    except ZeroDivisionError:
-        return "خطأ: قسمة على صفر!"
-    except TypeError as e:
-        return f"خطأ النوع: {e}"
-
-for a, b in [(10,2), (7,0), ("a",3), (9,3)]:
-    print(f"  {a}/{b} = {قسمة_آمنة(a,b)}")
-
-# ── 2. جميع أنواع الاستثناءات ────────────────────
-print("\\n── أنواع الاستثناءات ──")
-tests = [
-    ("ZeroDivisionError", lambda: 1/0),
-    ("NameError",         lambda: undefined_var),
-    ("TypeError",         lambda: "text" + 5),
-    ("ValueError",        lambda: int("abc")),
-    ("IndexError",        lambda: [1,2,3][10]),
-    ("KeyError",          lambda: {"a":1}["z"]),
-    ("AttributeError",    lambda: (42).upper()),
-    ("FileNotFoundError", lambda: open("لا_يوجد.txt")),
-    ("OverflowError",     lambda: __import__('math').exp(9999)),
+  exceptions: `print("=" * 40)
+print("  الاستثناءات try/except")
+print("=" * 40)
+cases = [
+    ("10/2",  lambda:10/2),
+    ("10/0",  lambda:10/0),
+    ('"a"+5', lambda:"a"+5),
+    ("int('hello')",lambda:int("hello")),
+    ("[1,2][9]",lambda:[1,2][9]),
+    ("{}['x']",lambda:{}["x"]),
+    ("x_undef",lambda:x_not_defined),
 ]
-for اسم, func in tests:
+for name, fn in cases:
     try:
-        func()
+        r = fn()
+        print(f"  OK  {name:20} = {r}")
     except Exception as e:
-        print(f"  {اسم:20}: {type(e).__name__}: {e}")
-
-# ── 3. else / finally ────────────────────────────
-print("\\n── else / finally ──")
-def معالجة_ملف(اسم_ملف):
+        print(f"  ERR {name:20} | {type(e).__name__}: {e}")
+print("\\n-- else / finally --")
+def safe_div(x, y):
     try:
-        f = open(اسم_ملف, 'r')        # قد يفشل
-        محتوى = f.read()
-    except FileNotFoundError:
-        print(f"  except: الملف '{اسم_ملف}' غير موجود")
+        r = x / y
+    except ZeroDivisionError:
+        print(f"  except: {x}/{y} -> ZeroDivisionError!")
+        return None
     else:
-        print(f"  else: تم قراءة {len(محتوى)} حرف")
-        f.close()
+        print(f"  else: {x}/{y} = {r:.4f}")
+        return r
     finally:
-        print(f"  finally: انتهت المحاولة لـ '{اسم_ملف}'")
-
-معالجة_ملف("/tmp/notes.txt")   # قد يوجد أو لا
-معالجة_ملف("لا_يوجد.txt")
-
-# ── 4. إنشاء استثناء مخصص ───────────────────────
-print("\\n── استثناء مخصص ──")
-class خطأ_تحقق(Exception):
-    def __init__(self, رسالة, قيمة=None):
-        super().__init__(رسالة)
-        self.القيمة = قيمة
-
-class خطأ_درجة(خطأ_تحقق):
-    pass
-
-class خطأ_حضور(خطأ_تحقق):
-    pass
-
-def تحقق_طالب(درجة, حضور):
-    if not 0 <= درجة <= 100:
-        raise خطأ_درجة(f"درجة {درجة} خارج النطاق", درجة)
-    if not 0 <= حضور <= 100:
-        raise خطأ_حضور(f"نسبة حضور {حضور}% غير صحيحة", حضور)
-    return f"بيانات صحيحة: درجة={درجة}, حضور={حضور}%"
-
-for (د, ح) in [(85, 90), (110, 80), (70, -5), (95, 100)]:
-    try:
-        print(f"  {تحقق_طالب(د, ح)}")
-    except خطأ_درجة as e:
-        print(f"  خطأ درجة: {e}")
-    except خطأ_حضور as e:
-        print(f"  خطأ حضور: {e}")
-
-# ── 5. raise ─────────────────────────────────────
-print("\\n── raise يدوياً ──")
-def جذر_تربيعي(n):
-    if n < 0:
-        raise ValueError(f"لا جذر تربيعي للعدد السالب: {n}")
-    return n ** 0.5
-
-for n in [16, 25, -4, 0]:
-    try:
-        print(f"  sqrt({n:4}) = {جذر_تربيعي(n)}")
-    except ValueError as e:
-        print(f"  sqrt({n:4}) -> خطأ: {e}")
-`,
-
-  imports: `# ╔══════════════════════════════════════╗
-# ║     المكتبات والاستيراد             ║
-# ╚══════════════════════════════════════╝
-#
-# import      = استيراد مكتبة كاملة
-# from X import Y = استيراد شيء محدد
-# import X as Y   = استيراد مع تغيير الاسم
-# Python يأتي بمكتبات كثيرة جاهزة (Standard Library)
-
-# ── 1. math (الرياضيات) ──────────────────────────
-import math
-print("── math ──")
-print(f"  pi     = {math.pi:.10f}")
-print(f"  e      = {math.e:.10f}")
-print(f"  inf    = {math.inf}")
-for n in [4, 9, 16, 25, 100]:
-    print(f"  sqrt({n:3}) = {math.sqrt(n):.1f}")
-print(f"  ceil(3.1)  = {math.ceil(3.1)}")
-print(f"  floor(3.9) = {math.floor(3.9)}")
-print(f"  log10(1000)= {math.log10(1000):.1f}")
-print(f"  sin(90°)   = {math.sin(math.radians(90)):.1f}")
-print(f"  factorial(5)= {math.factorial(5)}")
-print(f"  gcd(12,8)  = {math.gcd(12,8)}")
-
-# ── 2. random (الأرقام العشوائية) ────────────────
-import random
-random.seed(42)
-print("\\n── random ──")
-print(f"  random()        = {random.random():.4f}  (0 حتى 1)")
-print(f"  randint(1,10)   = {random.randint(1,10)}")
-print(f"  uniform(0,10)   = {random.uniform(0,10):.2f}")
-print(f"  choice(['a','b','c']) = {random.choice(['a','b','c'])}")
-lst = list(range(1,11))
-print(f"  الأصل:  {lst}")
-random.shuffle(lst)
-print(f"  shuffle: {lst}")
-print(f"  sample(range(1,20),5) = {random.sample(range(1,20),5)}")
-
-# ── 3. statistics (الإحصاء) ──────────────────────
-import statistics
-print("\\n── statistics ──")
-data = [4, 8, 2, 15, 1, 7, 11, 3, 6, 9, 4, 8]
-print(f"  data    : {data}")
-print(f"  mean    : {statistics.mean(data):.2f}")
-print(f"  median  : {statistics.median(data)}")
-print(f"  mode    : {statistics.mode(data)}")
-print(f"  stdev   : {statistics.stdev(data):.3f}")
-print(f"  variance: {statistics.variance(data):.3f}")
-print(f"  pstdev  : {statistics.pstdev(data):.3f}")
-
-# ── 4. datetime ───────────────────────────────────
-from datetime import datetime, date, timedelta
-print("\\n── datetime ──")
-الان = datetime.now()
-print(f"  الآن       : {الان.strftime('%Y-%m-%d %H:%M:%S')}")
-print(f"  اليوم      : {الان.strftime('%A %d/%m/%Y')}")
-print(f"  السنة      : {الان.year}")
-print(f"  الشهر      : {الان.month}")
-غد = الان + timedelta(days=1)
-print(f"  غداً       : {غد.strftime('%Y-%m-%d')}")
-قبل_أسبوع = الان - timedelta(weeks=1)
-print(f"  قبل أسبوع  : {قبل_أسبوع.strftime('%Y-%m-%d')}")
-
-# ── 5. os (نظام التشغيل) ─────────────────────────
-import os
-print("\\n── os ──")
-print(f"  os.sep         : {os.sep!r}")
-print(f"  os.getcwd()    : {os.getcwd()}")
-print(f"  os.path.exists : {os.path.exists('/tmp')}")
-print(f"  os.path.join   : {os.path.join('/tmp','files','test.txt')}")
-
-# ── 6. json ──────────────────────────────────────
-import json
-print("\\n── json ──")
-بيانات = {"اسم":"عاطف","درجات":[92,88,95],"ناجح":True}
-json_str = json.dumps(بيانات, ensure_ascii=False, indent=2)
-print(f"  dumps():\\n{json_str}")
-مُحمَّل = json.loads(json_str)
-print(f"  loads(): {مُحمَّل}")
-print(f"  النوع بعد loads: {type(مُحمَّل)}")
-`,
-
-  comprehensions: `# ╔══════════════════════════════════════╗
-# ║       Comprehensions                ║
-# ╚══════════════════════════════════════╝
-#
-# طريقة مختصرة لإنشاء قوائم وقواميس ومجموعات
-# [التعبير for متغير in مصدر if شرط]
-# بديل أكثر أناقة من for loop
-
-# ── 1. List Comprehension ────────────────────────
-print("── List Comprehension ──")
-# الطريقة التقليدية
-تقليدي = []
-for i in range(1, 8):
-    تقليدي.append(i ** 2)
-
-# List Comprehension - نفس النتيجة بسطر واحد
-جديد = [i**2 for i in range(1, 8)]
-
-print(f"  تقليدي  : {تقليدي}")
-print(f"  comp    : {جديد}")
-print(f"  النتيجة متطابقة: {تقليدي == جديد}")
-
-print("\\n  أمثلة متنوعة:")
-أزواج     = [x for x in range(20) if x % 2 == 0]
-مكعبات    = [x**3 for x in range(1, 6)]
-أحرف      = [c.upper() for c in "python" if c != "t"]
-كلمات_طويلة = [w for w in ["مرحبا","hi","أهلاً","ok","Python"] if len(w) > 3]
-print(f"  أزواج          : {أزواج}")
-print(f"  مكعبات 1-5     : {مكعبات}")
-print(f"  أحرف python    : {أحرف}")
-print(f"  كلمات طويلة   : {كلمات_طويلة}")
-
-# ── 2. مع شرط ────────────────────────────────────
-print("\\n── مع شرط (if) ──")
-طلاب = [("عاطف",85),("سارة",92),("محمد",55),("نورة",78),("خالد",45)]
-ناجحون = [اسم for اسم,د in طلاب if د >= 60]
-درجات_عالية = [د for _,د in طلاب if د >= 80]
-print(f"  الناجحون : {ناجحون}")
-print(f"  درجات عالية: {درجات_عالية}")
-
-# ── 3. Dict Comprehension ────────────────────────
-print("\\n── Dict Comprehension ──")
-مربعات = {x: x**2 for x in range(1, 7)}
-print(f"  {{x: x^2}}: {مربعات}")
-
-درجات = {"عاطف":85,"سارة":92,"محمد":55,"نورة":78}
-تقدير = {k:("A" if v>=90 else "B" if v>=80 else "C" if v>=70 else "D" if v>=60 else "F")
-          for k,v in درجات.items()}
-print(f"  التقدير: {تقدير}")
-
-مقلوب = {v:k for k,v in {"أ":1,"ب":2,"ج":3}.items()}
-print(f"  مقلوب: {مقلوب}")
-
-# ── 4. Set Comprehension ─────────────────────────
-print("\\n── Set Comprehension ──")
-حروف = {c.lower() for c in "Hello World Python"}
-print(f"  حروف فريدة: {sorted(حروف)}")
-
-# ── 5. Nested Comprehension ──────────────────────
-print("\\n── Nested (متداخل) ──")
-مصفوفة = [[1,2,3],[4,5,6],[7,8,9]]
-مسطحة  = [x for صف in مصفوفة for x in صف]
-print(f"  matrix  : {مصفوفة}")
-print(f"  flat    : {مسطحة}")
-
-ضرب = [(i,j,i*j) for i in range(1,4) for j in range(1,4)]
-for i,j,r in ضرب:
-    print(f"  {i}×{j}={r}", end="  ")
+        print("  finally: هذا دائماً ينفذ")
+safe_div(10, 3)
 print()
+safe_div(10, 0)
+print("\\n-- خطأ مخصص --")
+class GradeError(ValueError): pass
+def check_grade(g):
+    if not 0 <= g <= 100:
+        raise GradeError(f"الدرجة {g} خارج [0,100]")
+    return f"صحيحة: {g}%"
+for g in [85, 150, -5, 60]:
+    try: print(f"  {check_grade(g)}")
+    except GradeError as e: print(f"  GradeError: {e}")`,
 
-# ── 6. Generator Expression ──────────────────────
-print("\\n── Generator Expression ──")
-# مثل list comprehension لكن لا يحسب الكل دفعة
-# مفيد للقوائم الكبيرة (يوفر الذاكرة)
-gen = (x**2 for x in range(1_000_000))  # لا يحسب الكل
-print(f"  أول 5: {[next(gen) for _ in range(5)]}")
-print(f"  مجموع 1-100: {sum(i for i in range(1, 101))}")
-print(f"  أكبر زوجي <50: {max(x for x in range(50) if x%2==0)}")
-`,
-
-  /* ══ PROJECTS ══ */
-
-  project_calc: `# ╔══════════════════════════════════════╗
-# ║   مشروع: آلة حاسبة متكاملة 🧮      ║
-# ╚══════════════════════════════════════╝
-
-import math
-
-def آلة_حاسبة(أ, عملية, ب=None):
-    \\"\\"\\"آلة حاسبة تدعم عمليات ثنائية وأحادية\\"\\"\\"
-    # ثنائية
-    ثنائي = {
-        "+" : lambda x,y: x+y,
-        "-" : lambda x,y: x-y,
-        "*" : lambda x,y: x*y,
-        "/" : lambda x,y: x/y if y!=0 else "خطأ: قسمة على صفر",
-        "//": lambda x,y: x//y if y!=0 else "خطأ",
-        "%" : lambda x,y: x%y,
-        "**": lambda x,y: x**y,
-    }
-    # أحادية
-    أحادي = {
-        "sqrt": lambda x: math.sqrt(x) if x>=0 else "لا جذر لسالب",
-        "abs" : lambda x: abs(x),
-        "log" : lambda x: math.log10(x) if x>0 else "غير معرف",
-        "sin" : lambda x: round(math.sin(math.radians(x)),4),
-        "cos" : lambda x: round(math.cos(math.radians(x)),4),
-        "ceil": lambda x: math.ceil(x),
-        "floor":lambda x: math.floor(x),
-    }
-    if عملية in ثنائي:
-        return ثنائي[عملية](أ, ب)
-    if عملية in أحادي:
-        return أحادي[عملية](أ)
-    return "عملية غير معروفة"
-
-print("=" * 50)
-print("        آلة حاسبة متكاملة")
-print("=" * 50)
-
-print("\\n── العمليات الثنائية ──")
-for أ, عمل, ب in [(10,"+",5),(20,"-",7),(6,"*",8),(22,"/",4),
-                   (17,"%",5),(2,"**",10),(22,"//",4),(10,"/",0)]:
-    r = آلة_حاسبة(أ, عمل, ب)
-    print(f"  {أ:5} {عمل:3} {ب:5}  =  {r}")
-
-print("\\n── العمليات الأحادية ──")
-for val, op in [(25,"sqrt"),(144,"sqrt"),(-9,"sqrt"),(-42,"abs"),
-                (1000,"log"),(90,"sin"),(60,"cos"),(3.7,"ceil"),(3.7,"floor")]:
-    r = آلة_حاسبة(val, op)
-    print(f"  {op:6}({val:6})  =  {r}")
-
-print("\\n── حساب متسلسل ──")
-رقم = 100
-print(f"  البداية: {رقم}")
-لعمليات = [("+",50),("*",2),("-",30),("/",5),("**",2)]
-for عمل, ب in لعمليات:
-    رقم = آلة_حاسبة(رقم, عمل, ب)
-    print(f"  {عمل} {ب:4}  ->  {رقم}")
-
-print("\\n── جدول ضرب مخصص ──")
-n = 7
-print(f"  جدول ضرب {n}:")
-for i in range(1, 11):
-    شريط = "■" * i
-    print(f"  {n} × {i:2} = {n*i:3}  {شريط}")
-`,
-
-  project_student: `# ╔══════════════════════════════════════╗
-# ║   مشروع: نظام إدارة الطلاب 🎓      ║
-# ╚══════════════════════════════════════╝
-
-class طالب:
-    \\"\\"\\"كلاس يمثل طالباً\\"\\"\\"\\"
-    def __init__(self, اسم, رقم, مواد):
-        self.اسم    = اسم
-        self.رقم    = رقم
-        self.مواد   = مواد       # dict: {"مادة": درجة}
-        self.ملاحظات = []
-
-    @property
-    def متوسط(self):
-        if not self.مواد: return 0
-        return round(sum(self.مواد.values()) / len(self.مواد), 1)
-
-    @property
-    def تقدير(self):
-        m = self.متوسط
-        if m >= 90: return "A ممتاز"
-        if m >= 80: return "B جيد جدا"
-        if m >= 70: return "C جيد"
-        if m >= 60: return "D مقبول"
-        return "F راسب"
-
-    def أضف_ملاحظة(self, نص):
-        self.ملاحظات.append(نص)
-
-    def كشف_الدرجات(self):
-        lines = [f"  الطالب: {self.اسم} ({self.رقم})"]
-        for مادة, درجة in self.مواد.items():
-            شريط = "█"*(درجة//10) + "░"*(10-درجة//10)
-            lines.append(f"    {مادة:12}: {درجة:3}%  {شريط}")
-        lines.append(f"    {'المتوسط':12}: {self.متوسط}%  {self.تقدير}")
-        return "\\n".join(lines)
-
-class نظام:
-    \\"\\"\\"نظام يدير مجموعة من الطلاب\\"\\"\\"\\"
-    def __init__(self): self.طلاب = {}
-
-    def أضف(self, ط): self.طلاب[ط.رقم] = ط
-
-    def إحصاءات(self):
-        متوسطات = [ط.متوسط for ط in self.طلاب.values()]
-        return {
-            "عدد":      len(self.طلاب),
-            "متوسط_العام":  round(sum(متوسطات)/len(متوسطات),1),
-            "أعلى":         max(متوسطات),
-            "أدنى":         min(متوسطات),
-            "ناجحون":       sum(1 for m in متوسطات if m >= 60),
-        }
-
-    def تصنيف(self):
-        return sorted(self.طلاب.values(), key=lambda t: t.متوسط, reverse=True)
-
-# إنشاء البيانات
-sys = نظام()
-بيانات_طلاب = [
-    ("عاطف",  "2024001", {"Python":92,"إحصاء":88,"أنظمة":95}),
-    ("سارة",  "2024002", {"Python":85,"إحصاء":90,"أنظمة":82}),
-    ("محمد",  "2024003", {"Python":65,"إحصاء":70,"أنظمة":68}),
-    ("نورة",  "2024004", {"Python":98,"إحصاء":95,"أنظمة":97}),
-    ("خالد",  "2024005", {"Python":55,"إحصاء":60,"أنظمة":52}),
-]
-for اسم, رقم, مواد in بيانات_طلاب:
-    sys.أضف(طالب(اسم, رقم, مواد))
-
-print("=" * 50)
-print("      نظام إدارة الطلاب")
-print("=" * 50)
-
-print("\\n── كشف الدرجات ──")
-for ط in sys.تصنيف():
-    print(ط.كشف_الدرجات())
-    print()
-
-print("── الترتيب العام ──")
-for ترتيب, ط in enumerate(sys.تصنيف(), 1):
-    print(f"  {ترتيب}. {ط.اسم:8} {ط.متوسط}%  {ط.تقدير}")
-
-احصاء = sys.إحصاءات()
-print(f"\\n── الإحصاءات ──")
-for k,v in احصاء.items():
-    print(f"  {k:12}: {v}")
-`,
-
-  project_game: `# ╔══════════════════════════════════════╗
-# ║   مشروع: لعبة تخمين الرقم 🎮        ║
-# ╚══════════════════════════════════════╝
-
-import random
-
-class لعبة_التخمين:
-    \\"\\"\\"لعبة تخمين الرقم مع إحصاءات\\"\\"\\"\\"
-    def __init__(self, max_val=20, محاولات=6):
-        self.max_val   = max_val
-        self.محاولات  = محاولات
-        self.إحصاءات = {"العاب":0, "انتصارات":0, "هزائم":0, "مجموع_محاولات":0}
-
-    def _تلميح(self, تخمين, سر):
-        فرق = abs(تخمين - سر)
-        if   فرق == 0:  return "🎯 صح!"
-        elif فرق <= 2:   return "🔥 ساخن جداً"
-        elif فرق <= 5:   return "♨️  دافئ"
-        elif فرق <= 10:  return "❄️  بارد"
-        else:            return "🧊 بارد جداً"
-
-    def العب(self, تخمينات=None):
-        self.إحصاءات["العاب"] += 1
-        سر = random.randint(1, self.max_val)
-        print(f"  نطاق: 1-{self.max_val} | محاولات: {self.محاولات}")
-
-        for جولة in range(1, self.محاولات+1):
-            # في الاختبار نستخدم تخمينات محددة
-            if تخمينات:
-                تخمين = تخمينات[جولة-1] if جولة<=len(تخمينات) else random.randint(1,self.max_val)
-            else:
-                تخمين = random.randint(1, self.max_val)
-
-            تلميح = self._تلميح(تخمين, سر)
-            print(f"  جولة {جولة}: تخمين={تخمين:3}  {تلميح}", end="")
-
-            if تخمين == سر:
-                self.إحصاءات["انتصارات"] += 1
-                self.إحصاءات["مجموع_محاولات"] += جولة
-                print(f"  ← فاز في {جولة} محاولات! ✓")
-                return True
-            elif تخمين < سر: print("  ↑ الرقم أكبر")
-            else:             print("  ↓ الرقم أصغر")
-
-        self.إحصاءات["هزائم"] += 1
-        print(f"  انتهت المحاولات! الرقم كان: {سر} ✗")
-        return False
-
-    def ملخص(self):
-        إ = self.إحصاءات
-        نسبة = إ["انتصارات"]/إ["العاب"]*100 if إ["العاب"] else 0
-        متوسط = إ["مجموع_محاولات"]/إ["انتصارات"] if إ["انتصارات"] else 0
-        print(f"  العاب: {إ['العاب']} | انتصارات: {إ['انتصارات']} | هزائم: {إ['هزائم']}")
-        print(f"  نسبة الفوز: {نسبة:.0f}% | متوسط محاولات: {متوسط:.1f}")
-
-# تشغيل الألعاب
+  imports: `print("=" * 40)
+print("  المكتبات import")
+print("=" * 40)
+import math, random, statistics, json
+from datetime import datetime, timedelta
+from collections import Counter, defaultdict
+print("== math ==")
+for n in [4,9,16,25]:
+    print(f"  sqrt({n:2})={math.sqrt(n):4.1f}  log10={math.log10(n):.2f}")
+print(f"  pi={math.pi:.5f}  e={math.e:.5f}")
+print(f"  ceil(3.2)={math.ceil(3.2)}  floor(3.8)={math.floor(3.8)}")
+print(f"  sin(pi/2)={math.sin(math.pi/2):.4f}  factorial(6)={math.factorial(6)}")
+print("\\n== random ==")
 random.seed(42)
-لعبة = لعبة_التخمين(20, 5)
+print(f"  randint x5: {[random.randint(1,10) for _ in range(5)]}")
+lst=list(range(1,8)); random.shuffle(lst)
+print(f"  shuffle: {lst}")
+print(f"  sample 3: {random.sample(range(1,20),3)}")
+print("\\n== statistics ==")
+d=[4,8,2,15,1,7,11,3,6,9]
+print(f"  data={d}")
+print(f"  mean={statistics.mean(d):.2f} median={statistics.median(d)} stdev={statistics.stdev(d):.3f}")
+print("\\n== Counter ==")
+words=["Python","Java","Python","C++","Python","Java"]
+cnt=Counter(words); print(f"  Counter: {dict(cnt)}")
+print(f"  most_common(2): {cnt.most_common(2)}")
+print("\\n== json ==")
+data={"name":"عاطف","age":25,"skills":["Python","ML"]}
+j=json.dumps(data,ensure_ascii=False)
+print(f"  dumps: {j}")
+parsed=json.loads(j)
+print(f"  loads['name']: {parsed['name']}")
+print("\\n== datetime ==")
+now=datetime.now()
+print(f"  now: {now.strftime('%Y-%m-%d %H:%M')}")
+print(f"  +7 days: {(now+timedelta(days=7)).strftime('%Y-%m-%d')}")`,
+
+  comprehensions: `print("=" * 40)
+print("  Comprehensions")
+print("=" * 40)
+print("== List Comprehension ==")
+trad=[]; 
+for i in range(1,9): trad.append(i**2)
+comp=[i**2 for i in range(1,9)]
+print(f"  for loop   : {trad}")
+print(f"  comp       : {comp}")
+print(f"  evens <=20 : {[x for x in range(21) if x%2==0]}")
+print(f"  cubes 1-6  : {[x**3 for x in range(1,7)]}")
+names=["  عاطف  ","  سارة  ","  محمد  "]
+clean=[n.strip().upper() for n in names]
+print(f"  strip+upper: {clean}")
+nested=[i*j for i in range(1,4) for j in range(1,4)]
+print(f"  nested 3x3 : {nested}")
+print("\\n== Dict Comprehension ==")
+grades={"عاطف":85,"سارة":92,"محمد":78,"نورة":95}
+passed={k:v for k,v in grades.items() if v>=80}
+labels={k:("A" if v>=90 else "B" if v>=80 else "C") for k,v in grades.items()}
+print(f"  grades : {grades}")
+print(f"  passed : {passed}")
+print(f"  labels : {labels}")
+print("\\n== Set Comprehension ==")
+dupes=[1,2,2,3,3,3,4,4]
+unique={x for x in dupes}
+print(f"  unique from {dupes}: {sorted(unique)}")
+print("\\n== Generator Expression ==")
+total=sum(x**2 for x in range(1,101))
+biggest=max(x*2 for x in range(10) if x%2==0)
+print(f"  sum(x^2 for 1-100) = {total}")
+print(f"  max(2x for x<10 even) = {biggest}")
+print("\\n== Nested Comprehension ==")
+matrix=[[i*j for j in range(1,5)] for i in range(1,5)]
+print("  جدول ضرب 4x4:")
+for row in matrix: print(f"  {row}")
+flat=[x for row in matrix for x in row]
+print(f"  مسطح: {flat}")`,
+
+  /* PROJECTS */
+
+  project_calc: `print("=" * 45)
+print("    آلة حاسبة علمية")
+print("=" * 45)
+import math
+class Calculator:
+    def __init__(self): self.history=[]
+    def calc(self, a, op, b=None):
+        ops={"+":lambda:a+b,"-":lambda:a-b,"*":lambda:a*b,
+             "/":lambda:a/b if b!=0 else "ERR:zero",
+             "**":lambda:a**b,"%":lambda:a%b,"//":lambda:a//b}
+        unary={"sqrt":math.sqrt,"abs":abs,"log":math.log10,
+               "sin":math.sin,"cos":math.cos,
+               "ceil":math.ceil,"floor":math.floor}
+        if op in ops: r=ops[op]()
+        elif op in unary: r=unary[op](a)
+        else: return "?"
+        self.history.append(f"{a} {op} {b if b else ''} = {r}")
+        return r
+c=Calculator()
+print("-- ثنائية --")
+for a,op,b in [(10,"+",5),(20,"-",7),(6,"*",8),(22,"/",4),(2,"**",10),(17,"%",5)]:
+    r=c.calc(a,op,b)
+    print(f"  {a:5} {op:3} {b:4} = {r}")
+print("\\n-- أحادية --")
+for v,fn in [(25,"sqrt"),(100,"sqrt"),(1000,"log"),(-42,"abs"),(0.5,"sin")]:
+    r=c.calc(v,fn)
+    print(f"  {fn}({v}) = {r:.4f}" if isinstance(r,float) else f"  {fn}({v}) = {r}")
+print("\\n-- متسلسل --")
+r=100
+for op,v in [("+",50),("-",30),("*",2),("/",4),("**",2)]:
+    r=c.calc(r,op,v); print(f"  {op} {v:5} -> {r}")
+print("\\n-- السجل --")
+for h in c.history[-5:]: print(f"  {h}")`,
+
+  project_student: `print("=" * 45)
+print("  نظام إدارة الطلاب")
+print("=" * 45)
+class StudentSystem:
+    def __init__(self): self.db={}
+    def add(self, name, grades):
+        avg=sum(grades)/len(grades)
+        self.db[name]={"grades":grades,"avg":round(avg,1),
+                       "label":"A" if avg>=90 else "B" if avg>=80 else "C" if avg>=70 else "D" if avg>=60 else "F",
+                       "pass":avg>=60}
+    def report(self):
+        print(f"  {'Name':>8} {'Avg':>6} {'Grade':>7} {'Bar'}")
+        print("  "+"─"*45)
+        for n,d in sorted(self.db.items(),key=lambda x:-x[1]["avg"]):
+            bar=chr(9608)*int(d["avg"]//10)
+            st="✓" if d["pass"] else "✗"
+            print(f"  {n:>8} {d['avg']:>6}% {d['label']:>7} {st} {bar}")
+    def stats(self):
+        avgs=[v["avg"] for v in self.db.values()]
+        passed=sum(1 for v in self.db.values() if v["pass"])
+        return {"n":len(avgs),"mean":round(sum(avgs)/len(avgs),1),
+                "max":max(avgs),"min":min(avgs),"passed":passed}
+sys=StudentSystem()
+data=[("عاطف",[92,88,95,90]),("سارة",[85,79,88,82]),
+      ("محمد",[65,70,68,72]),("نورة",[98,95,97,99]),
+      ("خالد",[55,60,58,52]),("ريم",[78,82,80,85])]
+for n,g in data: sys.add(n,g)
+sys.report()
+s=sys.stats()
+print(f"\\n-- إحصاءات --")
+for k,v in s.items(): print(f"  {k}: {v}")`,
+
+  project_game: `print("=" * 40)
+print("  لعبة تخمين الرقم")
+print("=" * 40)
+import random
+random.seed(42)
+def play(max_n=50, max_tries=7):
+    secret=random.randint(1,max_n)
+    print(f"  الرقم السري: {secret} (1-{max_n})")
+    low, high = 1, max_n
+    for attempt in range(1, max_tries+1):
+        guess=(low+high)//2
+        print(f"  محاولة {attempt}: تخمين={guess}", end=" ")
+        if guess==secret:
+            print(f"✓ صح!")
+            return True, attempt
+        elif guess<secret:
+            print(f"↑ أكبر ({secret-guess} فرق)")
+            low=guess+1
+        else:
+            print(f"↓ أصغر ({guess-secret} فرق)")
+            high=guess-1
+    print(f"  انتهت المحاولات! الرقم={secret}")
+    return False, max_tries
+print("== جولة 1 ==")
+w,t=play(50,7)
+print(f"  {'فاز' if w else 'خسر'} في {t} محاولات\\n")
+print("== جولة 2 ==")
+w,t=play(100,7)
+print(f"  {'فاز' if w else 'خسر'} في {t} محاولات")
+print("\\n== إحصاء 5 جولات ==")
+wins=[play(100,7)[0] for _ in range(5)]
+print(f"  الفائزون: {sum(wins)}/5")`,
+
+  /* ML / AI */
+
+  ml_basics: `print("=" * 50)
+print("  تعلم الآلة - الانحدار الخطي")
 print("=" * 50)
-print("       لعبة تخمين الرقم")
-print("=" * 50)
+import statistics as st, math
+X=[1,2,3,4,5,6,7,8,9,10]
+Y=[42,53,61,68,74,80,85,90,94,97]
+n=len(X)
+xm,ym=st.mean(X),st.mean(Y)
+b=sum((X[i]-xm)*(Y[i]-ym) for i in range(n))/sum((X[i]-xm)**2 for i in range(n))
+a=ym-b*xm
+Yp=[a+b*x for x in X]
+R2=1-sum((Y[i]-Yp[i])**2 for i in range(n))/sum((Y[i]-ym)**2 for i in range(n))
+MAE=sum(abs(Y[i]-Yp[i]) for i in range(n))/n
+print(f"المعادلة: y = {a:.2f} + {b:.2f}x")
+print(f"R² = {R2:.4f}  ->  النموذج يفسر {R2*100:.1f}% من التباين")
+print(f"MAE= {MAE:.3f}  ->  متوسط الخطأ")
+print(f"\\n{'ساعات':>7} {'فعلي':>8} {'متنبأ':>8} {'خطأ':>7}")
+print("-"*35)
+for i in range(n):
+    e=abs(Y[i]-Yp[i])
+    print(f"{X[i]:>7} {Y[i]:>8} {Yp[i]:>8.1f} {e:>7.2f}")
+print("\\nتنبؤات جديدة:")
+for h in [3.5,5.5,11,15]:
+    print(f"  {h} ساعات -> {min(100,a+b*h):.1f} درجة")`,
 
-print("\\n── لعبة 1 ──")
-لعبة.العب([7, 14, 11, 18, 16])  # تخمينات محددة للعرض
+  /* REFERENCE */
 
-print("\\n── لعبة 2 ──")
-لعبة.العب([5, 15, 10, 12, 13])
-
-print("\\n── لعبة 3 (عشوائية) ──")
-لعبة.العب()
-
-print("\\n── الملخص الإجمالي ──")
-لعبة.ملخص()
-`,
-
-  /* ══ ML / AI ══ */
-
-  ml_basics: `# ╔══════════════════════════════════════╗
-# ║   ML - الانحدار الخطي               ║
-# ║   Machine Learning Basics           ║
-# ╚══════════════════════════════════════╝
-#
-# الانحدار الخطي = إيجاد خط مستقيم يمثل العلاقة
-# بين متغيرين: X (المدخل) و Y (الخرج)
-# المعادلة: Y = a + b*X
-# a = نقطة التقاطع مع محور Y
-# b = ميل الخط (كيف تتغير Y مع كل وحدة من X)
-
-import statistics
-
-print("=" * 50)
-print("  الانحدار الخطي: درجة = f(ساعات المذاكرة)")
-print("=" * 50)
-
-# بيانات التدريب
-بيانات = [
-    (1, 45), (2, 52), (3, 60), (4, 68),
-    (5, 75), (6, 80), (7, 87), (8, 91),
-    (9, 95), (10, 98)
+  errors: `print("=" * 40)
+print("  انواع الاخطاء في Python")
+print("=" * 40)
+cases=[
+    ("NameError",        lambda: x_not_def),
+    ("TypeError",        lambda: "a"+5),
+    ("ValueError",       lambda: int("hi")),
+    ("ZeroDivisionError",lambda: 1/0),
+    ("IndexError",       lambda: [1,2][9]),
+    ("KeyError",         lambda: {}["x"]),
+    ("AttributeError",   lambda: (5).upper()),
 ]
-X = [d[0] for d in بيانات]
-Y = [d[1] for d in بيانات]
-n = len(X)
+for name,fn in cases:
+    try: fn()
+    except Exception as e:
+        print(f"  {name:22}: {e}")
+print("\\n-- الفرق بين الاخطاء --")
+info=[
+    ("SyntaxError",     "كتابة خاطئة","قبل التشغيل","تحقق من الاقواس والنقطتين"),
+    ("NameError",       "متغير غير معرف","اثناء التشغيل","عرّف المتغير: x=10"),
+    ("TypeError",       "نوع خاطئ","اثناء التشغيل","حوّل: str(5)+نص"),
+    ("ValueError",      "قيمة غير صالحة","اثناء التشغيل","تحقق قبل التحويل"),
+    ("ZeroDivisionError","قسمة صفر","اثناء التشغيل","if y!=0: x/y"),
+    ("IndexError",      "فهرس خارج","اثناء التشغيل","if i<len(lst)"),
+    ("KeyError",        "مفتاح مفقود","اثناء التشغيل","d.get('k','default')"),
+    ("ImportError",     "مكتبة مفقودة","اثناء التشغيل","pip install name"),
+]
+for n,why,when,fix in info:
+    print(f"  {n:22} | {why:16} | {fix}")`,
 
-print(f"\\nبيانات التدريب ({n} نقطة):")
-for h, d in بيانات:
-    شريط = "█" * (d//10)
-    print(f"  {h:2} ساعات -> {d:3}%  {شريط}")
-
-# ── حساب معادلة الانحدار ─────────────────────────
-print("\\n── حساب المعادلة ──")
-x_mean = statistics.mean(X)
-y_mean = statistics.mean(Y)
-
-# b = الارتباط المشترك / تباين X
-cov  = sum((X[i]-x_mean)*(Y[i]-y_mean) for i in range(n))
-varX = sum((X[i]-x_mean)**2 for i in range(n))
-b = cov / varX       # الميل
-a = y_mean - b*x_mean  # التقاطع
-
-print(f"  x̄ = {x_mean}  ȳ = {y_mean}")
-print(f"  covariance = {cov:.2f}")
-print(f"  variance X = {varX:.2f}")
-print(f"  b (الميل)  = {b:.4f}")
-print(f"  a (التقاطع)= {a:.4f}")
-print(f"  المعادلة   : Y = {a:.2f} + {b:.2f}×X")
-
-# ── دقة النموذج ──────────────────────────────────
-print("\\n── دقة النموذج ──")
-print(f"{'ساعات':>7} {'فعلي':>7} {'متنبأ':>8} {'خطأ':>7} {'خطأ%':>7}")
-print("-" * 40)
-أخطاء = []
-for ساعات, فعلي in بيانات:
-    متنبأ = a + b * ساعات
-    خطأ  = abs(فعلي - متنبأ)
-    أخطاء.append(خطأ)
-    print(f"{ساعات:7} {فعلي:7} {متنبأ:8.1f} {خطأ:7.2f} {خطأ/فعلي*100:6.1f}%")
-
-mae = sum(أخطاء)/n  # Mean Absolute Error
-print(f"\\nMAE (متوسط الخطأ المطلق): {mae:.3f}")
-
-# ── التنبؤ بقيم جديدة ────────────────────────────
-print("\\n── التنبؤ بقيم جديدة ──")
-for ساعات in [0.5, 3.5, 6.5, 11, 15]:
-    تنبؤ = a + b * ساعات
-    تنبؤ = max(0, min(100, تنبؤ))  # حصر بين 0 و100
-    print(f"  {ساعات:4} ساعات -> {تنبؤ:.1f}%")
-
-# ── معامل الارتباط R ─────────────────────────────
-print("\\n── معامل الارتباط R² ──")
-ss_res = sum((Y[i] - (a + b*X[i]))**2 for i in range(n))
-ss_tot = sum((Y[i] - y_mean)**2 for i in range(n))
-R2 = 1 - ss_res/ss_tot
-print(f"  R² = {R2:.6f}")
-print(f"  النموذج يفسر {R2*100:.1f}% من تباين البيانات")
-if R2 > 0.95: print("  نموذج ممتاز ✓")
-elif R2 > 0.80: print("  نموذج جيد")
-else: print("  النموذج يحتاج تحسيناً")
-`,
-
-  /* ══ REFERENCE ══ */
-
-  errors: `# ╔══════════════════════════════════════╗
-# ║    أنواع الأخطاء - Error Types      ║
-# ╚══════════════════════════════════════╝
-#
-# نوعان رئيسيان:
-# 1. SyntaxError  = خطأ في كتابة الكود (قبل التشغيل)
-# 2. RuntimeError = خطأ أثناء التشغيل (بعد التشغيل)
-
-print("=" * 50)
-print("    دليل أخطاء Python الشامل")
-print("=" * 50)
-
-# قاموس الأخطاء مع الوصف والحل
-أخطاء = {
-    "SyntaxError":       ("كتابة خاطئة للكود",     "راجع الأقواس والنقطتين"),
-    "IndentationError":  ("مسافة بادئة خاطئة",     "استخدم 4 مسافات دائماً"),
-    "NameError":         ("متغير غير معرف",         "عرّف المتغير قبل استخدامه"),
-    "TypeError":         ("نوع خاطئ في العملية",   "تأكد من نوع البيانات"),
-    "ValueError":        ("قيمة غير صالحة",         "تحقق من القيمة قبل التحويل"),
-    "ZeroDivisionError": ("قسمة على صفر",           "تحقق if y != 0 قبل القسمة"),
-    "IndexError":        ("فهرس خارج الحدود",       "تحقق len() قبل الوصول"),
-    "KeyError":          ("مفتاح غير موجود",        "استخدم get() أو in للتحقق"),
-    "AttributeError":    ("صفة غير موجودة",         "تحقق type() للتأكد"),
-    "FileNotFoundError": ("ملف غير موجود",          "تحقق من مسار الملف"),
-    "RecursionError":    ("تكرار لا نهائي",         "أضف شرط توقف للدالة"),
-    "MemoryError":       ("نفدت الذاكرة",           "قلل حجم البيانات"),
-    "ImportError":       ("مكتبة غير موجودة",       "pip install المكتبة"),
-    "OverflowError":     ("رقم كبير جداً",          "استخدم decimal للأرقام الكبيرة"),
-    "UnicodeError":      ("ترميز النص خاطئ",        "حدد encoding='utf-8'"),
-}
-
-print("\\n── جدول الأخطاء ──")
-for خطأ, (وصف, حل) in أخطاء.items():
-    print(f"  {خطأ:22}  | {وصف:20} | {حل}")
-
-# ── محاكاة الأخطاء ───────────────────────────────
-print("\\n── محاكاة وإصلاح الأخطاء ──")
-
-# NameError
-print("\\n1. NameError:")
-try:
-    print(متغير_غير_معرف)
-except NameError as e:
-    print(f"   خطأ:  {e}")
-    متغير_غير_معرف = "تم التعريف"
-    print(f"   حل:   {متغير_غير_معرف}")
-
-# TypeError
-print("\\n2. TypeError:")
-try:
-    print("العمر: " + 25)
-except TypeError as e:
-    print(f"   خطأ:  {e}")
-    print(f"   حل:   {'العمر: ' + str(25)}")
-
-# ValueError
-print("\\n3. ValueError:")
-for s in ["123", "abc", "3.14", ""]:
-    try:
-        n = int(s)
-        print(f"   int({s!r:8}) = {n}")
-    except ValueError:
-        print(f"   int({s!r:8}) -> خطأ (ليس رقماً)")
-
-# IndexError
-print("\\n4. IndexError:")
-lst = [10, 20, 30]
-for i in [0, 1, 2, 3, -1, 5]:
-    try:
-        print(f"   lst[{i:2}] = {lst[i]}")
-    except IndexError:
-        print(f"   lst[{i:2}] -> خطأ (الحجم {len(lst)})")
-
-# KeyError
-print("\\n5. KeyError:")
-d = {"x":1, "y":2}
-for k in ["x","z","y","w"]:
-    print(f"   get({k!r}) = {d.get(k, 'غير موجود')}")  # get آمن
-
-# ZeroDivisionError
-print("\\n6. ZeroDivisionError:")
-for a, b in [(10,2), (7,0), (0,5), (9,0)]:
-    if b != 0:
-        print(f"   {a}/{b} = {a/b:.2f}")
-    else:
-        print(f"   {a}/{b} -> تجنبنا الخطأ (b==0)")
-
-# RecursionError
-print("\\n7. Recursion (مثال صحيح وخاطئ):")
-def factorial(n):
-    if n <= 1: return 1          # شرط التوقف (مهم!)
-    return n * factorial(n-1)
-
-for n in [5, 10, 0]:
-    print(f"   {n}! = {factorial(n)}")
-`,
-
-  numpy: `# ╔══════════════════════════════════════╗
-# ║       Numpy - الحسابات العلمية      ║
-# ╚══════════════════════════════════════╝
-#
-# Numpy = المكتبة الأساسية للحسابات العلمية في Python
-# توفر: مصفوفات متعددة الأبعاد + عمليات رياضية سريعة
-# أسرع بكثير من القوائم العادية
-
+  numpy: `print("=" * 40)
+print("  Numpy")
+print("=" * 40)
 import numpy as np
-
-print("=" * 45)
-print("        Numpy للحسابات العلمية")
-print("=" * 45)
-
-# ── 1. إنشاء المصفوفات ───────────────────────────
-print("\\n── إنشاء المصفوفات ──")
-arr1 = np.array([1, 2, 3, 4, 5, 6])
-arr2 = np.zeros(5)
-arr3 = np.ones(5)
-arr4 = np.arange(0, 20, 3)       # من 0 حتى 20 بخطوة 3
-arr5 = np.linspace(0, 1, 6)      # 6 قيم بين 0 و1 بتساوٍ
-arr6 = np.random.seed(42); rnd = np.random.randint(1,100,8)
-
-print(f"  array    : {arr1}")
-print(f"  zeros    : {arr2}")
-print(f"  ones     : {arr3}")
-print(f"  arange   : {arr4}")
-print(f"  linspace : {arr5}")
-print(f"  dtype    : {arr1.dtype}")
-print(f"  shape    : {arr1.shape}")
-
-# ── 2. العمليات على المصفوفات ────────────────────
-print("\\n── العمليات (تُطبق على كل عنصر) ──")
-a = np.array([1, 2, 3, 4, 5])
-b = np.array([10, 20, 30, 40, 50])
-print(f"  a         : {a}")
-print(f"  b         : {b}")
-print(f"  a + b     : {a + b}")
-print(f"  a * b     : {a * b}")
-print(f"  a ** 2    : {a ** 2}")
-print(f"  a + 100   : {a + 100}")  # Broadcast
-print(f"  a * 3     : {a * 3}")    # Broadcast
-print(f"  sqrt(b)   : {np.sqrt(b)}")
-print(f"  dot(a,b)  : {np.dot(a,b)}")  # حاصل الضرب الداخلي
-
-# ── 3. الإحصاء ───────────────────────────────────
-print("\\n── الإحصاء ──")
-data = np.array([4, 8, 2, 15, 1, 7, 11, 3, 6, 9])
-print(f"  data      : {data}")
-print(f"  mean      : {np.mean(data):.2f}")
-print(f"  median    : {np.median(data)}")
-print(f"  std       : {np.std(data):.3f}")
-print(f"  var       : {np.var(data):.3f}")
-print(f"  max       : {np.max(data)}")
-print(f"  min       : {np.min(data)}")
-print(f"  sum       : {np.sum(data)}")
-print(f"  cumsum    : {np.cumsum(data)}")
-print(f"  sorted    : {np.sort(data)}")
-print(f"  percentile 25,50,75: {np.percentile(data,[25,50,75])}")
-
-# ── 4. المصفوفة ثنائية الأبعاد (2D) ──────────────
-print("\\n── 2D Matrix ──")
-m = np.array([[1,2,3],[4,5,6],[7,8,9]])
+print("== إنشاء المصفوفات ==")
+a=np.array([1,2,3,4,5,6,7,8])
+print(f"  array   : {a}")
+print(f"  zeros   : {np.zeros(5)}")
+print(f"  ones    : {np.ones(5)}")
+print(f"  arange  : {np.arange(0,20,3)}")
+print(f"  linspace: {np.linspace(0,1,5)}")
+print(f"  randn   : {np.random.randn(4).round(3)}")
+print("\\n== العمليات ==")
+x=np.array([1,2,3,4]); y=np.array([10,20,30,40])
+print(f"  x={x}")
+print(f"  y={y}")
+print(f"  x+y  : {x+y}")
+print(f"  x*y  : {x*y}")
+print(f"  x**2 : {x**2}")
+print(f"  sqrt : {np.sqrt(y)}")
+print(f"  dot  : {np.dot(x,y)}")
+print("\\n== الاحصاء ==")
+d=np.array([23,45,12,67,34,89,56,78,43,21])
+print(f"  data   : {d}")
+print(f"  mean   : {np.mean(d):.2f}")
+print(f"  median : {np.median(d):.2f}")
+print(f"  std    : {np.std(d):.3f}")
+print(f"  sorted : {np.sort(d)}")
+print(f"  Q1,Q3  : {np.percentile(d,25)}, {np.percentile(d,75)}")
+print("\\n== 2D مصفوفة ==")
+m=np.array([[1,2,3],[4,5,6],[7,8,9]])
 print(f"  matrix:\\n{m}")
-print(f"  shape     : {m.shape}  ->  {m.shape[0]} صفوف x {m.shape[1]} أعمدة")
-print(f"  m[0]      : {m[0]}  (الصف الأول)")
-print(f"  m[1,2]    : {m[1,2]}  (الصف 1 العمود 2)")
-print(f"  m[:,1]    : {m[:,1]}  (العمود الثاني)")
-print(f"  sum cols  : {np.sum(m, axis=0)}")
-print(f"  sum rows  : {np.sum(m, axis=1)}")
-print(f"  transpose :\\n{m.T}")
+print(f"  shape:{m.shape}  T:\\n{m.T}")
+print(f"  col sums: {np.sum(m,axis=0)}")
+print(f"  row sums: {np.sum(m,axis=1)}")`,
 
-# ── 5. الفلترة ───────────────────────────────────
-print("\\n── الفلترة ──")
-arr = np.array([3, 7, 1, 9, 4, 6, 2, 8, 5])
-print(f"  arr       : {arr}")
-print(f"  arr > 5   : {arr[arr > 5]}")
-print(f"  arr % 2=0 : {arr[arr % 2 == 0]}")
-print(f"  where > 5 : {np.where(arr > 5, arr, 0)}")  # استبدل الصغيرة بـ0
-`,
-
-  builtins: `# ╔══════════════════════════════════════╗
-# ║   كل دوال Python المدمجة (Built-in) ║
-# ╚══════════════════════════════════════╝
-#
-# Python يأتي بـ 70+ دالة مدمجة جاهزة للاستخدام
-# بدون استيراد أي مكتبة
-
-print("=" * 50)
-print("      دوال Python المدمجة الكاملة")
-print("=" * 50)
-
-# ── 1. تحويل الأنواع ─────────────────────────────
-print("\\n── تحويل الأنواع ──")
-cases_convert = [
-    ("int('42')",      int('42')),
-    ("int(3.9)",       int(3.9)),           # يقطع (لا يقرب)
-    ("float('3.14')",  float('3.14')),
-    ("float(5)",       float(5)),
-    ("str(100)",       str(100)),
-    ("str(True)",      str(True)),
-    ("bool(0)",        bool(0)),
-    ("bool(1)",        bool(1)),
-    ("bool('')",       bool('')),
-    ("bool('hi')",     bool('hi')),
-    ("bool(None)",     bool(None)),
-    ("bool([])",       bool([])),
-    ("list('abc')",    list('abc')),
-    ("list(range(5))", list(range(5))),
-    ("tuple([1,2,3])", tuple([1,2,3])),
-    ("set([1,1,2,2])", set([1,1,2,2])),
-    ("dict(a=1,b=2)",  dict(a=1,b=2)),
-    ("frozenset({1,2})",frozenset({1,2})),
-    ("complex(2,3)",   complex(2,3)),
-    ("bytes('hi','utf-8')",bytes('hi','utf-8')),
-]
-for expr, val in cases_convert:
-    print(f"  {expr:30} = {val}")
-
-# ── 2. الرياضيات ─────────────────────────────────
-print("\\n── الرياضيات ──")
-cases_math = [
-    ("abs(-42)",          abs(-42)),
-    ("abs(-3.7)",         abs(-3.7)),
-    ("round(3.7)",        round(3.7)),
-    ("round(3.14159, 3)", round(3.14159, 3)),
-    ("round(2.5)",        round(2.5)),       # Python يقرب للزوجي
-    ("pow(2, 10)",        pow(2, 10)),
-    ("pow(2, 10, 1000)",  pow(2, 10, 1000)), # pow مع mod
-    ("divmod(17, 5)",     divmod(17, 5)),    # (몫, باقي)
-    ("max(3,1,4,1,5,9)",  max(3,1,4,1,5,9)),
-    ("min(3,1,4,1,5,9)",  min(3,1,4,1,5,9)),
-    ("sum(range(1,11))",  sum(range(1,11))),
-    ("sum([1,2],start=10)",sum([1,2], 10)),  # sum مع قيمة بداية
-]
-for expr, val in cases_math:
-    print(f"  {expr:32} = {val}")
-
-# ── 3. القوائم والتسلسلات ────────────────────────
-print("\\n── القوائم والتسلسلات ──")
-lst = [4, 2, 8, 1, 9, 3, 7]
-print(f"  القائمة: {lst}")
-print(f"  len()          = {len(lst)}")
-print(f"  max()          = {max(lst)}")
-print(f"  min()          = {min(lst)}")
-print(f"  sum()          = {sum(lst)}")
-print(f"  sorted()       = {sorted(lst)}")
-print(f"  sorted(rev)    = {sorted(lst, reverse=True)}")
-print(f"  reversed()     = {list(reversed(lst))}")
-print(f"  enumerate()    = {list(enumerate(lst, start=1))[:3]}...")
-print(f"  zip()          = {list(zip([1,2,3],['a','b','c']))}")
-nums_str = [str(x) for x in lst]
-print(f"  map(str,lst)   = {list(map(str, lst))}")
-print(f"  filter(>4,lst) = {list(filter(lambda x: x>4, lst))}")
-
-# ── 4. التحقق ────────────────────────────────────
-print("\\n── التحقق والمعلومات ──")
-cases_check = [
-    ("any([0,0,1])",          any([0,0,1])),
-    ("any([0,0,0])",          any([0,0,0])),
-    ("all([1,1,1])",          all([1,1,1])),
-    ("all([1,0,1])",          all([1,0,1])),
-    ("isinstance(5, int)",    isinstance(5, int)),
-    ("isinstance(5.0, int)",  isinstance(5.0, int)),
-    ("isinstance(5.0, float)",isinstance(5.0, float)),
-    ("issubclass(bool,int)",  issubclass(bool, int)),
-    ("callable(print)",       callable(print)),
-    ("callable(5)",           callable(5)),
-    ("hasattr([],"append")",hasattr([], "append")),
-    ("id(42) == id(42)",      id(42) == id(42)),   # الأرقام الصغيرة مخزنة مسبقاً
-    ("type(3.14).__name__",   type(3.14).__name__),
-]
-for expr, val in cases_check:
-    print(f"  {expr:35} = {val}")
-
-# ── 5. النطاق والتسلسل ───────────────────────────
-print("\\n── range() و slice() ──")
-print(f"  range(5)         = {list(range(5))}")
-print(f"  range(2,8)       = {list(range(2,8))}")
-print(f"  range(0,20,3)    = {list(range(0,20,3))}")
-print(f"  range(10,0,-2)   = {list(range(10,0,-2))}")
-
-# ── 6. التنسيق والإدخال/إخراج ────────────────────
-print("\\n── الإدخال والإخراج ──")
-print(f"  print() مع sep  :", end=" ")
-print(1, 2, 3, sep=" | ")
-print(f"  print() مع end  :", end=" ")
-print("أ", end=" "); print("ب", end=" "); print("ج")
-print(f"  repr(3.14)       = {repr(3.14)}")
-print(f"  repr('مرحبا')    = {repr('مرحبا')}")
-print(f"  bin(42)          = {bin(42)}")    # ثنائي
-print(f"  oct(42)          = {oct(42)}")    # ثماني
-print(f"  hex(255)         = {hex(255)}")   # ستة عشري
-print(f"  ord('A')         = {ord('A')}")   # كود الحرف
-print(f"  chr(65)          = {chr(65)}")    # حرف الكود
-print(f"  chr(0x1F600)     = {chr(0x1F600)}")  # إيموجي
-print(f"  format(pi,'.4f') = {3.14159265:.4f}")
-
-# ── 7. الدوال الوظيفية ───────────────────────────
-print("\\n── الدوال الوظيفية ──")
-nums = [1, 2, 3, 4, 5]
+  builtins: `print("=" * 40)
+print("  كل دوال Python المدمجة")
+print("=" * 40)
+print("== تحويل الانواع ==")
+for n,v in [("int('42')",int('42')),("float('3.14')",float('3.14')),
+            ("str(100)",str(100)),("bool(0)",bool(0)),("bool('x')",bool('x')),
+            ("list('abc')",list('abc')),("tuple([1,2])",tuple([1,2])),
+            ("set([1,1,2,2])",set([1,1,2,2])),("dict(a=1)",dict(a=1)),
+            ("chr(65)",chr(65)),("ord('A')",ord('A')),
+            ("bin(10)",bin(10)),("hex(255)",hex(255)),("oct(8)",oct(8))]:
+    print(f"  {n:22} = {v}")
+print("\\n== الرياضيات ==")
+for n,v in [("abs(-7)",abs(-7)),("round(3.14159,2)",round(3.14159,2)),
+            ("pow(2,10)",pow(2,10)),("divmod(17,5)",divmod(17,5)),
+            ("sum([1..5])",sum(range(1,6)))]:
+    print(f"  {n:22} = {v}")
+print("\\n== القوائم ==")
+lst=[4,8,2,15,1,7,11]
+for n,v in [("len",len(lst)),("max",max(lst)),("min",min(lst)),
+            ("sum",sum(lst)),("sorted",sorted(lst)),
+            ("reversed",list(reversed(lst))),
+            ("enumerate[:3]",list(enumerate(lst[:3])))]:
+    print(f"  {n:14}: {v}")
+print("\\n== التحقق ==")
+for n,v in [("any([0,0,1])",any([0,0,1])),("all([1,1,1])",all([1,1,1])),
+            ("isinstance(5,int)",isinstance(5,int)),
+            ("type(3.14).__name__",type(3.14).__name__),
+            ("callable(print)",callable(print)),
+            ("hasattr([],append)",hasattr([],"append"))]:
+    print(f"  {n:26} = {v}")
+print("\\n== map / filter / zip / reduce ==")
+nums=[1,2,3,4,5]
+print(f"  map x2   : {list(map(lambda x:x*2,nums))}")
+print(f"  filter>3 : {list(filter(lambda x:x>3,nums))}")
+print(f"  zip a,b  : {list(zip([1,2,3],['a','b','c']))}")
 from functools import reduce
-print(f"  map(x²)          = {list(map(lambda x:x**2, nums))}")
-print(f"  filter(>2)       = {list(filter(lambda x:x>2, nums))}")
-print(f"  reduce(+)        = {reduce(lambda a,b:a+b, nums)}")
-print(f"  zip([1..3],abc)  = {list(zip([1,2,3],'abc'))}")
-print(f"  enumerate(abc,1) = {list(enumerate('abc',1))}")
-`,
+print(f"  reduce * : {reduce(lambda a,b:a*b,nums)}")`,
 
 };
 

@@ -13232,16 +13232,36 @@ table { display: block; overflow-x: auto; max-width: 100%; }
               padding:6px 12px;border-radius:8px;font-family:var(--font);font-size:0.82rem;cursor:pointer;
             ">
               <option value="">📋 قوالب جاهزة...</option>
+              <optgroup label="── الأساسيات ──">
               <option value="hello">👋 مرحبا بالعالم</option>
               <option value="variables">📦 المتغيرات</option>
               <option value="arithmetic">➕ العمليات الحسابية</option>
               <option value="constants">🔒 الاسماء الثابتة</option>
+              </optgroup>
+              <optgroup label="── التحكم في التدفق ──">
+              <option value="conditions">🔀 الشروط if/elif/else</option>
+              <option value="loops">🔄 الحلقات for/while</option>
+              </optgroup>
+              <optgroup label="── البنى والدوال ──">
               <option value="functions">⚙️ الدوال Functions</option>
-              <option value="loops">🔄 الحلقات Loops</option>
               <option value="oop">🏗️ البرمجة الكائنية OOP</option>
-              <option value="len_lists">📋 len والقوائم</option>
-              <option value="errors">🐛 SyntaxError vs NameError</option>
+              <option value="advanced_fn">⚡ Lambda/Generator/Decorator</option>
+              </optgroup>
+              <optgroup label="── البيانات ──">
+              <option value="len_lists">📋 len والقوائم والقواميس</option>
+              <option value="strings">🔤 النصوص Strings</option>
+              <option value="comprehensions">🗜️ Comprehensions</option>
+              </optgroup>
+              <optgroup label="── متقدم ──">
+              <option value="exceptions">🛡️ الاستثناءات try/except</option>
+              <option value="files">💾 الملفات File I/O</option>
+              <option value="imports">📦 استيراد المكتبات</option>
+              <option value="numpy">🔢 Numpy</option>
+              </optgroup>
+              <optgroup label="── الأخطاء والدوال ──">
+              <option value="errors">🐛 أنواع الأخطاء</option>
               <option value="builtins">📚 كل دوال Python</option>
+              </optgroup>
             </select>
             <button onclick="clearPyEditor()" style="
               padding:6px 14px;border-radius:8px;border:1px solid var(--border);
@@ -16129,7 +16149,7 @@ function buildPythonOnlyLab() {
       + '</div>'
       + '<div style="display:flex;gap:6px;flex-wrap:wrap">'
         + '<select id="elab-py-tmpl" onchange="elabLoadPyTmpl()" style="padding:5px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-family:var(--font);font-size:0.78rem">'
-          + '<option value="">📋 قوالب...</option>'+'<option value="hello">👋 مرحبا</option>'+'<option value="variables">📦 المتغيرات</option>'+'<option value="arithmetic">➕ عمليات</option>'+'<option value="constants">🔒 ثوابت</option>'+'<option value="functions">⚙️ الدوال</option>'+'<option value="loops">🔄 الحلقات</option>'+'<option value="oop">🏗️ OOP</option>'+'<option value="len_lists">📋 len والقوائم</option>'+'<option value="errors">🐛 الاخطاء</option>'+'<option value="builtins">📚 كل الدوال</option>'
+          + '<option value="">📋 قوالب...</option>'+'<option value="hello">👋 مرحبا</option>'+'<option value="variables">📦 المتغيرات</option>'+'<option value="arithmetic">➕ عمليات</option>'+'<option value="conditions">🔀 الشروط</option>'+'<option value="functions">⚙️ الدوال</option>'+'<option value="loops">🔄 الحلقات</option>'+'<option value="oop">🏗️ OOP</option>'+'<option value="strings">🔤 النصوص</option>'+'<option value="comprehensions">🗜️ Comprehensions</option>'+'<option value="advanced_fn">⚡ Lambda</option>'+'<option value="exceptions">🛡️ try/except</option>'+'<option value="imports">📦 المكتبات</option>'+'<option value="numpy">🔢 Numpy</option>'+'<option value="errors">🐛 الاخطاء</option>'+'<option value="builtins">📚 كل الدوال</option>'
         + '</select>'
         + '<button onclick="(function(){document.getElementById(\'elab-editor\').value=\'\';document.getElementById(\'elab-lnums\').innerHTML=\'1\'})()" style="padding:5px 12px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text-muted);font-family:var(--font);font-size:0.78rem;cursor:pointer">🗑️</button>'
         + '<button id="elab-run-btn" onclick="elabRunPy()" style="padding:6px 16px;border-radius:10px;border:none;background:linear-gradient(135deg,#3776AB,#1a4a7a);color:white;font-family:var(--font);font-weight:700;font-size:0.85rem;cursor:pointer">▶ تشغيل</button>'
@@ -16530,8 +16550,299 @@ x = 10
 y = 3
 print(f"\n{x} + {y} = {x+y}")
 print(f"{x} * {y} = {x*y}")
-print(f"{x} ** {y} = {x**y}")`,
-};
+print(f"{x} ** {y} = {x**y}")`,,
+  // ── 11. الشروط (If/Elif/Else) ─────────────────────────
+  conditions: `# ======= الشروط if / elif / else =======
+
+درجة = 85
+
+if درجة >= 90:
+    print("ممتاز")
+elif درجة >= 80:
+    print("جيد جدا")
+elif درجة >= 70:
+    print("جيد")
+elif درجة >= 60:
+    print("مقبول")
+else:
+    print("راسب")
+
+# شرط في سطر واحد (Ternary)
+حالة = "ناجح" if درجة >= 60 else "راسب"
+print(f"النتيجة: {حالة}")
+
+# and / or / not
+عمر = 20
+لديه_هوية = True
+
+if عمر >= 18 and لديه_هوية:
+    print("يمكنه الدخول")
+
+# in - التحقق من وجود قيمة
+مواد = ["Python", "احصاء", "انظمة"]
+if "Python" in مواد:
+    print("Python موجودة في القائمة")`,
+
+  // ── 12. النصوص (Strings) ─────────────────────────────
+  strings: `# ======= النصوص Strings =======
+
+نص = "مرحبا يا عالم Python"
+
+print(f"الطول:       {len(نص)}")
+print(f"كبير:        {نص.upper()}")
+print(f"صغير:        {نص.lower()}")
+print(f"يبدا بـ م؟   {نص.startswith('م')}")
+print(f"ينتهي بـ n؟  {نص.endswith('n')}")
+print(f"يحتوي مرحبا؟ {'مرحبا' in نص}")
+print(f"استبدال:     {نص.replace('عالم', 'صديق')}")
+print(f"تقسيم:       {نص.split()}")
+print(f"شريحة [0:6]: {نص[0:6]}")
+print(f"عكس النص:    {نص[::-1]}")
+
+# تنظيف النصوص
+نص2 = "   Python   "
+print(f"strip:  '{نص2.strip()}'")
+print(f"lstrip: '{نص2.lstrip()}'")
+print(f"rstrip: '{نص2.rstrip()}'")
+
+# تحويل وبحث
+رقم_نص = "42"
+print(f"\\nint:   {int(رقم_نص)}")
+print(f"find:  {نص.find('Python')}")
+print(f"count: {نص.count('ا')}")
+
+# f-string متقدم
+اسم = "عاطف"
+درجة = 92.567
+print(f"\\nالطالب {اسم} حصل على {درجة:.1f}%")
+print(f"{'':>20}")`,
+
+  // ── 13. التعامل مع الملفات ────────────────────────────
+  files: `# ======= التعامل مع الملفات =======
+# في المتصفح نستخدم /tmp/
+
+# كتابة ملف
+with open('/tmp/notes.txt', 'w', encoding='utf-8') as f:
+    f.write("السطر الاول\\n")
+    f.write("السطر الثاني\\n")
+    f.write("السطر الثالث\\n")
+print("تم كتابة الملف")
+
+# قراءة الملف كاملا
+with open('/tmp/notes.txt', 'r', encoding='utf-8') as f:
+    محتوى = f.read()
+print("المحتوى:")
+print(محتوى)
+
+# قراءة سطرا بسطر
+with open('/tmp/notes.txt', 'r', encoding='utf-8') as f:
+    for i, سطر in enumerate(f, 1):
+        print(f"  سطر {i}: {سطر.strip()}")
+
+# إضافة لملف موجود
+with open('/tmp/notes.txt', 'a', encoding='utf-8') as f:
+    f.write("السطر الرابع - مضاف\\n")
+
+# قراءة السطور كقائمة
+with open('/tmp/notes.txt', 'r', encoding='utf-8') as f:
+    سطور = f.readlines()
+print(f"\\nعدد السطور: {len(سطور)}")`,
+
+  // ── 14. استيراد المكتبات ──────────────────────────────
+  imports: `# ======= استيراد المكتبات import =======
+
+import math
+import random
+import statistics
+from datetime import datetime
+
+print("=== math ===")
+print(f"pi    = {math.pi:.6f}")
+print(f"e     = {math.e:.6f}")
+print(f"sqrt(16) = {math.sqrt(16)}")
+print(f"ceil(3.2) = {math.ceil(3.2)}")
+print(f"floor(3.8) = {math.floor(3.8)}")
+print(f"log10(1000) = {math.log10(1000)}")
+
+print("\\n=== random ===")
+print(f"عدد عشوائي 1-10: {random.randint(1,10)}")
+print(f"عشري بين 0-1:    {random.random():.4f}")
+قائمة = [1, 2, 3, 4, 5]
+random.shuffle(قائمة)
+print(f"بعد shuffle:     {قائمة}")
+print(f"اختيار عشوائي:  {random.choice(قائمة)}")
+
+print("\\n=== statistics ===")
+بيانات = [4, 8, 2, 15, 1, 7, 11, 3]
+print(f"mean:   {statistics.mean(بيانات):.2f}")
+print(f"median: {statistics.median(بيانات)}")
+print(f"stdev:  {statistics.stdev(بيانات):.2f}")
+
+print("\\n=== datetime ===")
+الان = datetime.now()
+print(f"التاريخ الان: {الان.strftime('%Y-%m-%d %H:%M')}")`,
+
+  // ── 15. Comprehensions (القوائم المختصرة) ─────────────
+  comprehensions: `# ======= List/Dict/Set Comprehensions =======
+
+# بدونها - الطريقة التقليدية
+مربعات = []
+for i in range(1, 6):
+    مربعات.append(i ** 2)
+print(f"تقليدي:       {مربعات}")
+
+# List Comprehension - في سطر واحد
+مربعات2 = [i**2 for i in range(1, 6)]
+print(f"comprehension: {مربعات2}")
+
+# مع شرط
+أزواج = [i for i in range(20) if i % 2 == 0]
+print(f"الأزواج:      {أزواج}")
+
+# تحويل نصوص
+أسماء = ["  عاطف  ", "  سارة  ", "  محمد  "]
+نظيفة = [اسم.strip() for اسم in أسماء]
+print(f"بعد strip:    {نظيفة}")
+
+# Dict Comprehension
+طلاب = {"عاطف": 85, "سارة": 92, "محمد": 78}
+مضاعف = {k: v*2 for k, v in طلاب.items()}
+print(f"\\nDrجات مضاعفة: {مضاعف}")
+
+ناجحون = {k: v for k, v in طلاب.items() if v >= 80}
+print(f"الناجحون >80: {ناجحون}")
+
+# Set Comprehension (بدون تكرار)
+أرقام = [1, 2, 2, 3, 3, 3, 4]
+فريدة = {x for x in أرقام}
+print(f"\\nSet (بدون تكرار): {فريدة}")`,
+
+  // ── 16. Lambda وDeco وGenerator ──────────────────────
+  advanced_fn: `# ======= Lambda / Generator / Decorator =======
+
+print("=== lambda ===")
+# دالة مجهولة في سطر
+مربع = lambda x: x ** 2
+مجموع = lambda a, b: a + b
+print(f"lambda مربع(5): {مربع(5)}")
+print(f"lambda مجموع(3,4): {مجموع(3,4)}")
+
+# lambda مع sorted
+طلاب = [("عاطف",85), ("سارة",92), ("محمد",78)]
+مرتبون = sorted(طلاب, key=lambda x: x[1], reverse=True)
+print(f"مرتب بالدرجة: {مرتبون}")
+
+print("\\n=== Generator ===")
+# مولد - يعطي قيمة في كل مرة بدلا من تخزين الكل
+def مولد_مربعات(n):
+    for i in range(1, n+1):
+        yield i ** 2   # yield بدلا من return
+
+gen = مولد_مربعات(5)
+print(f"next(): {next(gen)}")
+print(f"next(): {next(gen)}")
+print(f"باقي:   {list(gen)}")
+
+# Generator Expression
+مجموع_مربعات = sum(i**2 for i in range(1, 101))
+print(f"\\nمجموع مربعات 1-100: {مجموع_مربعات}")
+
+print("\\n=== Decorator ===")
+def مؤقت(دالة):
+    def wrapper(*args, **kwargs):
+        print(f">>> تشغيل {دالة.__name__}()")
+        نتيجة = دالة(*args, **kwargs)
+        print(f">>> انتهى {دالة.__name__}()")
+        return نتيجة
+    return wrapper
+
+@مؤقت
+def احسب_مجموع(أرقام):
+    return sum(أرقام)
+
+print(احسب_مجموع([1,2,3,4,5]))`,
+
+  // ── 17. الاستثناءات المتقدمة ─────────────────────────
+  exceptions: `# ======= الاستثناءات المتقدمة =======
+
+print("=== try / except / else / finally ===")
+def قسمة_آمنة(x, y):
+    try:
+        نتيجة = x / y
+    except ZeroDivisionError:
+        print(f"  خطأ: لا يمكن القسمة على صفر")
+        return None
+    except TypeError as e:
+        print(f"  خطأ نوع: {e}")
+        return None
+    else:
+        # ينفذ فقط اذا لم يحدث خطأ
+        print(f"  نجح: {x}/{y} = {نتيجة:.2f}")
+        return نتيجة
+    finally:
+        # ينفذ دائما سواء حدث خطأ أم لا
+        print(f"  finally: انتهت العملية")
+
+قسمة_آمنة(10, 2)
+print()
+قسمة_آمنة(10, 0)
+print()
+
+# رفع خطأ مخصص
+class خطأ_درجة(ValueError):
+    pass
+
+def تحقق_درجة(درجة):
+    if not 0 <= درجة <= 100:
+        raise خطأ_درجة(f"الدرجة {درجة} خارج النطاق 0-100")
+    return f"درجة صحيحة: {درجة}"
+
+for د in [85, 150, -5]:
+    try:
+        print(تحقق_درجة(د))
+    except خطأ_درجة as e:
+        print(f"خطأ: {e}")`,
+
+  // ── 18. Numpy ─────────────────────────────────────────
+  numpy: `# ======= Numpy للحسابات العلمية =======
+import numpy as np
+
+print("=== إنشاء المصفوفات ===")
+arr = np.array([1, 2, 3, 4, 5])
+print(f"array:    {arr}")
+print(f"نوع:      {arr.dtype}")
+print(f"شكل:      {arr.shape}")
+
+zeros = np.zeros(5)
+ones  = np.ones(5)
+arange = np.arange(0, 10, 2)
+linspace = np.linspace(0, 1, 5)
+print(f"zeros:    {zeros}")
+print(f"ones:     {ones}")
+print(f"arange:   {arange}")
+print(f"linspace: {linspace}")
+
+print("\\n=== العمليات ===")
+a = np.array([1,2,3,4])
+b = np.array([10,20,30,40])
+print(f"a + b  = {a+b}")
+print(f"a * b  = {a*b}")
+print(f"a ** 2 = {a**2}")
+print(f"sqrt:  {np.sqrt(a)}")
+
+print("\\n=== الإحصاء ===")
+data = np.array([4,8,2,15,1,7,11,3,6,9])
+print(f"mean:  {np.mean(data):.2f}")
+print(f"std:   {np.std(data):.2f}")
+print(f"max:   {np.max(data)}")
+print(f"min:   {np.min(data)}")
+
+print("\\n=== مصفوفة ثنائية (2D) ===")
+m = np.array([[1,2,3],[4,5,6],[7,8,9]])
+print(m)
+print(f"شكل: {m.shape}")
+print(f"محور 0 (عمود): {np.sum(m, axis=0)}")`,
+};};
 
 // Connect to embedded lab
 ELAB_PY_TEMPLATES = PY_TEMPLATES;
@@ -22370,11 +22681,16 @@ function buildEmbeddedLab(subjectId) {
             <option value="hello">👋 مرحبا</option>
             <option value="variables">📦 المتغيرات</option>
             <option value="arithmetic">➕ عمليات</option>
-            <option value="constants">🔒 ثوابت</option>
+            <option value="conditions">🔀 الشروط</option>
             <option value="functions">⚙️ الدوال</option>
             <option value="loops">🔄 الحلقات</option>
             <option value="oop">🏗️ OOP</option>
-            <option value="len_lists">📋 len</option>
+            <option value="strings">🔤 النصوص</option>
+            <option value="comprehensions">🗜️ Comprehensions</option>
+            <option value="advanced_fn">⚡ Lambda/Gen</option>
+            <option value="exceptions">🛡️ try/except</option>
+            <option value="imports">📦 المكتبات</option>
+            <option value="numpy">🔢 Numpy</option>
             <option value="errors">🐛 الاخطاء</option>
             <option value="builtins">📚 كل الدوال</option>
           </select>

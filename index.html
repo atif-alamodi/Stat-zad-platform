@@ -14679,29 +14679,30 @@ function startExam() {
 
 function renderExamQuestion() {
   const state = examState;
-  const isEng = state.subj === 'english';
-  const EL = {
-    q:    isEng ? 'Question' : 'السؤال',
-    easy: isEng ? 'Easy 🟢' : 'سهل 🟢',
-    med:  isEng ? 'Medium 🟡' : 'متوسط 🟡',
-    hard: isEng ? 'Hard 🔴' : 'صعب 🔴',
-    page: isEng ? 'pg.' : 'ص',
-    next: isEng ? 'Next →' : 'التالي ←',
-    end:  isEng ? '🏁 Finish Exam' : '🏁 إنهاء الاختبار',
-    hint: isEng ? '💡 Hint' : '💡 تلميح',
-  };
   const q = state.questions[state.current];
   const idx = state.current;
   const total = state.questions.length;
+  const isEng = state.subj === 'english';
 
   const pct = (idx / total) * 100;
   const progEl = document.getElementById('quiz-progress');
   if(progEl) progEl.style.width = pct + '%';
   const cntEl = document.getElementById('quiz-counter');
-  if(cntEl) cntEl.textContent = `${EL.q} ${idx+1} / ${total}`;
+  if(cntEl) cntEl.textContent = (isEng?'Question ':'السؤال ') + (idx+1) + (isEng?' of ':' من ') + total;
 
-  const diffBadge = {easy:EL.easy,medium:EL.med,hard:EL.hard}[q.difficulty||'medium'] || EL.med;
+  const diffBadge = {
+    easy:   isEng ? 'Easy 🟢'   : 'سهل 🟢',
+    medium: isEng ? 'Medium 🟡' : 'متوسط 🟡',
+    hard:   isEng ? 'Hard 🔴'   : 'صعب 🔴'
+  }[q.difficulty||'medium'] || (isEng?'Medium 🟡':'متوسط 🟡');
+  
   const diffColor = {easy:'rgba(0,191,165,0.15)',medium:'rgba(255,214,0,0.15)',hard:'rgba(255,82,82,0.15)'}[q.difficulty||'medium'];
+  const pageLabel = isEng ? '📄 pg.' : '📄 ص';
+  const hintLabel = isEng ? '💡 Hint' : '💡 تلميح';
+  const nextLabel = isEng ? 'Next →' : 'التالي ←';
+  const endLabel  = isEng ? '🏁 Finish Exam' : '🏁 إنهاء الاختبار';
+  const optLetters = isEng ? ['A','B','C','D'] : ['A','B','C','D'];
+  const textDir = isEng ? 'ltr' : 'rtl';
 
   document.getElementById('quiz-content').innerHTML = `
     <div style="
@@ -14710,11 +14711,11 @@ function renderExamQuestion() {
     ">
       <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center;">
         <span style="background:${diffColor};padding:4px 12px;border-radius:20px;font-size:0.75rem;font-weight:700;">${diffBadge}</span>
-        <span style="font-size:0.75rem;color:var(--text-muted);">📄 ص ${q.page||'—'}</span>
+        <span style="font-size:0.75rem;color:var(--text-muted);">${pageLabel} ${q.page||'—'}</span>
         <span style="font-size:0.75rem;color:var(--text-muted);">📚 ${q.lesson||''}</span>
         ${state.timeLimited?`<span id="exam-timer" style="margin-right:auto;background:rgba(255,82,82,0.12);padding:5px 14px;border-radius:20px;font-size:0.85rem;font-weight:800;color:#FF5252;">⏱ ${formatTime(state.seconds)}</span>`:''}
       </div>
-      <div style="font-size:1.1rem;font-weight:700;line-height:1.6;margin-bottom:20px;">${q.q}</div>
+      <div style="font-size:1.1rem;font-weight:700;line-height:1.6;margin-bottom:20px;direction:${textDir};">${q.q}</div>
       <div id="exam-opts">
         ${q.options.map((opt, i) => `
           <div id="exam-opt-${i}" onclick="selectExamOption(${i})"
@@ -14722,7 +14723,7 @@ function renderExamQuestion() {
               display:flex;align-items:center;gap:14px;padding:14px 16px;
               background:rgba(255,255,255,0.03);border:1.5px solid var(--border);
               border-radius:14px;margin-bottom:8px;cursor:pointer;
-              transition:all 0.2s;font-size:0.95rem;
+              transition:all 0.2s;font-size:0.95rem;direction:${textDir};
             "
             onmouseenter="if(!this.dataset.locked)this.style.borderColor='var(--primary)'"
             onmouseleave="if(!this.dataset.locked)this.style.borderColor='var(--border)'">
@@ -14735,12 +14736,12 @@ function renderExamQuestion() {
           </div>
         `).join('')}
       </div>
-      <div id="exam-hint-box" style="display:none;background:rgba(255,214,0,0.08);border:1px solid rgba(255,214,0,0.25);border-radius:12px;padding:12px 16px;margin-top:12px;font-size:0.88rem;color:#FFD600;"></div>
-      <div id="exam-exp-box" style="display:none;background:rgba(0,230,118,0.07);border:1px solid rgba(0,230,118,0.2);border-radius:12px;padding:12px 16px;margin-top:8px;font-size:0.88rem;color:var(--text-muted);line-height:1.55;"></div>
+      <div id="exam-hint-box" style="display:none;background:rgba(255,214,0,0.08);border:1px solid rgba(255,214,0,0.25);border-radius:12px;padding:12px 16px;margin-top:12px;font-size:0.88rem;color:#FFD600;direction:${textDir};"></div>
+      <div id="exam-exp-box" style="display:none;background:rgba(0,230,118,0.07);border:1px solid rgba(0,230,118,0.2);border-radius:12px;padding:12px 16px;margin-top:8px;font-size:0.88rem;color:var(--text-muted);line-height:1.55;direction:${textDir};"></div>
     </div>
     <div style="display:flex;gap:10px;">
-      <button onclick="showExamHint()" style="flex:1;padding:13px;background:rgba(255,214,0,0.1);border:1px solid rgba(255,214,0,0.25);border-radius:12px;color:#FFD600;font-family:var(--font);font-weight:700;cursor:pointer;font-size:0.88rem;">💡 تلميح</button>
-      <button id="exam-next-btn" onclick="nextExamQuestion()" disabled style="flex:2;padding:13px;background:var(--primary);border:none;border-radius:12px;color:white;font-family:var(--font);font-weight:800;cursor:pointer;font-size:0.95rem;opacity:0.4;">التالي ←</button>
+      <button onclick="showExamHint()" style="flex:1;padding:13px;background:rgba(255,214,0,0.1);border:1px solid rgba(255,214,0,0.25);border-radius:12px;color:#FFD600;font-family:var(--font);font-weight:700;cursor:pointer;font-size:0.88rem;">${hintLabel}</button>
+      <button id="exam-next-btn" onclick="nextExamQuestion()" disabled style="flex:2;padding:13px;background:var(--primary);border:none;border-radius:12px;color:white;font-family:var(--font);font-weight:800;cursor:pointer;font-size:0.95rem;opacity:0.4;">${nextLabel}</button>
     </div>
   `;
 }
@@ -14774,7 +14775,9 @@ function selectExamOption(i) {
 
   const exp = document.getElementById('exam-exp-box');
   exp.style.display = 'block';
-  exp.innerHTML = (i===correct?'✅ ':'❌ ') + q.explanation;
+  const isEngSE = examState.subj === 'english';
+  exp.innerHTML = (i===correct?(isEngSE?'✅ Correct! ':'✅ '):(isEngSE?'❌ Wrong. Correct: '+q.options[correct]+'. ':'❌ الصحيح: '+q.options[correct]+'. ')) + (q.explanation||'');
+  exp.style.direction = isEngSE ? 'ltr' : 'rtl';
 
   const nb = document.getElementById('exam-next-btn');
   if(nb) { nb.disabled=false; nb.style.opacity='1'; nb.textContent = examState.current < examState.questions.length-1 ? 'التالي ←' : '🏁 إنهاء الاختبار'; }

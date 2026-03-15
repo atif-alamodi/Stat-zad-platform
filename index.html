@@ -18009,40 +18009,58 @@ function buildAIQuizUI(subject, subjectId) {
   if (subjectId) subject = getSubjectWithUploads(subjectId) || subject;
   if (!subjectId && subject) subjectId = subject.id;
 
-  var questions = generateQuiz(subjectId, 10, 'mixed');
-  if (!questions || !questions.length) {
-    return '<div style="text-align:center;padding:40px;color:var(--text-muted)">'
-      + '<div style="font-size:2.5rem;margin-bottom:12px">❓</div>'
-      + '<div style="font-weight:700;margin-bottom:6px">لا توجد أسئلة بعد</div>'
-      + '<div style="font-size:0.82rem">ارفع محتوى أو أكمل الدروس لتفعيل الاختبار</div>'
-      + '</div>';
-  }
+  var diff = window._ZAD_QUIZ_DIFF || 'mixed';
+  var questions = generateQuiz(subjectId, 10, diff);
 
   window._ZAD_AI_QUIZ_STATE = {
-    questions: questions,
-    current: 0,
-    answers: [],
-    score: 0,
-    subjectId: subjectId,
-    subjectTitle: (subject && subject.title) || subjectId,
-    isEnglish: subjectId === 'english'
+    questions: questions || [], current: 0, answers: [], score: 0,
+    subjectId: subjectId, subjectTitle: (subject && subject.title) || subjectId,
+    isEnglish: ZAD_LANG.isEnglish(subjectId)
   };
   window._ZAD_AI_QUIZ_SELECTED = -1;
 
-  return '<div style="direction:rtl">'
+  var isEng = ZAD_LANG.isEnglish(subjectId);
+
+  var html = '<div style="direction:rtl">'
     + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">'
       + '<div>'
-        + '<div style="font-weight:900;font-size:0.95rem">❓ الاختبارات</div>'
-        + '<div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px">'+(subject?subject.title:subjectId)+' — '+questions.length+' سؤال</div>'
+        + '<div style="font-weight:900;font-size:0.95rem">❓ ' + ZAD_LANG.ui('question', subjectId) + 's</div>'
+        + '<div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px">' + (subject ? subject.title : subjectId) + ' — ' + (questions ? questions.length : 0) + ' ' + (isEng ? 'questions' : 'سؤال') + '</div>'
       + '</div>'
       + '<div style="display:flex;gap:6px">'
-        + '<button onclick="window._ZAD_QUIZ_DIFF=\'easy\';buildAIQuizUI(null,\''+subjectId+'\')" style="padding:5px 10px;border-radius:8px;border:1px solid rgba(40,202,65,0.4);background:rgba(40,202,65,0.08);color:#66BB6A;font-size:0.72rem;cursor:pointer;font-weight:700">سهل</button>'
-        + '<button onclick="window._ZAD_QUIZ_DIFF=\'medium\';buildAIQuizUI(null,\''+subjectId+'\')" style="padding:5px 10px;border-radius:8px;border:1px solid rgba(255,167,38,0.4);background:rgba(255,167,38,0.08);color:#FFA726;font-size:0.72rem;cursor:pointer;font-weight:700">متوسط</button>'
-        + '<button onclick="window._ZAD_QUIZ_DIFF=\'hard\';buildAIQuizUI(null,\''+subjectId+'\')" style="padding:5px 10px;border-radius:8px;border:1px solid rgba(239,83,80,0.4);background:rgba(239,83,80,0.08);color:#EF5350;font-size:0.72rem;cursor:pointer;font-weight:700">صعب</button>'
+        + '<button onclick="window._ZAD_QUIZ_DIFF=\'easy\';showSubject(\''+subjectId+'\',\'quiz\')" style="padding:5px 10px;border-radius:8px;border:1px solid rgba(40,202,65,0.4);background:rgba(40,202,65,0.08);color:#66BB6A;font-size:0.72rem;cursor:pointer;font-weight:700">' + ZAD_LANG.ui('easy',subjectId) + '</button>'
+        + '<button onclick="window._ZAD_QUIZ_DIFF=\'medium\';showSubject(\''+subjectId+'\',\'quiz\')" style="padding:5px 10px;border-radius:8px;border:1px solid rgba(255,167,38,0.4);background:rgba(255,167,38,0.08);color:#FFA726;font-size:0.72rem;cursor:pointer;font-weight:700">' + ZAD_LANG.ui('medium',subjectId) + '</button>'
+        + '<button onclick="window._ZAD_QUIZ_DIFF=\'hard\';showSubject(\''+subjectId+'\',\'quiz\')" style="padding:5px 10px;border-radius:8px;border:1px solid rgba(239,83,80,0.4);background:rgba(239,83,80,0.08);color:#EF5350;font-size:0.72rem;cursor:pointer;font-weight:700">' + ZAD_LANG.ui('hard',subjectId) + '</button>'
       + '</div>'
     + '</div>'
-    + '<div id="ai-quiz-q-area">'+renderAIQuizQuestion()+'</div>'
-  + '</div>';
+    + '<div id="ai-quiz-q-area">';
+
+  if (!questions || !questions.length) {
+    html += '<div style="text-align:center;padding:40px;color:var(--text-muted)">'
+      + '<div style="font-size:2.5rem;margin-bottom:12px">❓</div>'
+      + '<div style="font-weight:700;margin-bottom:6px">' + ZAD_LANG.ui('no_questions', subjectId) + '</div>'
+      + '</div>';
+  } else {
+    html += renderAIQuizQuestion();
+    // If English subject has Arabic questions → translate in background
+    if (isEng) {
+      var hasAr = questions.some(function(q){ return hasArabic(q.q) || (q.options||[]).some(hasArabic); });
+      if (hasAr) {
+        setTimeout(function() {
+          translateQuizItemsToEnglish(window._ZAD_AI_QUIZ_STATE.questions).then(function(translated) {
+            window._ZAD_AI_QUIZ_STATE.questions = translated;
+            var area = document.getElementById('ai-quiz-q-area');
+            if (area && window._ZAD_AI_QUIZ_STATE.current === 0) {
+              area.innerHTML = renderAIQuizQuestion();
+            }
+          });
+        }, 100);
+      }
+    }
+  }
+
+  html += '</div></div>';
+  return html;
 }
 
 function renderAIQuizQuestion() {
@@ -21176,6 +21194,108 @@ var ZAD_LANG = (function() {
 
   return { isEnglish: isEnglish, get: get, ui: ui, letters: letters, dir: dir };
 })();
+
+// ════════════════════════════════════════════════════════════════
+// AUTO-TRANSLATE English Quiz Items to English via Groq
+// ════════════════════════════════════════════════════════════════
+function hasArabic(str) {
+  return /[\u0600-\u06ff]/.test(str || '');
+}
+
+async function translateQuizItemsToEnglish(questions) {
+  var needsTranslation = questions.filter(function(q) {
+    return hasArabic(q.q) || (q.options || []).some(hasArabic) || hasArabic(q.hint);
+  });
+
+  if (!needsTranslation.length) return questions;
+
+  // Build translation request
+  var toTranslate = needsTranslation.map(function(q, i) {
+    return {
+      idx: questions.indexOf(q),
+      q: q.q,
+      options: q.options,
+      hint: q.hint || ''
+    };
+  });
+
+  var prompt = 'Translate these quiz items to English. Keep answers factually correct.\n'
+    + 'Return ONLY a JSON array with same structure. Each item: {idx, q, options, hint}\n'
+    + 'RULES: q = question in English, options = all 4 choices in English, hint = in English\n'
+    + 'Items:\n' + JSON.stringify(toTranslate);
+
+  try {
+    var resp = await fetch('https://zad-proxy.atif-alamodi.workers.dev', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'llama-3.1-8b-instant',
+        messages: [
+          { role: 'system', content: 'You are a translator. Return ONLY valid JSON array, no markdown.' },
+          { role: 'user', content: prompt }
+        ],
+        max_tokens: 2000, temperature: 0.1
+      })
+    });
+
+    if (!resp.ok) return questions;
+    var data = await resp.json();
+    var raw = (data.choices && data.choices[0].message.content) || '[]';
+    raw = raw.replace(/```json|```/g, '').trim();
+    var translated = JSON.parse(raw);
+
+    // Apply translations
+    var result = questions.map(function(q) { return Object.assign({}, q); });
+    translated.forEach(function(t) {
+      if (t.idx >= 0 && t.idx < result.length) {
+        if (t.q) result[t.idx].q = t.q;
+        if (t.options && t.options.length === 4) result[t.idx].options = t.options;
+        if (t.hint) result[t.idx].hint = t.hint;
+      }
+    });
+    return result;
+  } catch(e) {
+    return questions;
+  }
+}
+
+async function buildAIQuizUIAsync(subject, subjectId) {
+  if (subjectId) subject = getSubjectWithUploads(subjectId) || subject;
+  if (!subjectId && subject) subjectId = subject.id;
+
+  var diff = window._ZAD_QUIZ_DIFF || 'mixed';
+  var questions = generateQuiz(subjectId, 10, diff);
+  if (!questions || !questions.length) {
+    var area = document.getElementById('ai-quiz-q-area');
+    if (area) area.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted)">'
+      + '<div style="font-size:2.5rem;margin-bottom:12px">❓</div>'
+      + '<div style="font-weight:700;margin-bottom:6px">'+ZAD_LANG.ui('no_questions',subjectId)+'</div>'
+      + '</div>';
+    return;
+  }
+
+  // Show loading while translating
+  if (ZAD_LANG.isEnglish(subjectId)) {
+    var area2 = document.getElementById('ai-quiz-q-area');
+    var hasAr = questions.some(function(q){ return hasArabic(q.q) || (q.options||[]).some(hasArabic); });
+    if (hasAr && area2) {
+      area2.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted)">'
+        + '<div style="font-size:1.5rem;margin-bottom:8px">🔄</div>'
+        + '<div>Preparing English questions...</div></div>';
+      questions = await translateQuizItemsToEnglish(questions);
+    }
+  }
+
+  window._ZAD_AI_QUIZ_STATE = {
+    questions: questions, current: 0, answers: [], score: 0,
+    subjectId: subjectId, subjectTitle: (subject && subject.title) || subjectId,
+    isEnglish: ZAD_LANG.isEnglish(subjectId)
+  };
+  window._ZAD_AI_QUIZ_SELECTED = -1;
+
+  var area3 = document.getElementById('ai-quiz-q-area');
+  if (area3) area3.innerHTML = renderAIQuizQuestion();
+}
 </script>
 
 

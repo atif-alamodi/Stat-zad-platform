@@ -960,7 +960,7 @@ print(f"الأعلى : {df['الدرجة'].max()}")`,
             title: 'الأسماء — Nouns',
             type: 'concept',
             content: {
-              definition: '🟦 الاسم (Noun) = أي كلمة تُسمّي شيئاً!\nالأشخاص: Ahmad, teacher, student\nالأماكن: Jeddah, school, home\nالأشياء: book, phone, car\nالأفكار: love, freedom, happiness\n\n💡 القاعدة الذهبية: إذا استطعت أن تضع "the" أو "a" أمام الكلمة = اسم!',
+              definition: '🟦 الnoun (Noun) = أي كلمة تُسمّي شيئاً!\nالأشخاص: Ahmad, teacher, student\nالأماكن: Jeddah, school, home\nالأشياء: book, phone, car\nالأفكار: love, freedom, happiness\n\n💡 القاعدة الذهبية: إذا استطعت أن تضع "the" أو "a" أمام الكلمة = noun!',
               whyLearn: [
                 '🧱 الأسماء هي اللَّبِنات الأساسية لأي جملة — بدونها لا تستطيع الكلام!',
                 '📝 80% من مفردات اللغة الإنجليزية أسماء',
@@ -975,18 +975,18 @@ print(f"الأعلى : {df['الدرجة'].max()}")`,
               keyTerms: [
                 { term: 'Singular (مفرد)', def: 'كلمة واحدة: book, car, student' },
                 { term: 'Plural (جمع)', def: 'أكثر من واحد: books, cars, students — نُضيف s أو es في الغالب' },
-                { term: 'Proper Noun (اسم علم)', def: 'اسم خاص يُكتب بحرف كبير: Ahmed, Google, Jeddah' },
-                { term: 'Common Noun (اسم عام)', def: 'اسم عام لا يُكتب بحرف كبير: city, company, name' },
+                { term: 'Proper Noun (noun علم)', def: 'noun خاص يُكتب بحرف كبير: Ahmed, Google, Jeddah' },
+                { term: 'Common Noun (noun عام)', def: 'noun عام لا يُكتب بحرف كبير: city, company, name' },
               ],
               steps: [
-                '🔵 الخطوة 1 — جرّب وضع "a" أمام الكلمة: "a book" ✅ "a run" ❌ → book اسم',
+                '🔵 الخطوة 1 — جرّب وضع "a" أمام الكلمة: "a book" ✅ "a run" ❌ → book noun',
                 '🔵 الخطوة 2 — هل يمكن جمعها؟ books ✅، happiness ❌ (بعض الأسماء لا تُجمع)',
-                '🔵 الخطوة 3 — هل تصف شخصاً أو مكاناً أو شيئاً؟ إذن هي اسم!',
+                '🔵 الخطوة 3 — هل تصف شخصاً أو مكاناً أو شيئاً؟ إذن هي noun!',
               ],
               realExamples: [
                 { title: '✅ جمل صحيحة', desc: 'The teacher explains the lesson. (teacher, lesson = أسماء)\nMy friend works at a hospital. (friend, hospital = أسماء)', icon: '✅' },
                 { title: '⚠️ أخطاء شائعة', desc: 'خطأ: "The informations are" ← information لا تُجمع!\nصحيح: "The information is" ✓\nخطأ: "a good advices" ← advice لا تُجمع!\nصحيح: "good advice" ✓', icon: '⚠️' },
-                { title: '🧠 حيلة الحفظ', desc: 'تذكّر: N.A.T.I = Noun = Name, Animal, Thing, Idea\nأي كلمة تدخل في واحدة من هذه = اسم!', icon: '🧠' },
+                { title: '🧠 حيلة الحفظ', desc: 'تذكّر: N.A.T.I = Noun = Name, Animal, Thing, Idea\nأي كلمة تدخل في واحدة من هذه = noun!', icon: '🧠' },
               ],
               mindMap: {
                 center: 'Nouns أسماء',
@@ -1000,7 +1000,7 @@ print(f"الأعلى : {df['الدرجة'].max()}")`,
             },
             quiz: [
               { q: 'Which word is a NOUN?', options: ['quickly', 'beautiful', 'university', 'run'], answer: 2, hint: 'Can you put "a" before it?', explanation: '"a university" ✅ — university = place noun ✅. quickly = adverb. beautiful = adjective. run = verb/noun depending on context.', page: '1-10' },
-              { q: 'Which sentence is CORRECT about uncountable nouns?', options: ['No error', 'happiness does not need "The" — it is uncountable', '"important" is wrong', '"is" should be "are"'], answer: 1, hint: 'Abstract nouns rarely need "the".', explanation: 'Correct: "Happiness is important" — abstract nouns (happiness, love) do not use "the".s, love, freedom لا تحتاج "the" عند التحدث بشكل عام.', page: '5-10' },
+              { q: 'Which sentence is CORRECT about uncountable nouns?', options: ['No error', 'happiness does not need "The" — it is uncountable', '"important" is wrong', '"is" should be "are"'], answer: 1, hint: 'Abstract nouns rarely need "the".', explanation: 'Correct: "Happiness is important" — abstract nouns (happiness, love) do not use "the".s, love, freedom "the" .', page: '5-10' },
               { q: 'Which sentence contains a PROPER NOUN?', options: ['The city is big', 'Riyadh is a beautiful city', 'I love coffee', 'Books are useful'], answer: 1, hint: 'A Proper Noun starts with a capital letter.', explanation: 'Riyadh = Proper Noun (name of a city) — always written with a capital letter.', page: '8-12' },
             ],
           },
@@ -1018,7 +1018,7 @@ print(f"الأعلى : {df['الدرجة'].max()}")`,
               types: [
                 { name: '🏃 أفعال الحدث (Action Verbs)', desc: 'أفعال تصف حركة أو نشاطاً:\nwork, study, run, eat, write, read, speak, listen', icon: '🏃' },
                 { name: '🧠 أفعال الحالة (State Verbs)', desc: 'أفعال تصف حالة ذهنية أو وجدانية:\nknow, like, love, hate, believe, understand, feel', icon: '🧠' },
-                { name: '🔗 أفعال الربط (Linking Verbs)', desc: 'تربط الاسم بالصفة:\nis, are, am, was, were, become, seem, look', icon: '🔗' },
+                { name: '🔗 أفعال الربط (Linking Verbs)', desc: 'تربط الnoun بالadjective:\nis, are, am, was, were, become, seem, look', icon: '🔗' },
                 { name: '🤝 أفعال مساعدة (Auxiliary Verbs)', desc: 'تُساعد الفعل الرئيسي:\ndo, does, did, will, would, can, could, should, must', icon: '🤝' },
               ],
               keyTerms: [
@@ -1059,7 +1059,7 @@ print(f"الأعلى : {df['الدرجة'].max()}")`,
             title: 'الصفات والظروف — Adjectives & Adverbs',
             type: 'concept',
             content: {
-              definition: '🟩 الصفة (Adjective) = تصف الاسم\nكبير big، جميلة beautiful، سريع fast، ذكي smart\n\n🟨 الظرف (Adverb) = تصف الفعل أو الصفة أو ظرفاً آخر\nبسرعة quickly، ببطء slowly، بالأمس yesterday، جداً very\n\n💡 حيلة سهلة: معظم الظروف تنتهي بـ -ly\nquick → quickly | slow → slowly | careful → carefully',
+              definition: '🟩 الadjective (Adjective) = تصف الnoun\nكبير big، جميلة beautiful، سريع fast، ذكي smart\n\n🟨 الظرف (Adverb) = تصف الفعل أو الadjective أو ظرفاً آخر\nبسرعة quickly، ببطء slowly، بالأمس yesterday، جداً very\n\n💡 حيلة سهلة: معظم الظروف تنتهي بـ -ly\nquick → quickly | slow → slowly | careful → carefully',
               whyLearn: [
                 '🎨 الصفات تجعل كلامك أغنى وأكثر دقة',
                 '📝 الظروف تُخبر الآخرين متى وكيف وأين حدث الشيء',
@@ -1074,18 +1074,18 @@ print(f"الأعلى : {df['الدرجة'].max()}")`,
                 { name: '🟨 ظروف المكان (Place)', desc: 'here, there, inside, outside, above, below, nearby', icon: '📍' },
               ],
               keyTerms: [
-                { term: 'Comparative (التفضيل)', def: 'مقارنة بين اثنين: bigger, smarter, more important\nالقاعدة: صفة قصيرة + er | long → more + صفة' },
+                { term: 'Comparative (التفضيل)', def: 'مقارنة بين اثنين: bigger, smarter, more important\nالقاعدة: adjective قصيرة + er | long → more + adjective' },
                 { term: 'Superlative (التفضيل الأعلى)', def: 'الأعلى في مجموعة: the biggest, the smartest, the most important' },
               ],
               steps: [
-                '🔵 للتعرف على الصفة: تأتي قبل الاسم "a fast car" أو بعد فعل الربط "the car is fast"',
+                '🔵 للتعرف على الadjective: تأتي قبل الnoun "a fast car" أو بعد فعل الربط "the car is fast"',
                 '🔵 للتعرف على الظرف: يصف الفعل "She runs quickly" أو يأتي في آخر الجملة',
                 '🟢 التفضيل: 1-2 مقطع: big→bigger→biggest | 3+ مقاطع: more/most important',
               ],
               realExamples: [
-                { title: '✅ الصفة قبل الاسم', desc: 'a beautiful day | an interesting book | a difficult problem | an important meeting', icon: '✅' },
+                { title: '✅ الadjective قبل الnoun', desc: 'a beautiful day | an interesting book | a difficult problem | an important meeting', icon: '✅' },
                 { title: '✅ الظرف بعد الفعل', desc: 'He speaks clearly. | She works efficiently. | They arrived early. | I understand completely.', icon: '✅' },
-                { title: '⚠️ فرق مهم: good vs well', desc: '"good" = صفة تصف اسم: "a good student"\n"well" = ظرف تصف فعل: "He speaks well"\nخطأ: "He speaks good" ❌\nصحيح: "He speaks well" ✓', icon: '⚠️' },
+                { title: '⚠️ فرق مهم: good vs well', desc: '"good" = adjective تصف noun: "a good student"\n"well" = ظرف تصف فعل: "He speaks well"\nخطأ: "He speaks good" ❌\nصحيح: "He speaks well" ✓', icon: '⚠️' },
               ],
               mindMap: {
                 center: 'Descriptors',
@@ -1274,7 +1274,7 @@ print(f"الأعلى : {df['الدرجة'].max()}")`,
                 { name: '3️⃣ جملة معقدة (Complex)', desc: 'جملة رئيسية + because/when/if/although:\n"I failed because I didn\'t study enough."\n"When I finish, I will call you."', icon: '3️⃣' },
               ],
               keyTerms: [
-                { term: 'Subject (فاعل)', def: 'I, you, he, she, it, we, they + أي اسم: The manager, My friend, Ahmed' },
+                { term: 'Subject (فاعل)', def: 'I, you, he, she, it, we, they + أي noun: The manager, My friend, Ahmed' },
                 { term: 'Predicate (المحمول)', def: 'الفعل + ما بعده: works every day, is a doctor, wrote the report' },
                 { term: 'Clause (جملة فرعية)', def: 'مجموعة كلمات تحتوي فاعل وفعل: "because he was tired"' },
                 { term: 'Conjunction (رابط)', def: 'and, but, or, so, because, when, if, although, while' },
@@ -1300,8 +1300,8 @@ print(f"الأعلى : {df['الدرجة'].max()}")`,
               },
             },
             quiz: [
-              { q: 'What is wrong with: "Because the meeting was cancelled."?', options: ['No problem at all', 'Incomplete sentence — "because" needs a result clause', '"because" is wrong here', 'The verb tense is wrong'], answer: 1, hint: 'because is a subordinating conjunction — needs a main clause.', explanation: '"Because the meeting was cancelled" is a fragment — "because" must be followed by a main clause.لصحيح: "We left early because the meeting was cancelled."', page: '85-90' },
-              { q: 'Connect these two sentences: "It was raining. We cancelled the picnic." — Best option?', options: ['It was raining and we cancelled the picnic.', 'It was raining, so we cancelled the picnic.', 'It was raining but we cancelled the picnic.', 'It was raining or we cancelled the picnic.'], answer: 1, hint: 'Rain = cause, cancellation = result. Use "because/since/as".', explanation: '"so" = result/consequence ✓ | "and" = addition | "but" = contrast | "or" = alternative. المطر سبب لإلغاء النزهة.', page: '88-92' },
+              { q: 'What is wrong with: "Because the meeting was cancelled."?', options: ['No problem at all', 'Incomplete sentence — "because" needs a result clause', '"because" is wrong here', 'The verb tense is wrong'], answer: 1, hint: 'because is a subordinating conjunction — needs a main clause.', explanation: '"Because the meeting was cancelled" is a fragment — "because" must be followed by a main clause. : "We left early because the meeting was cancelled."', page: '85-90' },
+              { q: 'Connect these two sentences: "It was raining. We cancelled the picnic." — Best option?', options: ['It was raining and we cancelled the picnic.', 'It was raining, so we cancelled the picnic.', 'It was raining but we cancelled the picnic.', 'It was raining or we cancelled the picnic.'], answer: 1, hint: 'Rain = cause, cancellation = result. Use "because/since/as".', explanation: '"so" = result/consequence ✓ | "and" = addition | "but" = contrast | "or" = alternative. .', page: '88-92' },
             ],
           },
           {
@@ -1322,7 +1322,7 @@ print(f"الأعلى : {df['الدرجة'].max()}")`,
                 '4️⃣ اختم باحترافية: "Best regards / Kind regards / Thank you for your time"',
               ],
               types: [
-                { name: '📧 الإيميل الرسمي', desc: 'Subject: واضح ومحدد\nDear [Name/Title],\n[الغرض]\n[التفاصيل]\nBest regards,\n[الاسم والمسمى]', icon: '📧' },
+                { name: '📧 الإيميل الرسمي', desc: 'Subject: واضح ومحدد\nDear [Name/Title],\n[الغرض]\n[التفاصيل]\nBest regards,\n[الnoun والمسمى]', icon: '📧' },
                 { name: '📋 تقرير قصير', desc: 'Introduction: What is this about?\nFindings: What did you discover?\nConclusion: What do you recommend?', icon: '📋' },
                 { name: '💬 رسالة LinkedIn/CV', desc: 'أقوى الكلمات المهنية:\nmanaged, led, achieved, improved, developed, coordinated, analyzed, delivered', icon: '💬' },
               ],
@@ -1341,7 +1341,7 @@ print(f"الأعلى : {df['الدرجة'].max()}")`,
               },
             },
             quiz: [
-              { q: 'Which is the most professional email opening?', options: ['Hey! I hope you are doing great...', 'I am writing to request approval for...', 'So basically what happened is...', 'As you know, it has been a while...'], answer: 1, hint: 'Professional emails state the purpose clearly from the start.', explanation: '"I am writing to request..." ✓ — professional emails state their purpose in the first sentence.جنب التحيات المطولة في الإيميلات المهنية.', page: '100-106' },
+              { q: 'Which is the most professional email opening?', options: ['Hey! I hope you are doing great...', 'I am writing to request approval for...', 'So basically what happened is...', 'As you know, it has been a while...'], answer: 1, hint: 'Professional emails state the purpose clearly from the start.', explanation: '"I am writing to request..." ✓ — professional emails state their purpose in the first sentence. .', page: '100-106' },
             ],
           },
         ],
@@ -1408,9 +1408,9 @@ CURRICULUM['english'] = {
             },
           },
           quiz: [
-            { q: 'أيٌّ من هذه الكلمات اسم (Noun)؟', options: ['quickly', 'beautiful', 'university', 'run'], answer: 2, hint: 'هل يمكن وضع "a" أمامها؟', explanation: '"a university" ✅ — university = اسم مكان. quickly = ظرف. beautiful = صفة. run = فعل.', page: '1-10' },
-            { q: 'ما الخطأ في: "She gave me some informations"؟', options: ['gave', 'me', 'informations — لا تُجمع!', 'some'], answer: 2, hint: 'information = اسم لا يُجمع', explanation: 'الصحيح: "some information" (بدون s) — information من الأسماء غير المعدودة.', page: '5-8' },
-            { q: 'أيٌّ من هذه Proper Noun؟', options: ['city', 'teacher', 'Riyadh', 'school'], answer: 2, hint: 'Proper Noun = اسم خاص بحرف كبير', explanation: 'Riyadh = Proper Noun — اسم مدينة خاص يُكتب بحرف كبير دائماً.', page: '8-12' },
+            { q: 'Which of these words is a NOUN?', options: ['quickly', 'beautiful', 'university', 'run'], answer: 2, hint: 'Can you put "a" before it? If yes → NOUN!', explanation: '"a university" ✅ — university is a place noun. quickly=adverb, beautiful=adjective, run=verb. Nouns can follow "a", "the", or be pluralized. unikly = ظرف. beautiful = صفة. run = فعل.', page: '1-10' },
+            { q: 'What is wrong with: "She gave me some informations"?', options: ['gave', 'me', 'informations — uncountable noun, no plural!', 'some'], answer: 2, hint: 'information is uncountable — never add -s!', explanation: 'الصحيح: "some information" (بدون s) — information من الأسماء غير المعدودة.', page: '5-8' },
+            { q: 'Which of these is a PROPER NOUN?', options: ['city', 'teacher', 'Riyadh', 'school'], answer: 2, hint: 'A proper noun is a specific name, always capitalized.', explanation: 'Riyadh = Proper Noun — اسم مدينة خاص يُكتب بحرف كبير دائماً.', page: '8-12' },
           ],
         },
         {
@@ -1457,9 +1457,9 @@ CURRICULUM['english'] = {
             },
           },
           quiz: [
-            { q: 'ما الخطأ في: "She work here every day"؟', options: ['work يجب أن تكون works', 'here خطأ', 'every day خطأ', 'لا خطأ'], answer: 0, hint: 'She = he/she/it → يجب + s', explanation: 'مع she يجب إضافة s: "She works here every day" ✓', page: '15-20' },
-            { q: '"Can" في "I can swim" هو:', options: ['فعل رئيسي', 'اسم', 'فعل مساعد (Modal)', 'صفة'], answer: 2, hint: 'يساعد الفعل الرئيسي swim', explanation: 'can = Modal Auxiliary يُعبّر عن القدرة. swim هو الفعل الرئيسي.', page: '22-25' },
-            { q: 'أيٌّ من هذه جملة صحيحة؟', options: ["He don't like coffee", "He doesn't likes coffee", "He doesn't like coffee", "He not like coffee"], answer: 2, hint: "مع he/she/it → doesn't + فعل جذر", explanation: '"He doesn\'t like coffee" ✓ — doesn\'t + جذر الفعل بدون s.', page: '18-22' },
+            { q: 'What is wrong with: "She work here every day"?', options: ['work — should be works', 'here is wrong', 'every day is wrong', 'no error'], answer: 0, hint: 'She = he/she/it → verb must have -s in Simple Present.', explanation: 'مع she يجب إضافة s: "She works here every day" ✓', page: '15-20' },
+            { q: 'In "I can swim", what type of verb is "can"?', options: ['main verb', 'اسم', 'modal auxiliary verb', 'صفة'], answer: 2, hint: 'Modal verbs (can/will/must) come before the main verb.', explanation: 'can = Modal Auxiliary يُعبّر عن القدرة. swim هو الفعل الرئيسي.', page: '22-25' },
+            { q: 'Which of these sentences is CORRECT?', options: ["He don't like coffee", "He doesn't likes coffee", "He doesn't like coffee", "He not like coffee"], answer: 2, hint: "he/she/it → always use doesn't + base verb.", explanation: '"He doesn\'t like coffee" ✓ — doesn\'t + جذر الفعل بدون s.', page: '18-22' },
           ],
         },
         {
@@ -1503,8 +1503,8 @@ CURRICULUM['english'] = {
             },
           },
           quiz: [
-            { q: 'أيٌّ من هذه صحيح؟', options: ['He is a good worker', 'He works good', 'The job is well', 'He does well job'], answer: 0, hint: '"good" مع الأسماء — "well" مع الأفعال', explanation: '"a good worker" ✓ — good صفة تصف اسم (worker).', page: '30-35' },
-            { q: '"She speaks English ___" — أي كلمة تكمل الجملة صحيح؟', options: ['fluent', 'fluency', 'fluently', 'fluented'], answer: 2, hint: 'تصف الفعل speaks → ظرف ينتهي بـ -ly', explanation: '"fluently" ✓ — ظرف يصف كيف تتكلم (speaks).', page: '31-34' },
+            { q: 'Which sentence uses good/well CORRECTLY?', options: ['He is a good worker', 'He works good', 'The job is well', 'He does well job'], answer: 0, hint: '"good" = adjective (before nouns). "well" = adverb (after verbs).', explanation: '"a good worker" ✓ — good صفة تصف اسم (worker).', page: '30-35' },
+            { q: '"She speaks English ___" — Which word correctly completes the sentence?', options: ['fluent', 'fluency', 'fluently', 'fluented'], answer: 2, hint: 'Modifies the verb speaks → needs an adverb ending in -ly.', explanation: '"fluently" ✓ — ظرف يصف كيف تتكلم (speaks).', page: '31-34' },
           ],
         },
       ],
@@ -1556,9 +1556,9 @@ CURRICULUM['english'] = {
             },
           },
           quiz: [
-            { q: 'أكمل: "She ___ to the office every day."', options: ['go', 'goes', 'going', 'gone'], answer: 1, hint: 'She = he/she/it → فعل + s', explanation: '"She goes" ✓ — go + es = goes (go ينتهي بـ o → +es).', page: '45-50' },
-            { q: '"He ___ like spicy food."', options: ["don't", "doesn't", 'not', "isn't"], answer: 1, hint: 'He → يستخدم doesn\'t', explanation: '"He doesn\'t like" ✓ — مع he/she/it نستخدم doesn\'t.', page: '48-52' },
-            { q: 'أيٌّ من هذه حقيقة علمية بالمضارع البسيط؟', options: ['I am studying now', 'She studied yesterday', 'Water freezes at 0°C', 'He will come tomorrow'], answer: 2, hint: 'الحقائق العلمية = المضارع البسيط', explanation: '"Water freezes at 0°C" ✓ — الحقائق الثابتة = المضارع البسيط.', page: '41-44' },
+            { q: 'Complete: "She ___ to the office every day."', options: ['go', 'goes', 'going', 'gone'], answer: 1, hint: 'She = he/she/it → add -s or -es to the verb.', explanation: '"She goes" ✓ — go + es = goes (go ينتهي بـ o → +es).', page: '45-50' },
+            { q: '"He ___ like spicy food."', options: ["don't", "doesn't", 'not', "isn't"], answer: 1, hint: 'He = 3rd person singular → use doesn\'t for negation.', explanation: '"He doesn\'t like" ✓ — مع he/she/it نستخدم doesn\'t.', page: '48-52' },
+            { q: 'Which sentence states a scientific fact using Simple Present?', options: ['I am studying now', 'She studied yesterday', 'Water freezes at 0°C', 'He will come tomorrow'], answer: 2, hint: 'Scientific/permanent facts always use Simple Present teلبسيط', explanation: '"Water freezes at 0°C" ✓ — الحقائق الثابتة = المضارع البسيط.', page: '41-44' },
           ],
         },
         {
@@ -1603,9 +1603,9 @@ CURRICULUM['english'] = {
             },
           },
           quiz: [
-            { q: '"She ___ the email before the deadline." (send)', options: ['send', 'sends', 'sent', 'sended'], answer: 2, hint: 'send = فعل شاذ → sent', explanation: '"She sent" ✓ — send فعل شاذ: send→sent. لا نُضيف -ed!', page: '55-60' },
-            { q: '"I didn\'t ___ to the conference last year."', options: ['went', 'go', 'gone', 'goes'], answer: 1, hint: "بعد didn't = فعل جذر دائماً", explanation: '"I didn\'t go" ✓ — بعد didn\'t نستخدم الجذر.', page: '58-62' },
-            { q: 'ما الصيغة الصحيحة لـ study في الماضي؟', options: ['studyed', 'studied', 'studies', 'studed'], answer: 1, hint: 'consonant + y → y→ied', explanation: 'study → studied ✓ (y قبلها consonant d → نحذف y ونضع ied)', page: '55-57' },
+            { q: '"She ___ the email before the deadline." (send)', options: ['send', 'sends', 'sent', 'sended'], answer: 2, hint: 'send is an irregular verb: send → sent (NOT sended).', explanation: '"She sent" ✓ — send فعل شاذ: send→sent. لا نُضيف -ed!', page: '55-60' },
+            { q: '"I didn\'t ___ to the conference last year."', options: ['went', 'go', 'gone', 'goes'], answer: 1, hint: "After didn't always use the base form (infinitive).", explanation: '"I didn\'t go" ✓ — بعد didn\'t نستخدم الجذر.', page: '58-62' },
+            { q: 'What is the correct Simple Past of "study"?', options: ['studyed', 'studied', 'studies', 'studed'], answer: 1, hint: 'When verb ends in consonant+y → change y to i and add -ed.', explanation: 'study → studied ✓ (y قبلها consonant d → نحذف y ونضع ied)', page: '55-57' },
           ],
         },
         {
@@ -1649,8 +1649,8 @@ CURRICULUM['english'] = {
             },
           },
           quiz: [
-            { q: 'Your friend says "I\'m cold!" — ماذا تقول؟', options: ['I going to close the window', "I'll close the window", 'I close the window', 'I am close the window'], answer: 1, hint: 'قرار فوري = will', explanation: '"I\'ll close the window" ✓ — قرار تأخذه الآن لحل المشكلة = will.', page: '65-70' },
-            { q: '"Look at those dark clouds! It ___ rain."', options: ['will', "is going to", 'rains', 'rained'], answer: 1, hint: 'دليل واضح = going to', explanation: '"It\'s going to rain" ✓ — عندما نرى دليلاً (السحاب) = be going to.', page: '67-70' },
+            { q: 'Your friend says "I\'m cold!" — What do you reply?', options: ['I going to close the window', "I'll close the window", 'I close the window', 'I am close the window'], answer: 1, hint: 'Instant decision made at the moment of speaking → will.', explanation: '"I\'ll close the window" ✓ — قرار تأخذه الآن لحل المشكلة = will.', page: '65-70' },
+            { q: '"Look at those dark clouds! It ___ rain."', options: ['will', "is going to", 'rains', 'rained'], answer: 1, hint: 'Clear evidence or prior plan → be going to.', explanation: '"It\'s going to rain" ✓ — عندما نرى دليلاً (السحاب) = be going to.', page: '67-70' },
           ],
         },
       ],
@@ -1702,8 +1702,8 @@ CURRICULUM['english'] = {
             },
           },
           quiz: [
-            { q: 'ما المشكلة في: "Because the meeting was cancelled."؟', options: ['لا توجد مشكلة', 'جملة ناقصة — تحتاج جملة رئيسية!', 'because خطأ', 'meeting لا يحتاج the'], answer: 1, hint: 'because وحدها = جملة ناقصة', explanation: '"Because..." وحدها ناقصة. الصحيح: "We left early because the meeting was cancelled."', page: '85-90' },
-            { q: 'أيٌّ من هذه يربط جملتين بعلاقة نتيجة؟', options: ['but', 'although', 'so', 'or'], answer: 2, hint: 'السبب → so → النتيجة', explanation: '"so" للنتيجة: "It rained, so we cancelled." ✓', page: '88-92' },
+            { q: 'What is wrong with: "Because the meeting was cancelled."?', options: ['No problem at all', 'Incomplete sentence — needs a main clause!', 'because is the wrong word', 'meeting does not need the'], answer: 1, hint: '"because" alone cannot start a complete sentence — it needs a main clause. beة ناقصة', explanation: '"Because..." وحدها ناقصة. الصحيح: "We left early because the meeting was cancelled."', page: '85-90' },
+            { q: 'Which connector shows a RESULT relationship?', options: ['but', 'although', 'so', 'or'], answer: 2, hint: 'cause → so → result. "It rained, so we cancelled."', explanation: '"so" للنتيجة: "It rained, so we cancelled." ✓', page: '88-92' },
           ],
         },
         {
@@ -2122,20 +2122,7 @@ function buildPyOutput(rawHtml, code) {
       + '</div>';
   }
 
-  if (rawHtml.includes('❌') || rawHtml.includes('color:#FF5252')) {
-    const plainMsg = rawHtml.replace(/<[^>]+>/g, '').replace(/^❌ خطأ:\s*/, '').trim();
-    return buildPyError(plainMsg, code);
-  }
-
-  return '<div style="background:#0d1117;border-radius:12px;overflow:hidden;border:1px solid rgba(40,202,65,0.2)">'
-
-    + '<div style="background:rgba(40,202,65,0.12);padding:8px 14px;display:flex;align-items:center;gap:8px;border-bottom:1px solid rgba(40,202,65,0.15)">'
-    + '<span style="color:#28CA41;font-size:1rem">✅</span>'
-    + '<span style="color:#28CA41;font-weight:700;font-size:0.85rem">تم التنفيذ بنجاح</span>'
-    + '<span style="color:rgba(40,202,65,0.5);font-size:0.75rem;margin-right:auto">المخرجات:</span>'
-    + '</div>'
-
-    + '<div style="padding:12px 14px;font-family:\'Fira Code\',monospace;font-size:0.85rem;line-height:1.8;direction:ltr;text-align:left;color:#e6edf3;white-space:pre-wrap">'
+  if (rawHtmlize:0.85rem;line-height:1.8;direction:ltr;text-align:left;color:#e6edf3;white-space:pre-wrap">'
     + rawHtml
     + '</div>'
     + '</div>';

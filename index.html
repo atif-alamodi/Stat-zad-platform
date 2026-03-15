@@ -10549,10 +10549,12 @@ async function analyzeAndGenerate(text, subjectId, fileName) {
   const bar   = document.getElementById('ai-gen-bar');
   const steps = document.getElementById('ai-gen-steps');
   const out   = document.getElementById('ai-gen-output');
+
   const upd = function(icon, msg, pct) {
     if (bar)   bar.style.width = pct + '%';
     if (steps) steps.innerHTML = '<div style="font-size:0.82rem;color:var(--text-muted);padding:8px 12px;background:rgba(255,255,255,0.03);border-radius:8px;border-right:3px solid var(--primary)">' + icon + ' ' + msg + '</div>';
   };
+
   const barWrap = document.getElementById('ai-gen-progress');
   if (barWrap) barWrap.style.display = 'block';
   if (out) { out.innerHTML = ''; out.style.opacity = '1'; }
@@ -10560,135 +10562,223 @@ async function analyzeAndGenerate(text, subjectId, fileName) {
   try {
     const subject  = CURRICULUM[subjectId];
     const subTitle = subject ? subject.title : (subjectId || 'المادة');
-    const cleanText = text.replace(/[\u0000-\u001F]/g, ' ').trim();
-    const isEnglish = subjectId === 'english';
+    const clean    = text.replace(/[\u0000-\u001F]/g, ' ').trim();
+    const isEng    = subjectId === 'english';
 
-    const CHUNK = 50000;
-    const chunks = [];
-    for (let i = 0; i < cleanText.length; i += CHUNK) chunks.push(cleanText.slice(i, i + CHUNK));
-    const totalChunks = Math.min(chunks.length, 20);
+    upd('🔍', 'تحليل هيكل الملف واكتشاف الدروس...', 10);
 
-    upd('📖', `قراءة الملف (${cleanText.length.toLocaleString()} حرف / ${totalChunks} أجزاء)...`, 10);
+    // ── STEP 1: Detect chapters/lessons structure ──────────────
+    const structResp = await zadFetch({
+      model: 'llama-3.3-70b-versatile',
+      max_tokens: 2000,
+      system: 'You are an expert educational content analyzer. Respond with valid JSON only.',
+      messages: [{
+        role: 'user',
+        content: `Analyze this educational text and identify distinct chapters, topics, or lessons within it.
+Text (first 8000 chars):
+${clean.slice(0, 8000)}
 
-    const allResults = [];
+Return JSON with the structure of the content:
+{
+  "hasMultipleTopics": true,
+  "topics": [
+    {"title": "Topic/Chapter Title", "startHint": "first few words of this section"},
+    {"title": "Topic 2 Title", "startHint": "first few words"}
+  ]
+}
+If the text is all one topic, return: {"hasMultipleTopics": false, "topics": [{"title": "auto", "startHint": ""}]}
+Identify REAL chapter/topic boundaries, not artificial ones. Max 8 topics.`
+      }]
+    });
+    const structData = await structResp.json();
+    let structure = null;
+    try {
+      const sText = (structData.content && structData.content[0] && structData.content[0].text) || '';
+      structure = repairAndParseJSON(sText);
+    } catch(e) {}
 
-    for (let ci = 0; ci < totalChunks; ci++) {
-      const pct = 15 + (ci / totalChunks) * 55;
-      upd('📡', `تحليل الجزء ${ci+1}/${totalChunks}...`, pct);
+    const topics = (structure && structure.topics && structure.topics.length > 1 && structure.hasMultipleTopics)
+      ? structure.topics.slice(0, 8)
+      : null;
 
-      const langInstruction = isEnglish
-        ? `You are an expert English language teacher. Your student is Arabic-speaking.
-RULES:
-- lessonTitle: in English
-- definition: in ARABIC - simple, clear, detailed explanation (3-5 sentences)
-- whyLearn: in ARABIC - why is this topic important
-- keyTerms: term in ENGLISH, def in ARABIC (simple translation + explanation)
-- examples: title and content in ENGLISH (real language examples)
-- steps: in ARABIC - main points explained simply
-- mindMapBranches: ALL in ENGLISH (grammar terms, vocabulary)
-- quiz: questions and options in ENGLISH, explanation in ARABIC
-- summary: in ARABIC - simple detailed summary
-- IMPORTANT: Explanations must be DETAILED, SIMPLE, and ACCURATE`
-        : `أنت مدرس خبير متخصص في ${subTitle}. الطالب يريد فهماً عميقاً ومبسطاً.
-القواعد:
-- اشرح كل مفهوم بشكل مبسط جداً كأنك تشرح لطالب مبتدئ
-- التعريف: شامل ومفصل (4-6 جمل)
-- لماذا ندرسه: أهمية عملية وواقعية
-- المصطلحات: تعريف مفصل وسهل
-- الأمثلة: تطبيقية من الواقع
-- الخطوات: مفصلة وواضحة
-- الأسئلة: من محتوى النص بالضبط مع شرح وافٍ
-- الملخص: شامل ومفصل ودقيق`;
+    const totalLessons = topics ? topics.length : 1;
+    upd('📚', `اكتُشف ${totalLessons} درس/موضوع في الملف`, 20);
 
-      const jsonTemplate = `{
-  "lessonTitle": "عنوان دقيق يعبر عن المحتوى",
-  "definition": "تعريف مفصل وشامل (4-6 جمل)",
-  "whyLearn": ["سبب مهم 1", "سبب مهم 2", "سبب مهم 3", "سبب مهم 4"],
-  "keyTerms": [
-    {"term": "مصطلح", "def": "تعريف مفصل وواضح"},
-    {"term": "مصطلح2", "def": "تعريف مفصل"},
-    {"term": "مصطلح3", "def": "تعريف مفصل"},
-    {"term": "مصطلح4", "def": "تعريف مفصل"},
-    {"term": "مصطلح5", "def": "تعريف مفصل"}
-  ],
-  "examples": [
-    {"icon": "💡", "title": "مثال 1", "content": "شرح مفصل للمثال"},
-    {"icon": "📌", "title": "مثال 2", "content": "شرح مفصل"},
-    {"icon": "🔍", "title": "مثال 3", "content": "شرح مفصل"}
-  ],
-  "steps": ["نقطة رئيسية مفصلة 1", "نقطة 2", "نقطة 3", "نقطة 4", "نقطة 5"],
-  "properties": ["خاصية 1", "خاصية 2", "خاصية 3"],
-  "types": ["نوع 1 مع شرحه", "نوع 2 مع شرحه", "نوع 3 مع شرحه"],
+    const langNote = isEng
+      ? `You are an expert English teacher for Arabic-speaking students.
+RULES: lessonTitle in English. definition/whyLearn/steps/summary in ARABIC (simple, detailed, accurate).
+keyTerms: term in ENGLISH, def in ARABIC. examples: in ENGLISH with Arabic explanation.
+mindMapBranches: ALL in ENGLISH. quiz: questions+options in ENGLISH, explanation in ARABIC.
+Explanations must be DETAILED, SIMPLE and ACCURATE.`
+      : `أنت مدرس خبير في ${subTitle}. اشرح بشكل مبسط جداً ومفصل ودقيق كأنك تشرح لمبتدئ.
+التعريف: 4-6 جمل مفصلة. الأمثلة: تطبيقية من الواقع. الأسئلة: من المحتوى مع شرح وافٍ.`;
+
+    const jsonTemplate = `{
+  "lessonTitle": "عنوان دقيق",
+  "definition": "تعريف مفصل وشامل (4-6 جمل مبسطة)",
+  "whyLearn": ["أهمية 1", "أهمية 2", "أهمية 3"],
+  "keyTerms": [{"term":"مصطلح","def":"تعريف مفصل"},{"term":"م2","def":"تعريف"},{"term":"م3","def":"تعريف"},{"term":"م4","def":"تعريف"},{"term":"م5","def":"تعريف"}],
+  "examples": [{"icon":"💡","title":"مثال 1","content":"شرح مفصل"},{"icon":"📌","title":"مثال 2","content":"شرح"},{"icon":"🔍","title":"مثال 3","content":"شرح"}],
+  "steps": ["نقطة مفصلة 1","نقطة 2","نقطة 3","نقطة 4","نقطة 5"],
+  "properties": ["خاصية 1","خاصية 2","خاصية 3"],
+  "types": ["نوع 1","نوع 2","نوع 3"],
   "mindMapBranches": [
-    {"label": "محور 1", "color": "#6C63FF", "children": ["فرع 1", "فرع 2", "فرع 3"]},
-    {"label": "محور 2", "color": "#FF6584", "children": ["فرع 1", "فرع 2", "فرع 3"]},
-    {"label": "محور 3", "color": "#00BFA5", "children": ["فرع 1", "فرع 2"]},
-    {"label": "محور 4", "color": "#FFD600", "children": ["فرع 1", "فرع 2"]}
+    {"label":"محور 1","color":"#6C63FF","children":["فرع 1","فرع 2","فرع 3"]},
+    {"label":"محور 2","color":"#FF6584","children":["فرع 1","فرع 2","فرع 3"]},
+    {"label":"محور 3","color":"#00BFA5","children":["فرع 1","فرع 2"]},
+    {"label":"محور 4","color":"#FFD600","children":["فرع 1","فرع 2"]}
   ],
   "quiz": [
-    {"q": "سؤال من النص", "options": ["الإجابة الصحيحة", "خطأ1", "خطأ2", "خطأ3"], "answer": 0, "explanation": "شرح مفصل للإجابة"},
-    {"q": "سؤال 2", "options": ["الصحيح", "خطأ1", "خطأ2", "خطأ3"], "answer": 0, "explanation": "شرح"},
-    {"q": "سؤال 3", "options": ["الصحيح", "خطأ1", "خطأ2", "خطأ3"], "answer": 0, "explanation": "شرح"},
-    {"q": "سؤال 4", "options": ["الصحيح", "خطأ1", "خطأ2", "خطأ3"], "answer": 0, "explanation": "شرح"},
-    {"q": "سؤال 5", "options": ["الصحيح", "خطأ1", "خطأ2", "خطأ3"], "answer": 0, "explanation": "شرح"}
+    {"q":"سؤال 1","options":["صحيح","خطأ1","خطأ2","خطأ3"],"answer":0,"explanation":"شرح مفصل"},
+    {"q":"سؤال 2","options":["صحيح","خطأ1","خطأ2","خطأ3"],"answer":0,"explanation":"شرح"},
+    {"q":"سؤال 3","options":["صحيح","خطأ1","خطأ2","خطأ3"],"answer":0,"explanation":"شرح"},
+    {"q":"سؤال 4","options":["صحيح","خطأ1","خطأ2","خطأ3"],"answer":0,"explanation":"شرح"},
+    {"q":"سؤال 5","options":["صحيح","خطأ1","خطأ2","خطأ3"],"answer":0,"explanation":"شرح"}
   ],
-  "summary": "ملخص شامل ومفصل للدرس"
+  "summary": "ملخص شامل ومفصل"
 }`;
 
-      const isFirst = ci === 0;
-      const chunkPrompt = isFirst
-        ? `${langInstruction}\n\nالنص (الجزء ${ci+1}/${totalChunks}):\n${chunks[ci]}\n\nأجب بـ JSON صالح فقط بهذا الشكل:\n${jsonTemplate}`
-        : `${langInstruction}\n\nنص إضافي (الجزء ${ci+1}/${totalChunks}):\n${chunks[ci]}\n\nأجب بـ JSON يحتوي مصطلحات وأسئلة إضافية فقط:\n{"keyTerms": [{"term":"...","def":"..."}], "steps": ["..."], "quiz": [{"q":"...","options":["الصحيح","خطأ1","خطأ2","خطأ3"],"answer":0,"explanation":"..."}]}`;
+    // ── STEP 2: Process each topic/lesson ─────────────────────
+    const savedLessons = [];
+    const CHUNK = 12000;
 
-      const resp = await zadFetch({
-        model: 'llama-3.3-70b-versatile',
-        max_tokens: 8000,
-        system: 'أنت مساعد تعليمي. أجب بـ JSON صالح فقط بدون أي نص خارجه.',
-        messages: [{ role: 'user', content: chunkPrompt }]
+    if (topics) {
+      // Split text into sections by topic hints
+      for (let ti = 0; ti < topics.length; ti++) {
+        const topic = topics[ti];
+        const pct = 25 + (ti / topics.length) * 65;
+        upd('📖', `معالجة الدرس ${ti+1}/${topics.length}: ${topic.title}...`, pct);
+
+        // Find section text
+        let sectionStart = 0;
+        if (topic.startHint && topic.startHint.length > 3) {
+          const hint = clean.indexOf(topic.startHint);
+          if (hint > 0) sectionStart = hint;
+        } else if (ti > 0) {
+          sectionStart = Math.floor((ti / topics.length) * clean.length);
+        }
+        const sectionEnd = ti < topics.length - 1
+          ? Math.floor(((ti+1) / topics.length) * clean.length)
+          : clean.length;
+        const sectionText = clean.slice(sectionStart, Math.min(sectionEnd, sectionStart + CHUNK));
+
+        const topicPrompt = `${langNote}\n\nموضوع هذا الدرس: "${topic.title}"\nنص الدرس:\n${sectionText}\n\nأجب بـ JSON صالح فقط:\n${jsonTemplate}`;
+
+        const resp = await zadFetch({
+          model: 'llama-3.3-70b-versatile',
+          max_tokens: 6000,
+          system: 'أنت مساعد تعليمي. أجب بـ JSON صالح فقط.',
+          messages: [{ role: 'user', content: topicPrompt }]
+        });
+        const data = await resp.json();
+        if (!data.content || !data.content[0]) continue;
+        const lesson = repairAndParseJSON((data.content[0].text||'').trim());
+        if (!lesson) continue;
+
+        // Ensure required fields
+        lesson.lessonTitle     = lesson.lessonTitle     || topic.title;
+        lesson.definition      = lesson.definition      || '';
+        lesson.whyLearn        = lesson.whyLearn        || [];
+        lesson.keyTerms        = lesson.keyTerms        || [];
+        lesson.examples        = lesson.examples        || [];
+        lesson.steps           = lesson.steps           || [];
+        lesson.mindMapBranches = lesson.mindMapBranches || [];
+        lesson.quiz            = lesson.quiz            || [];
+        lesson.summary         = lesson.summary         || '';
+
+        // Save each lesson separately
+        const lessonUploadId = uploadId + '_' + ti;
+        if (typeof saveAILessonForUser === 'function') {
+          saveAILessonForUser(lesson, subjectId, lessonUploadId, fileName + ' - ' + lesson.lessonTitle);
+        }
+        savedLessons.push(lesson);
+      }
+    } else {
+      // Single lesson - process in chunks
+      upd('📡', 'تحليل الملف...', 30);
+      const chunkSize = 12000;
+      const numChunks = Math.min(Math.ceil(clean.length / chunkSize), 8);
+      const allResults = [];
+
+      for (let ci = 0; ci < numChunks; ci++) {
+        const pct = 30 + (ci / numChunks) * 55;
+        upd('📡', `تحليل الجزء ${ci+1}/${numChunks}...`, pct);
+        const chunk = clean.slice(ci * chunkSize, (ci+1) * chunkSize);
+        const isFirst = ci === 0;
+        const prompt = isFirst
+          ? `${langNote}\n\nالنص:\n${chunk}\n\nأجب بـ JSON:\n${jsonTemplate}`
+          : `${langNote}\n\nنص إضافي:\n${chunk}\n\nأجب بـ JSON مع مصطلحات وأسئلة إضافية فقط:\n{"keyTerms":[{"term":"...","def":"..."}],"steps":["..."],"quiz":[{"q":"...","options":["صحيح","خطأ1","خطأ2","خطأ3"],"answer":0,"explanation":"..."}]}`;
+
+        const resp = await zadFetch({
+          model: 'llama-3.3-70b-versatile',
+          max_tokens: 6000,
+          system: 'أنت مساعد تعليمي. أجب بـ JSON صالح فقط.',
+          messages: [{ role: 'user', content: prompt }]
+        });
+        const data = await resp.json();
+        if (!data.content || !data.content[0]) continue;
+        const parsed = repairAndParseJSON((data.content[0].text||'').trim());
+        if (parsed) allResults.push(parsed);
+      }
+
+      if (!allResults.length) throw new Error('لم يُنتج الذكاء الاصطناعي أي محتوى');
+
+      const main = allResults[0];
+      const lesson = {
+        lessonTitle: main.lessonTitle || fileName,
+        definition: main.definition || '',
+        whyLearn: main.whyLearn || [],
+        keyTerms: [], examples: main.examples || [],
+        steps: [], properties: main.properties || [],
+        types: main.types || [], mindMapBranches: main.mindMapBranches || [],
+        quiz: [], summary: main.summary || ''
+      };
+      const sT = new Set(), sQ = new Set();
+      allResults.forEach(function(r) {
+        (r.keyTerms||[]).forEach(function(k){ if(k.term&&!sT.has(k.term)){sT.add(k.term);lesson.keyTerms.push(k);} });
+        (r.steps||[]).forEach(function(s){ if(s&&!lesson.steps.includes(s))lesson.steps.push(s); });
+        (r.quiz||[]).forEach(function(q){ if(q.q&&!sQ.has(q.q)){sQ.add(q.q);lesson.quiz.push(q);} });
       });
-      const data = await resp.json();
-      if (!data.content || !data.content[0]) continue;
-      const parsed = repairAndParseJSON((data.content[0].text||'').trim());
-      if (parsed) allResults.push(parsed);
+
+      if (typeof saveAILessonForUser === 'function') saveAILessonForUser(lesson, subjectId, uploadId, fileName);
+      savedLessons.push(lesson);
     }
 
-    if (!allResults.length) throw new Error('لم يُنتج الذكاء الاصطناعي أي محتوى');
+    const totalSaved = savedLessons.length;
+    const totalTerms = savedLessons.reduce(function(a,l){ return a+(l.keyTerms||[]).length; }, 0);
+    const totalQ     = savedLessons.reduce(function(a,l){ return a+(l.quiz||[]).length; }, 0);
 
-    upd('🔗', 'دمج المحتوى...', 75);
-    const main = allResults[0];
-    const lesson = {
-      lessonTitle:     main.lessonTitle     || fileName,
-      definition:      main.definition      || '',
-      whyLearn:        main.whyLearn        || [],
-      keyTerms:        [],
-      examples:        main.examples        || [],
-      steps:           [],
-      properties:      main.properties      || [],
-      types:           main.types           || [],
-      mindMapBranches: main.mindMapBranches || [],
-      quiz:            [],
-      summary:         main.summary         || ''
-    };
-    const seenT = new Set(), seenQ = new Set();
-    allResults.forEach(function(r) {
-      (r.keyTerms||[]).forEach(function(k){ if(k.term&&!seenT.has(k.term)){seenT.add(k.term);lesson.keyTerms.push(k);} });
-      (r.steps||[]).forEach(function(s){ if(s&&!lesson.steps.includes(s))lesson.steps.push(s); });
-      (r.quiz||[]).forEach(function(q){ if(q.q&&!seenQ.has(q.q)){seenQ.add(q.q);lesson.quiz.push(q);} });
-    });
-
-    upd('💾', `حفظ (${lesson.keyTerms.length} مصطلح، ${lesson.quiz.length} سؤال)...`, 88);
-    if (typeof saveAILessonForUser === 'function') saveAILessonForUser(lesson, subjectId, uploadId, fileName);
-    window._ZAD_AI_LESSON = { lesson, subjectId, uploadId, fileName };
     window._ZAD_LAST_UPLOAD_SUBJECT = subjectId;
-    upd('✅', `تم! ${lesson.keyTerms.length} مصطلح، ${lesson.quiz.length} سؤال`, 100);
-    refreshAllTabsWithAILesson(lesson, subjectId);
+    upd('✅', `تم! ${totalSaved} درس — ${totalTerms} مصطلح — ${totalQ} سؤال`, 100);
+    showToast(`✅ تم إنشاء ${totalSaved} درس من الملف`, 'success');
+
+    // Navigate to lessons
+    setTimeout(function() {
+      showSubject(subjectId, 'lessons');
+      if (typeof refreshUserCurriculumSection === 'function') refreshUserCurriculumSection();
+    }, 1500);
+
+    // Show green card
+    if (out) {
+      var btn = document.createElement('button');
+      btn.style.cssText = 'width:100%;padding:14px;border-radius:12px;border:none;cursor:pointer;background:linear-gradient(135deg,#28CA41,#1ea832);color:white;font-family:var(--font);font-weight:900;font-size:1rem;margin-top:10px';
+      btn.textContent = '📚 عرض ' + totalSaved + ' درس في تبويب الدروس';
+      btn.onclick = function() { showSubject(subjectId, 'lessons'); };
+      var card = document.createElement('div');
+      card.style.cssText = 'text-align:center;padding:20px;background:rgba(40,202,65,0.08);border:2px solid rgba(40,202,65,0.3);border-radius:18px;direction:rtl';
+      card.innerHTML = '<div style="font-size:2rem;margin-bottom:8px">✅</div><div style="font-weight:900;font-size:1rem;margin-bottom:4px">تم إنشاء '+totalSaved+' درس بنجاح!</div><div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:14px">'+totalTerms+' مصطلح • '+totalQ+' سؤال</div>';
+      card.appendChild(btn);
+      out.innerHTML = '';
+      out.appendChild(card);
+      out.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
 
   } catch(err) {
     if (err.message === 'NO_API_KEY' || err.message === 'INVALID_API_KEY' || err.message === 'BACKEND_NOT_CONFIGURED') return;
-    var em = String(err.message||err);
+    var em = String(err.message || err);
     if (document.getElementById('ai-gen-steps'))
-      document.getElementById('ai-gen-steps').innerHTML = '<div style="color:#FF5252;padding:10px;border-radius:8px;background:rgba(239,83,80,0.1)">❌ '+em+'</div>';
-    showUploadStatus('error', '❌ '+em.slice(0,200));
+      document.getElementById('ai-gen-steps').innerHTML = '<div style="color:#FF5252;padding:10px;border-radius:8px;background:rgba(239,83,80,0.1)">❌ ' + em + '</div>';
+    showUploadStatus('error', '❌ ' + em.slice(0, 200));
     console.error('analyzeAndGenerate:', err);
   }
 }

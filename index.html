@@ -16856,7 +16856,7 @@ async function buildAdminActivityAsync(container) {
   // Try to get real data from Worker
   var workerData = null;
   try {
-    var r = await fetch(ZAD_WORKER + '/students');
+    var controller2 = new AbortController(); setTimeout(function(){controller2.abort();},3000); var r = await fetch(ZAD_WORKER + '/students', {signal:controller2.signal});
     if (r.ok) workerData = await r.json();
   } catch(e) {}
 
@@ -19302,108 +19302,107 @@ function stopPresencePing() {
 // ── Admin: fetch real students from worker ─────────────────────
 async function fetchRealStudents() {
   try {
-    var r = await fetch(ZAD_WORKER + '/students');
+    var controller = new AbortController();
+    var timeout = setTimeout(function(){ controller.abort(); }, 3000);
+    var r = await fetch(ZAD_WORKER + '/students', { signal: controller.signal });
+    clearTimeout(timeout);
     if (!r.ok) return null;
     return await r.json();
   } catch(e) { return null; }
 }
 
 // ── Rewrite buildAdminOverview with REAL data ──────────────────
-async function buildAdminOverviewAsync() {
-  var el = document.getElementById('admin-panel-content');
-  if (!el) return;
 
-  // Show loading
-  el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted)">⏳ جاري تحميل البيانات الحقيقية...</div>';
-  adminTab('overview');
-
-  // Fetch real data from worker
-  var workerData = await fetchRealStudents();
-  var localDb    = getAllStudents();
-  var localEmails = Object.keys(localDb);
+function renderAdminOverviewHTML(el, workerData, localStudents, localDb) {
+  var localEmails = Object.keys(localDb || {});
+  var now = Date.now();
+  var bans = getBans();
+  var act = getAct ? getAct() : {};
 
   var allStudents, onlineCount, totalCount;
-
-  if (workerData && workerData.students) {
-    allStudents  = workerData.students;
-    onlineCount  = workerData.online || 0;
-    totalCount   = workerData.total  || 0;
+  if (workerData && Array.isArray(workerData) && workerData.length) {
+    allStudents = workerData;
+    onlineCount = allStudents.filter(function(s){ return s.online||(now-(s.lastSeen||0))<5*60*1000; }).length;
+    totalCount  = allStudents.length;
   } else {
-    // Fallback to localStorage
-    var act = getAct();
-    var now = Date.now();
-    allStudents = localEmails.map(function(e) {
-      var st = (localDb[e].student || {});
-      return {
-        email    : e,
-        name     : st.name || e,
-        lastSeen : (act[e]||{}).lastSeen || 0,
-        tab      : (act[e]||{}).tab || '—',
-        joinDate : st.joinDate || '',
-        level    : st.level || 'beginner',
-        online   : act[e] && (now - act[e].lastSeen) < 5*60*1000
-      };
+    allStudents = localStudents || localEmails.map(function(email) {
+      var a = (act[email]||{});
+      var st = ((localDb[email]||{}).student||{});
+      return { email:email, name:st.name||email, lastSeen:a.lastSeen||0,
+               tab:a.tab||'—', joinDate:st.joinDate||'', online:(now-(a.lastSeen||0))<5*60*1000 };
     });
-    onlineCount = allStudents.filter(function(s){return s.online;}).length;
+    onlineCount = allStudents.filter(function(s){ return s.online; }).length;
     totalCount  = allStudents.length;
   }
 
-  var now = Date.now();
-  var bans    = getBans();
   var weekAgo = now - 7*24*3600*1000;
-  var newWeek = allStudents.filter(function(s){
-    return s.joinDate && new Date(s.joinDate) > new Date(weekAgo);
-  }).length;
+  var newWeek = allStudents.filter(function(s){ return s.joinDate && new Date(s.joinDate)>new Date(weekAgo); }).length;
+  var totalScore=0, scoreN=0;
+  localEmails.forEach(function(e){ ((localDb[e].progress||{}).scores||[]).forEach(function(s){ totalScore+=s; scoreN++; }); });
+  var avgSc = scoreN>0 ? Math.round(totalScore/scoreN)+'%' : '—';
 
   var statsHTML = [
-    {icon:'👥', val:totalCount,   label:'مسجلون',          col:'#42A5F5'},
-    {icon:'🟢', val:onlineCount,  label:'متصلون الآن',      col:'#66BB6A'},
-    {icon:'🔴', val:totalCount - onlineCount, label:'غير متصلين', col:'#EF9A9A'},
-    {icon:'🆕', val:newWeek,      label:'تسجيل هذا الأسبوع',col:'#26C6DA'},
-    {icon:'🚫', val:bans.length,  label:'محظورون',           col:'#EF5350'},
-    {icon:'📊', val:(function(){
-      var t=0,n=0;
-      localEmails.forEach(function(e){((localDb[e].progress||{}).scores||[]).forEach(function(s){t+=s;n++;});});
-      return n>0?Math.round(t/n)+'%':'—';
-    })(),                          label:'متوسط النتائج',    col:'#AB47BC'},
+    {icon:'👥', val:totalCount,   label:'مسجلون',       col:'#42A5F5'},
+    {icon:'🟢', val:onlineCount,  label:'متصلون الآن',   col:'#66BB6A'},
+    {icon:'🆕', val:newWeek,      label:'هذا الأسبوع',   col:'#26C6DA'},
+    {icon:'🚫', val:bans.length,  label:'محظورون',       col:'#EF5350'},
+    {icon:'📊', val:avgSc,        label:'متوسط النتائج', col:'#AB47BC'},
   ].map(function(s) {
     return '<div style="background:'+s.col+'15;border:1.5px solid '+s.col+'40;border-radius:14px;padding:14px;text-align:center">'
       + '<div style="font-size:1.5rem;margin-bottom:4px">'+s.icon+'</div>'
       + '<div style="font-size:1.5rem;font-weight:900;color:'+s.col+'">'+s.val+'</div>'
       + '<div style="font-size:0.72rem;color:var(--text-muted);margin-top:2px">'+s.label+'</div>'
-      + '</div>';
+    + '</div>';
   }).join('');
 
-  // Students list sorted by lastSeen
-  var sorted = allStudents.slice().sort(function(a,b){return (b.lastSeen||0)-(a.lastSeen||0);});
+  var sorted = allStudents.slice().sort(function(a,b){ return (b.lastSeen||0)-(a.lastSeen||0); });
   var studentsHTML = sorted.slice(0,20).map(function(s) {
-    var timeAgo = s.lastSeen ? getTimeAgo(s.lastSeen) : 'لم يسجل دخول';
-    return '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;'
-      + 'background:rgba(255,255,255,0.03);border-radius:10px;margin-bottom:5px">'
-      + '<div style="width:10px;height:10px;border-radius:50%;flex-shrink:0;background:'+(s.online?'#66BB6A':'#555')+';'
-      + (s.online?'box-shadow:0 0 6px #66BB6A':'')+'"></div>'
-      + '<div style="flex:1;min-width:0">'
-        + '<div style="font-size:0.82rem;font-weight:700">'+(s.name||s.email)+'</div>'
-        + '<div style="font-size:0.68rem;color:var(--text-muted)">'+(s.email||'')+'</div>'
-      + '</div>'
+    var diff = now-(s.lastSeen||0);
+    var ago = diff<60000?'منذ لحظات':diff<3600000?Math.round(diff/60000)+' دق':diff<86400000?Math.round(diff/3600000)+' سا':Math.round(diff/86400000)+' يوم';
+    return '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:rgba(255,255,255,0.03);border-radius:10px;margin-bottom:5px">'
+      + '<div style="width:10px;height:10px;border-radius:50%;flex-shrink:0;background:'+(s.online?'#66BB6A':'#555')+';'+(s.online?'box-shadow:0 0 6px #66BB6A':'')+'">'+'</div>'
+      + '<div style="flex:1;min-width:0"><div style="font-size:0.82rem;font-weight:700">'+(s.name||s.email)+'</div>'
+      + '<div style="font-size:0.68rem;color:var(--text-muted)">'+(s.email||'')+'</div></div>'
       + '<div style="font-size:0.7rem;text-align:left;flex-shrink:0">'
-        + '<div style="color:'+(s.online?'#66BB6A':'var(--text-muted)')+'">'+(s.online?'● متصل الآن':timeAgo)+'</div>'
+        + '<div style="color:'+(s.online?'#66BB6A':'var(--text-muted)')+'">'+( s.online?'● الآن':ago)+'</div>'
         + '<div style="color:var(--text-muted);margin-top:2px">'+(s.tab||'—')+'</div>'
       + '</div>'
-      + '</div>';
+    + '</div>';
   }).join('');
 
-  var html = (typeof buildAdminPlatformKeySection==='function'?buildAdminPlatformKeySection():'')
+  var source = workerData ? '' : '<div style="font-size:0.7rem;color:var(--text-muted);text-align:center;margin-top:8px;padding:6px;background:rgba(255,255,255,0.02);border-radius:8px">📱 بيانات محلية — '+(totalCount?totalCount+' طالب':'لا يوجد طلاب')+'</div>';
+
+  el.innerHTML = (typeof buildAdminPlatformKeySection==='function'?buildAdminPlatformKeySection():'')
     + (typeof buildAdminSubjectsSection==='function'?buildAdminSubjectsSection():'')
-    + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-bottom:18px">'
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin-bottom:18px">'
     + statsHTML + '</div>'
     + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
-    + '<div style="font-weight:800;font-size:0.9rem">👥 المستخدمون ('+totalCount+')</div>'
-    + '<button onclick="buildAdminOverviewAsync()" style="padding:5px 12px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-muted);font-size:0.75rem;cursor:pointer">🔄 تحديث</button>'
+      + '<div style="font-weight:800;font-size:0.9rem">👥 الطلاب ('+totalCount+')</div>'
+      + '<button onclick="buildAdminOverviewAsync()" style="padding:5px 12px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.04);color:var(--text-muted);font-size:0.75rem;cursor:pointer">🔄 تحديث</button>'
     + '</div>'
-    + '<div style="max-height:400px;overflow-y:auto">' + (studentsHTML||'<div style="color:var(--text-muted);padding:20px;text-align:center">لا يوجد مستخدمون مسجلون بعد</div>') + '</div>';
-
-  el.innerHTML = html;
+    + '<div style="max-height:350px;overflow-y:auto">'+(studentsHTML||'<div style="color:var(--text-muted);padding:20px;text-align:center">لا يوجد طلاب مسجلون بعد</div>')+'</div>'
+    + source;
+}
+async function buildAdminOverviewAsync() {
+  var el = document.getElementById('admin-panel-content');
+  if (!el) return;
+  adminTab('overview');
+  // Show local data IMMEDIATELY
+  var localDb = getAllStudents();
+  var localEmails = Object.keys(localDb);
+  var now = Date.now();
+  var act = getAct ? getAct() : {};
+  var localStudents = localEmails.map(function(email) {
+    var a = act[email]||{};
+    var st = (localDb[email].student||{});
+    return { email:email, name:st.name||email, lastSeen:a.lastSeen||0, tab:a.tab||'—', joinDate:st.joinDate||'', online:(now-a.lastSeen)<5*60*1000 };
+  });
+  renderAdminOverviewHTML(el, null, localStudents, localDb);
+  // Update with Worker data in background
+  var workerData = await fetchRealStudents();
+  if (workerData && Array.isArray(workerData)) {
+    renderAdminOverviewHTML(el, workerData, null, localDb);
+  }
 }
 
 function getTimeAgo(ts) {

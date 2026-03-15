@@ -9020,69 +9020,132 @@ if (pySub) {
 }
 }
 
-const ZAD_UPLOADS = {
+// ════════════════════════════════════════════════════════════
+// ZAD_UPLOADS — IndexedDB-backed storage (no 5MB limit)
+// ════════════════════════════════════════════════════════════
+const ZAD_UPLOADS = (() => {
+  const DB_NAME = 'zad_platform';
+  const STORE   = 'uploads';
+  let _db = null;
 
-  _key() {
-    const email = APP.student.email || 'anonymous';
-    return `zad_uploads_${email.replace(/[^a-z0-9]/gi,'_')}`;
-  },
+  function _openDB() {
+    if (_db) return Promise.resolve(_db);
+    return new Promise((res, rej) => {
+      const req = indexedDB.open(DB_NAME, 2);
+      req.onupgradeneeded = e => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains(STORE)) {
+          db.createObjectStore(STORE, { keyPath: 'id' });
+        }
+      };
+      req.onsuccess = e => { _db = e.target.result; res(_db); };
+      req.onerror   = e => rej(e.target.error);
+    });
+  }
 
-  getAll() {
-    try {
-      return JSON.parse(localStorage.getItem(this._key()) || '[]');
-    } catch(e) { return []; }
-  },
+  function _emailKey() {
+    return (APP.student.email || 'anonymous').replace(/[^a-z0-9]/gi, '_');
+  }
 
-  save(bundle) {
-    const uploads = this.getAll();
+  // ── Sync in-memory cache (populated on first getAll) ──────
+  let _cache = null;
 
-    const filtered = uploads.filter(u => u.id !== bundle.id);
-    filtered.unshift(bundle);
-    localStorage.setItem(this._key(), JSON.stringify(filtered.slice(0, 50)));
-  },
+  return {
+    // Initialize / load from IndexedDB into cache
+    async init() {
+      const db = await _openDB();
+      const eKey = _emailKey();
+      return new Promise((res) => {
+        const tx = db.transaction(STORE, 'readonly');
+        const req = tx.objectStore(STORE).getAll();
+        req.onsuccess = e => {
+          _cache = (e.target.result || [])
+            .filter(u => u._owner === eKey)
+            .sort((a,b) => new Date(b.savedAt||0) - new Date(a.savedAt||0));
+          res(_cache);
+        };
+        req.onerror = () => { _cache = _cache || []; res(_cache); };
+      });
+    },
 
-  delete(uploadId, subjectId) {
+    // Sync getter — returns cache (always call init first on login)
+    getAll() {
+      if (_cache) return _cache;
+      // Fallback: try localStorage migration
+      try {
+        const lsKey = 'zad_uploads_' + _emailKey();
+        const ls = JSON.parse(localStorage.getItem(lsKey) || '[]');
+        if (ls.length) {
+          _cache = ls;
+          // Migrate to IDB in background
+          setTimeout(() => { ls.forEach(u => this._idbPut(u)); }, 500);
+          return ls;
+        }
+      } catch(e) {}
+      return [];
+    },
 
-    const uploads = this.getAll().filter(u => u.id !== uploadId);
-    localStorage.setItem(this._key(), JSON.stringify(uploads));
+    async _idbPut(bundle) {
+      try {
+        const db = await _openDB();
+        bundle._owner = _emailKey();
+        await new Promise((res, rej) => {
+          const tx = db.transaction(STORE, 'readwrite');
+          const req = tx.objectStore(STORE).put(bundle);
+          req.onsuccess = res; req.onerror = rej;
+        });
+      } catch(e) { console.warn('IDB put error:', e); }
+    },
 
-    if (typeof removeAILessonFromCurriculum === 'function') {
-      removeAILessonFromCurriculum(uploadId, subjectId);
-    }
+    async save(bundle) {
+      bundle._owner = _emailKey();
+      bundle.savedAt = bundle.savedAt || new Date().toISOString();
+      // Update cache
+      if (!_cache) _cache = [];
+      _cache = _cache.filter(u => u.id !== bundle.id);
+      _cache.unshift(bundle);
+      // Persist to IDB
+      await this._idbPut(bundle);
+      // Also keep small localStorage copy (ids only) for quick check
+      try {
+        const ids = _cache.slice(0,50).map(u=>u.id);
+        localStorage.setItem('zad_upl_ids_'+_emailKey(), JSON.stringify(ids));
+      } catch(e) {}
+    },
 
-    try {
-      const quizKey = `zad_quiz_upload_${uploadId}`;
-      localStorage.removeItem(quizKey);
-    } catch(e) {}
+    delete(uploadId, subjectId) {
+      if (_cache) _cache = _cache.filter(u => u.id !== uploadId);
+      // IDB delete
+      _openDB().then(db => {
+        const tx = db.transaction(STORE, 'readwrite');
+        tx.objectStore(STORE).delete(uploadId);
+      }).catch(()=>{});
+      // localStorage cleanup
+      try { localStorage.removeItem('zad_quiz_upload_' + uploadId); } catch(e) {}
+      try { localStorage.removeItem('zad_cards_upload_' + uploadId); } catch(e) {}
+      try { localStorage.removeItem('zad_examples_' + uploadId); } catch(e) {}
+      if (typeof removeAILessonFromCurriculum === 'function') {
+        removeAILessonFromCurriculum(uploadId, subjectId);
+      }
+      showToast('🗑️ تم حذف الملف وكل محتواه نهائياً', 'info');
+      return _cache || [];
+    },
 
-    try {
-      const cardsKey = `zad_cards_upload_${uploadId}`;
-      localStorage.removeItem(cardsKey);
-    } catch(e) {}
+    resetCache() { _cache = null; },
 
-    try {
-      const exKey = `zad_examples_${uploadId}`;
-      localStorage.removeItem(exKey);
-    } catch(e) {}
+    getCardExamples(cardId) {
+      try { return JSON.parse(localStorage.getItem('zad_card_ex_' + cardId) || '[]'); }
+      catch(e) { return []; }
+    },
+    saveCardExample(cardId, example) {
+      const examples = this.getCardExamples(cardId);
+      examples.unshift({ text: example, date: new Date().toLocaleDateString('ar-SA'), id: Date.now() });
+      try { localStorage.setItem('zad_card_ex_' + cardId, JSON.stringify(examples.slice(0, 10))); } catch(e) {}
+    },
+  };
+})();
 
-    showToast('🗑️ تم حذف الملف وكل محتواه نهائياً', 'info');
-    return uploads;
-  },
-
-  getCardExamples(cardId) {
-    try {
-      return JSON.parse(localStorage.getItem(`zad_card_ex_${cardId}`) || '[]');
-    } catch(e) { return []; }
-  },
-
-  saveCardExample(cardId, example) {
-    const examples = this.getCardExamples(cardId);
-    examples.unshift({ text: example, date: new Date().toLocaleDateString('ar-SA'), id: Date.now() });
-    localStorage.setItem(`zad_card_ex_${cardId}`, JSON.stringify(examples.slice(0, 10)));
-  },
-};
-
-function saveAILessonForUser(lesson, subjectId, uploadId, originalFileName) {
+async function saveAILessonForUser(lesson, subjectId, uploadId, originalFileName) {
   const email = APP.student.email;
   if (!email) return;
 
@@ -9135,40 +9198,23 @@ function saveAILessonForUser(lesson, subjectId, uploadId, originalFileName) {
     savedAt: new Date().toISOString(),
     lesson: newLesson,
   };
-  ZAD_UPLOADS.save(bundle);
+  await ZAD_UPLOADS.save(bundle);
 
-  // Verify save worked
-  var saved = ZAD_UPLOADS.getAll().find(function(u){ return u.id === uploadId; });
-  if (saved) {
-    showToast('✅ تم حفظ "' + (lesson.lessonTitle||'الدرس') + '" بنجاح', 'success');
-  } else {
-    showToast('⚠️ مشكلة في الحفظ — حاول مرة أخرى', 'error');
-  }
+  showToast('✅ تم حفظ "' + (lesson.lessonTitle||'الدرس') + '" بنجاح', 'success');
+
   // Immediately refresh curriculum section on dashboard
   if (typeof refreshUserCurriculumSection === 'function') {
     setTimeout(refreshUserCurriculumSection, 200);
   }
 }
 
-function restoreUserUploads() {
+async function restoreUserUploads() {
+  await ZAD_UPLOADS.init();
   const uploads = ZAD_UPLOADS.getAll();
   uploads.forEach(bundle => {
     if (!bundle.lesson || !bundle.subjectId) return;
-    const subject = CURRICULUM[bundle.subjectId];
-    if (!subject) return;
-
-    let aiCh = subject.chapters.find(ch => ch.id === 'ai-generated');
-    if (!aiCh) {
-      aiCh = { id:'ai-generated', title:'📂 ملفاتي المرفوعة', pages:'', icon:'📂', lessons:[] };
-      subject.chapters.push(aiCh);
-    }
-
-    if (!aiCh.lessons.find(l => l.id === bundle.lessonId)) {
-      aiCh.lessons.push(bundle.lesson);
-    }
+    _injectLessonToCurriculum(bundle.lesson, bundle.subjectId);
   });
-  if (uploads.length > 0) {
-      }
 }
 
 function buildMyUploadsPanel(subjectId) {
@@ -10583,7 +10629,7 @@ async function analyzeAndGenerate(text, subjectId, fileName) {
         system: 'Respond with valid JSON only. No markdown.',
         messages: [{
           role: 'user',
-          content: 'Does this text have multiple chapters/topics?\nText (first 6000 chars):\n' + clean.slice(0, 6000) + '\n\nReturn JSON: {"hasMultipleTopics":true/false,"topics":[{"title":"Topic","startHint":"first words"}]}\nMax 6 topics. If one topic: {"hasMultipleTopics":false,"topics":[{"title":"auto","startHint":""}]}'
+          content: 'Analyze this educational text and detect its structure.\nText (first 8000 chars):\n' + clean.slice(0, 8000) + '\n\nReturn ONLY valid JSON (no markdown):\n{"chapterTitle":"main title of the document","hasMultipleTopics":true/false,"topics":[{"title":"Lesson/Topic title","startHint":"first 5 words of this section"}]}\nRules: max 10 topics. If single topic set hasMultipleTopics:false and topics:[{"title":"auto","startHint":""}]. Extract real titles from text.'
         }]
       });
       const structData = await structResp.json();
@@ -10597,6 +10643,11 @@ async function analyzeAndGenerate(text, subjectId, fileName) {
     const topics = (structure && structure.topics && structure.topics.length > 1 && structure.hasMultipleTopics)
       ? structure.topics
       : null;
+
+    // Use detected chapter title as file display name
+    const detectedChapterTitle = (structure && structure.chapterTitle && structure.chapterTitle !== 'auto')
+      ? structure.chapterTitle
+      : fileName.replace(/\.[^.]+$/, '');
 
     const totalLessons = topics ? topics.length : 1;
     upd('📚', `اكتُشف ${totalLessons} درس/موضوع في الملف`, 20);
@@ -10653,7 +10704,7 @@ VIOLATION: Writing Arabic in quiz.q or quiz.options is a critical error.`
         try {
           const resp = await zadFetch({
             model: 'llama-3.3-70b-versatile',
-            max_tokens: 4000,
+            max_tokens: 6000,
             system: 'You are an educational assistant. Reply with valid JSON only. No markdown.',
             messages: [{ role: 'user', content: topicPrompt }]
           });
@@ -10693,7 +10744,8 @@ VIOLATION: Writing Arabic in quiz.q or quiz.options is a critical error.`
         // Save each lesson separately
         const lessonUploadId = uploadId + '_' + ti;
         if (typeof saveAILessonForUser === 'function') {
-          saveAILessonForUser(lesson, subjectId, lessonUploadId, fileName + ' - ' + lesson.lessonTitle);
+          // Pass detected chapter title so chapter shows the doc title
+          saveAILessonForUser(lesson, subjectId, lessonUploadId, detectedChapterTitle || fileName);
         }
         savedLessons.push(lesson);
       }
@@ -10721,7 +10773,7 @@ VIOLATION: Writing Arabic in quiz.q or quiz.options is a critical error.`
         try {
           const resp = await zadFetch({
             model: 'llama-3.3-70b-versatile',
-            max_tokens: 4000,
+            max_tokens: 6000,
             system: 'You are an educational assistant. Reply with valid JSON only. No markdown, no extra text.',
             messages: [{ role: 'user', content: prompt }]
           });
@@ -10760,7 +10812,7 @@ VIOLATION: Writing Arabic in quiz.q or quiz.options is a critical error.`
         } catch(fbErr) {
           console.error('Fallback also failed:', fbErr);
         }
-        if (!allResults.length) throw new Error('لم يُنتج الذكاء الاصطناعي أي محتوى — تأكد من اتصالك بالإنترنت وحجم الملف');
+        if (!allResults.length) throw new Error('لم يُنتج الذكاء الاصطناعي أي محتوى — تأكد من الاتصال بالإنترنت أو جرّب ملفاً أصغر');
       }
 
       const main = allResults[0];
@@ -10780,7 +10832,7 @@ VIOLATION: Writing Arabic in quiz.q or quiz.options is a critical error.`
         (r.quiz||[]).forEach(function(q){ if(q.q&&!sQ.has(q.q)){sQ.add(q.q);lesson.quiz.push(q);} });
       });
 
-      if (typeof saveAILessonForUser === 'function') saveAILessonForUser(lesson, subjectId, uploadId, fileName);
+      if (typeof saveAILessonForUser === 'function') await saveAILessonForUser(lesson, subjectId, uploadId, detectedChapterTitle || fileName);
       savedLessons.push(lesson);
     }
 
@@ -18461,26 +18513,47 @@ function showUploadStatus(type, msg) {
 
 function _injectLessonToCurriculum(lesson, subjectId) {
   var subject = CURRICULUM[subjectId];
-  if (!subject || !subject.chapters || !subject.chapters.length) return;
+  if (!subject) return;
+  if (!subject.chapters) subject.chapters = [];
 
-  // Add to the FIRST chapter so it appears among regular lessons
-  var firstChapter = subject.chapters[0];
+  // ── Group lessons by their source file (chapterId = file-based) ──
+  var chapterId = lesson.sourceUploadId
+    ? 'up-ch-' + lesson.sourceUploadId.replace(/_[0-9]+$/, '') // strip topic index
+    : 'ai-generated';
 
-  // Remove old version of same lesson (by sourceUploadId or id)
-  firstChapter.lessons = firstChapter.lessons.filter(function(l) {
+  var chapterTitle = lesson.sourceFile
+    ? ('📂 ' + lesson.sourceFile.replace(/\.[^.]+$/, ''))  // filename without extension
+    : '📂 ملفاتي المرفوعة';
+
+  var aiCh = subject.chapters.find(function(c) { return c.id === chapterId; });
+  if (!aiCh) {
+    aiCh = {
+      id: chapterId,
+      title: chapterTitle,
+      pages: 'مرفوع',
+      icon: '📂',
+      aiGenerated: true,
+      lessons: []
+    };
+    // Insert uploaded chapters BEFORE built-in ones at position 0
+    subject.chapters.unshift(aiCh);
+  }
+
+  // Remove old version of same lesson
+  aiCh.lessons = aiCh.lessons.filter(function(l) {
     return l.sourceUploadId !== lesson.sourceUploadId && l.id !== lesson.id;
   });
 
-  // Mark as AI-generated for delete button visibility
   lesson.aiGenerated = true;
-
-  // Add at the beginning of the chapter
-  firstChapter.lessons.unshift(lesson);
+  aiCh.lessons.push(lesson);
 }
 
-function restoreUserAILessons() {
+async function restoreUserAILessons() {
   const email = APP.student.email;
   if (!email) return;
+
+  // Init IDB cache first (loads all uploads from IndexedDB)
+  await ZAD_UPLOADS.init();
 
   const uploads = ZAD_UPLOADS.getAll();
   if (!uploads.length) return;
@@ -18490,8 +18563,9 @@ function restoreUserAILessons() {
     _injectLessonToCurriculum(bundle.lesson, bundle.subjectId);
   });
 
-  if (uploads.length > 0) {
-      }
+  if (uploads.length > 0 && typeof refreshUserCurriculumSection === 'function') {
+    refreshUserCurriculumSection();
+  }
 }
 
 function removeAILessonFromCurriculum(uploadId, subjectId) {

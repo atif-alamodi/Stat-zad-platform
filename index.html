@@ -10576,34 +10576,25 @@ async function analyzeAndGenerate(text, subjectId, fileName) {
     upd('🔍', 'تحليل هيكل الملف واكتشاف الدروس...', 10);
 
     // ── STEP 1: Detect chapters/lessons structure ──────────────
-    const structResp = await zadFetch({
-      model: 'llama-3.3-70b-versatile',
-      max_tokens: 2000,
-      system: 'You are an expert educational content analyzer. Respond with valid JSON only.',
-      messages: [{
-        role: 'user',
-        content: `Analyze this educational text and identify distinct chapters, topics, or lessons within it.
-Text (first 8000 chars):
-${clean.slice(0, 8000)}
-
-Return JSON with the structure of the content:
-{
-  "hasMultipleTopics": true,
-  "topics": [
-    {"title": "Topic/Chapter Title", "startHint": "first few words of this section"},
-    {"title": "Topic 2 Title", "startHint": "first few words"}
-  ]
-}
-If the text is all one topic, return: {"hasMultipleTopics": false, "topics": [{"title": "auto", "startHint": ""}]}
-Identify REAL chapter/topic boundaries, not artificial ones. Max 8 topics.`
-      }]
-    });
     let structure = null;
     try {
+      upd('🔍', 'تحليل هيكل الملف...', 12);
+      const structResp = await zadFetch({
+        model: 'llama-3.1-8b-instant',
+        max_tokens: 800,
+        system: 'Respond with valid JSON only. No markdown.',
+        messages: [{
+          role: 'user',
+          content: 'Does this text have multiple chapters/topics?\nText (first 3000 chars):\n' + clean.slice(0, 3000) + '\n\nReturn JSON: {"hasMultipleTopics":true/false,"topics":[{"title":"Topic","startHint":"first words"}]}\nMax 6 topics. If one topic: {"hasMultipleTopics":false,"topics":[{"title":"auto","startHint":""}]}'
+        }]
+      });
       const structData = await structResp.json();
       const sText = (structData.content && structData.content[0] && structData.content[0].text) || '';
-      structure = repairAndParseJSON(sText);
-    } catch(e) { console.warn('Structure detection failed:', e.message); }
+      structure = repairAndParseJSON(sText.trim());
+    } catch(stepErr) {
+      console.warn('Structure detection skipped:', stepErr.message);
+      structure = null;
+    }
 
     const topics = (structure && structure.topics && structure.topics.length > 1 && structure.hasMultipleTopics)
       ? structure.topics.slice(0, 8)
@@ -10674,7 +10665,21 @@ VIOLATION: Writing Arabic in quiz.q or quiz.options is a critical error.`
         } catch(topicErr) {
           console.warn('Topic', ti, 'failed:', topicErr.message);
         }
-        if (!lesson) continue;
+        if (!lesson) {
+          console.warn('Lesson', ti, 'skipped - no content generated');
+          upd('⚠️', 'تخطي درس ' + (ti+1) + ' — إعادة المحاولة بطريقة أبسط', 25 + (ti / topics.length) * 65);
+          // Try simpler fallback for this topic
+          try {
+            const fbR = await zadFetch({ model:'llama-3.1-8b-instant', max_tokens:2000,
+              system: isEng ? 'Educational JSON. English quiz only.' : 'مساعد تعليمي. JSON فقط.',
+              messages:[{role:'user', content:(isEng?'Create a short English lesson about: ':'أنشئ درساً قصيراً عن: ')
+                + topic.title + '\n\nReturn JSON:\n' + jsonTemplate}] });
+            const fbD = await fbR.json();
+            const fbT = (fbD.content&&fbD.content[0]&&fbD.content[0].text)||'';
+            lesson = repairAndParseJSON(fbT.trim());
+          } catch(fb2) { console.warn('Fallback lesson failed'); }
+          if (!lesson) continue;
+        }
 
         // Ensure required fields
         lesson.lessonTitle     = lesson.lessonTitle     || topic.title;

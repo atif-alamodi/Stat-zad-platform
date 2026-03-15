@@ -11354,16 +11354,16 @@ body {
 /* ============ SUBJECT CARDS ============ */
 .subjects-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 20px;
-  margin-bottom: 30px;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
 }
 
 .subject-card {
   background: rgba(255,255,255,0.05);
   border: 1px solid var(--border);
-  border-radius: 25px;
-  padding: 30px;
+  border-radius: 18px;
+  padding: 18px 16px;
   cursor: pointer;
   transition: all 0.3s;
   position: relative;
@@ -13624,46 +13624,41 @@ function renderSubjectCards(containerId, limit) {
   var container = document.getElementById(containerId);
   if (!container) return;
 
-  try {
-    var subjects = Object.values(CURRICULUM).slice(0, limit || 99);
-    container.innerHTML = subjects.map(function(s) {
-      var prog = 0;
-      try { prog = typeof calcSubjectProgress === 'function' ? calcSubjectProgress(s.id) : (APP.progress.subjectProgress[s.id] || 0); } catch(e2) {}
-      var chapters = s.chapters ? s.chapters.length : 0;
-      var isCustom  = s.id && s.id.startsWith('custom_');
-      var color     = s.color || '#6C63FF';
-      var totalDone = 0, totalLessons = 0;
-      try {
-        (s.chapters||[]).forEach(function(ch) {
-          (ch.lessons||[]).forEach(function(l) {
-            totalLessons++;
-            var comp = typeof getLessonCompletion === 'function' ? getLessonCompletion(s.id, l.id) : null;
-            if (comp && comp.status === 'completed') totalDone++;
-          });
+  var subjects = [];
+  try { subjects = Object.values(CURRICULUM).slice(0, limit || 99); } catch(e) { return; }
+
+  container.innerHTML = subjects.map(function(s) {
+    var prog = 0;
+    var color = s.color || '#6C63FF';
+    var chapters = (s.chapters||[]).length;
+    var totalDone = 0, totalLessons = 0;
+    try {
+      (s.chapters||[]).forEach(function(ch) {
+        (ch.lessons||[]).forEach(function(l) {
+          totalLessons++;
+          var comp = typeof getLessonCompletion==='function' ? getLessonCompletion(s.id, l.id) : null;
+          if (comp && comp.status==='completed') totalDone++;
         });
-      } catch(e3) {}
+      });
+    } catch(e2) {}
+    try {
+      prog = typeof calcSubjectProgress==='function' ? calcSubjectProgress(s.id) : 0;
+    } catch(e3) {}
 
-      return '<div class="subject-card" data-subject-id="' + s.id + '" onclick="showSubject(\'' + s.id + '\')"'
-        + ' style="border-color:' + color + '30;position:relative">'
-        + (isCustom ? '<button onclick="event.stopPropagation();deleteSubject(\'' + s.id + '\')" style="position:absolute;top:8px;left:8px;background:rgba(255,82,82,0.12);border:none;border-radius:6px;color:#FF5252;cursor:pointer;padding:3px 7px;font-size:0.72rem">🗑️</button>' : '')
-        + '<div class="subject-icon">' + (s.icon||'📚') + '</div>'
-        + '<div class="subject-title">' + (s.title||'') + '</div>'
-        + '<div class="subject-chapters"><i class="fas fa-book-open"></i> ' + chapters + ' فصل</div>'
-        + '<div class="progress-label" style="font-size:0.72rem;color:var(--text-muted);margin-bottom:4px;display:flex;justify-content:space-between">'
-          + '<span>' + totalDone + '/' + totalLessons + ' درس</span>'
-          + '<span style="color:' + color + '">' + prog + '%</span></div>'
-        + '<div class="progress-bar"><div class="progress-fill" style="width:' + prog + '%;background:' + color + '"></div></div>'
-        + '</div>';
-    }).join('');
+    var isCustom = s.id && s.id.startsWith('custom_');
 
-    if (typeof refreshProgressBars === 'function') setTimeout(function(){ try { refreshProgressBars(); } catch(e) {} }, 400);
-  } catch(err) {
-    console.error('renderSubjectCards:', err);
-    container.innerHTML = '<div style="padding:20px;color:var(--text-muted)">جاري التحميل...</div>';
-    setTimeout(function() {
-      try { renderSubjectCards(containerId, limit); } catch(e2) {}
-    }, 500);
-  }
+    return '<div class="subject-card" data-subject-id="'+s.id+'" onclick="showSubject(\''+s.id+'\')" style="border-color:'+color+'30;cursor:pointer">'
+      + (isCustom ? '<button onclick="event.stopPropagation();deleteSubject(\''+s.id+'\')" style="position:absolute;top:8px;left:8px;background:rgba(255,82,82,0.12);border:none;border-radius:6px;color:#FF5252;cursor:pointer;padding:3px 7px;font-size:0.72rem;z-index:2">🗑️</button>' : '')
+      + '<div class="subject-icon">'+(s.icon||'📚')+'</div>'
+      + '<div class="subject-title">'+(s.title||s.id)+'</div>'
+      + '<div class="subject-chapters"><i class="fas fa-book-open"></i> '+chapters+' فصل</div>'
+      + '<div style="font-size:0.72rem;color:var(--text-muted);margin:6px 0 4px;display:flex;justify-content:space-between">'
+        + '<span>'+totalDone+'/'+totalLessons+' درس</span>'
+        + '<span style="color:'+color+'">'+prog+'%</span>'
+      + '</div>'
+      + '<div class="progress-bar"><div class="progress-fill" style="width:'+prog+'%;background:'+color+'"></div></div>'
+      + '</div>';
+  }).join('');
 }
 
 function clearPlayground(id) {

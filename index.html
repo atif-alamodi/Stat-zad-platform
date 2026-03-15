@@ -6525,7 +6525,7 @@ function buildAlphabetPanel() {
 function buildConvoPanel() {
   var scenarios = [
     {
-      id:'greet', icon:'👋', title:'التحيات — Greetings',
+      id:'greet', icon:'👋', title:'Greetings — التحيات',
       color:'#42A5F5',
       lines:[
         {en:'Hello! How are you?',         ar:'مرحباً! كيف حالك؟',          who:'A'},
@@ -6535,7 +6535,7 @@ function buildConvoPanel() {
       ]
     },
     {
-      id:'intro', icon:'🙋', title:'التعريف بالنفس — Introductions',
+      id:'intro', icon:'🙋', title:'Introductions — التعريف بالنفس',
       color:'#26C6DA',
       lines:[
         {en:'What\'s your name?',           ar:'ما اسمك؟',                   who:'A'},
@@ -6546,7 +6546,7 @@ function buildConvoPanel() {
       ]
     },
     {
-      id:'shop', icon:'🛒', title:'التسوق — Shopping',
+      id:'shop', icon:'🛒', title:'Shopping — التسوق',
       color:'#66BB6A',
       lines:[
         {en:'Excuse me, how much is this?',  ar:'عفواً، بكم هذا؟',           who:'A'},
@@ -6557,7 +6557,7 @@ function buildConvoPanel() {
       ]
     },
     {
-      id:'direction', icon:'🗺️', title:'الاتجاهات — Directions',
+      id:'direction', icon:'🗺️', title:'Directions — الاتجاهات',
       color:'#FFA726',
       lines:[
         {en:'Excuse me, where is the hospital?',ar:'عفواً، أين المستشفى؟',   who:'A'},
@@ -6664,17 +6664,17 @@ function buildConvoPanel() {
 function buildGrammarPanel() {
   var rules = [
     {
-      title:'🧩 أجزاء الجملة الإنجليزية',
+      title:'🧩 English Sentence Structure',
       col:'#42A5F5',
       content: (function() {
         var partsSVG = '<svg viewBox="0 0 620 110" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block">'
           + '<text x="310" y="18" text-anchor="middle" font-family="Cairo" font-size="12" fill="#42A5F5" font-weight="800">'
           + 'الجملة الأساسية: Subject + Verb + Object</text>'
           + [
-              {label:'الفاعل\nSubject',  ex:'I / She / Atif',  col:'#42A5F5', x:10,  w:140},
-              {label:'الفعل\nVerb',      ex:'eat / reads / go', col:'#34d399', x:165, w:140},
-              {label:'المفعول\nObject',  ex:'an apple / books', col:'#a78bfa', x:320, w:150},
-              {label:'الظرف\nAdverb',   ex:'quickly / at home',col:'#fbbf24', x:485, w:125},
+              {label:'Subject\nالفاعل',  ex:'I / She / Atif',  col:'#42A5F5', x:10,  w:140},
+              {label:'Verb\nالفعل',      ex:'eat / reads / go', col:'#34d399', x:165, w:140},
+              {label:'Object\nالمفعول',  ex:'an apple / books', col:'#a78bfa', x:320, w:150},
+              {label:'Adverb\nالظرف',   ex:'quickly / at home',col:'#fbbf24', x:485, w:125},
             ].map(function(p) {
               var lines = p.label.split('\n');
               return '<rect x="' + p.x + '" y="28" width="' + p.w + '" height="72" rx="12"'
@@ -6691,9 +6691,9 @@ function buildGrammarPanel() {
           + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;margin-top:10px">'
           + [
               {q:'Ahmed reads a book.',
-               parts:[{t:'Ahmed',r:'فاعل - Subject',c:'#42A5F5'},{t:'reads',r:'فعل - Verb',c:'#34d399'},{t:'a book',r:'مفعول به',c:'#a78bfa'}]},
+               parts:[{t:'Ahmed',r:'Subject - فاعل',c:'#42A5F5'},{t:'reads',r:'Verb - فعل',c:'#34d399'},{t:'a book',r:'Object',c:'#a78bfa'}]},
               {q:'She speaks slowly.',
-               parts:[{t:'She',r:'ضمير - Pronoun',c:'#42A5F5'},{t:'speaks',r:'فعل - Verb',c:'#34d399'},{t:'slowly',r:'ظرف - Adverb',c:'#fbbf24'}]},
+               parts:[{t:'She',r:'ضمير - Pronoun',c:'#42A5F5'},{t:'speaks',r:'Verb - فعل',c:'#34d399'},{t:'slowly',r:'ظرف - Adverb',c:'#fbbf24'}]},
             ].map(function(ex) {
               return '<div style="background:rgba(255,255,255,0.04);border-radius:11px;padding:10px">'
                 + '<div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:6px;font-style:italic">مثال:</div>'
@@ -6820,7 +6820,7 @@ function buildGrammarPanel() {
 function buildVocabPanel() {
   var categories = [
     {
-      name:'الأرقام — Numbers', icon:'🔢', color:'#42A5F5',
+      name:'Numbers — الأرقام', icon:'🔢', color:'#42A5F5',
       words:[
         {en:'One',ar:'واحد',num:'1'},{en:'Two',ar:'اثنان',num:'2'},
         {en:'Three',ar:'ثلاثة',num:'3'},{en:'Four',ar:'أربعة',num:'4'},
@@ -6831,7 +6831,7 @@ function buildVocabPanel() {
       ]
     },
     {
-      name:'الألوان — Colors', icon:'🎨', color:'#AB47BC',
+      name:'Colors — الألوان', icon:'🎨', color:'#AB47BC',
       words:[
         {en:'Red',ar:'أحمر',em:'🔴'},{en:'Blue',ar:'أزرق',em:'🔵'},
         {en:'Green',ar:'أخضر',em:'🟢'},{en:'Yellow',ar:'أصفر',em:'🟡'},
@@ -6842,7 +6842,7 @@ function buildVocabPanel() {
       ]
     },
     {
-      name:'الأيام والأوقات — Days & Time', icon:'📅', color:'#26C6DA',
+      name:'Days & Time — الأيام والأوقات', icon:'📅', color:'#26C6DA',
       words:[
         {en:'Monday',ar:'الإثنين',em:'1️⃣'},{en:'Tuesday',ar:'الثلاثاء',em:'2️⃣'},
         {en:'Wednesday',ar:'الأربعاء',em:'3️⃣'},{en:'Thursday',ar:'الخميس',em:'4️⃣'},
@@ -6853,7 +6853,7 @@ function buildVocabPanel() {
       ]
     },
     {
-      name:'الأسرة — Family', icon:'👨‍👩‍👧‍👦', color:'#EF5350',
+      name:'Family — الأسرة', icon:'👨‍👩‍👧‍👦', color:'#EF5350',
       words:[
         {en:'Father',ar:'أب',em:'👨'},{en:'Mother',ar:'أم',em:'👩'},
         {en:'Brother',ar:'أخ',em:'👦'},{en:'Sister',ar:'أخت',em:'👧'},
@@ -7004,7 +7004,7 @@ function buildTensePanel() {
       name:'المضارع البسيط',
       en:'Present Simple',
       col:'#42A5F5',
-      use:'حقيقة دائمة أو عادة متكررة',
+      use:'Permanent facts or habits | حقيقة دائمة أو عادة',
       form:'Subject + Verb (s/es للغائب)',
       examples:[
         {pos:'I drink coffee every morning.', ar:'أشرب قهوة كل صباح.'},
@@ -7019,7 +7019,7 @@ function buildTensePanel() {
       name:'الماضي البسيط',
       en:'Past Simple',
       col:'#a78bfa',
-      use:'حدث انتهى في وقت محدد في الماضي',
+      use:'Completed action in the past | حدث في الماضي',
       form:'Subject + Verb-ed / (فعل ماضٍ شاذ)',
       examples:[
         {pos:'I visited Makkah last year.', ar:'زرت مكة السنة الماضية.'},
@@ -7034,7 +7034,7 @@ function buildTensePanel() {
       name:'المستقبل',
       en:'Future (will)',
       col:'#34d399',
-      use:'قرار لحظي أو توقع مستقبلي',
+      use:'Instant decision or future prediction | مستقبل',
       form:'Subject + will + Verb',
       examples:[
         {pos:'I will call you tomorrow.', ar:'سأتصل بك غداً.'},
@@ -7049,7 +7049,7 @@ function buildTensePanel() {
       name:'المضارع التام',
       en:'Present Perfect',
       col:'#fbbf24',
-      use:'تجربة في الحياة أو حدث أثّر في الحاضر',
+      use:'Life experience or recent event | تجربة حياتية',
       form:'Subject + have/has + Past Participle',
       examples:[
         {pos:'I have visited London.', ar:'لقد زرت لندن (في حياتي).'},
@@ -7118,7 +7118,7 @@ function buildTensePanel() {
   return '<div style="direction:rtl">'
     + '<div style="background:rgba(33,150,243,0.06);border:1px solid rgba(33,150,243,0.2);'
     + 'border-radius:12px;padding:10px 14px;margin-bottom:14px;font-size:0.79rem">'
-    + '⏰ <strong style="color:#42A5F5">نصيحة الأزمنة:</strong> ابدأ بالمضارع والماضي — هما 80% من استخدامك اليومي للإنجليزية'
+    + '⏰ <strong style="color:#42A5F5">Tense Tip:</strong> Start with Present Simple & Past Simple — they cover 80% of daily English use.'
     + '</div>'
     + cards
     + '</div>';

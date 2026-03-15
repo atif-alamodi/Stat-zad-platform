@@ -13632,14 +13632,14 @@ function showSubject(subjectId, activeTab) {
   try { history.pushState({ zad: 'subject', sid: subjectId, tab: activeTab }, '', '#subject-' + subjectId); } catch(ex) {}
 
   var TABS = [
-    { id: 'lessons',  icon: '📖', label: 'الدروس'        },
-    { id: 'cards',    icon: '🃏', label: 'البطاقات'      },
-    { id: 'mindmaps', icon: '🧠', label: 'الخرائط'       },
-    { id: 'quiz',     icon: '❓', label: 'اختبار'         },
-    { id: 'lab',      icon: '✏️', label: 'المختبر'        },
-    { id: 'adaptive', icon: '🧬', label: 'مستواك'        },
-    { id: 'homework', icon: '✏️', label: 'الواجبات'      },
-    { id: 'upload',   icon: '📤', label: 'رفع محتوى'     }
+    { id: 'lessons',  icon: '📖', label: 'الدروس'         },
+    { id: 'cards',    icon: '🃏', label: 'بطاقات المعلومات'},
+    { id: 'mindmaps', icon: '🧠', label: 'الخرائط الذهنية'},
+    { id: 'quiz',     icon: '❓', label: 'الاختبارات'      },
+    { id: 'lab',      icon: '🔬', label: 'المختبر'         },
+    { id: 'adaptive', icon: '🧬', label: 'مستواك الذكي'   },
+    { id: 'homework', icon: '✏️', label: 'تصحيح الواجبات' },
+    { id: 'upload',   icon: '📤', label: 'رفع محتوى'      }
   ];
 
   var tabsHTML = '<div style="display:flex;flex-direction:row;gap:8px;overflow-x:auto;padding:4px 2px 10px;-webkit-overflow-scrolling:touch;scrollbar-width:none;margin-bottom:8px">'
@@ -13682,7 +13682,7 @@ function showSubject(subjectId, activeTab) {
       else body=buildEmbeddedLab(subjectId);
     }
     if (activeTab === 'upload')   body = buildUploadTab(subjectId);
-    if (activeTab === 'quiz')     body = buildAIQuizUI(subject, subjectId);
+    if (activeTab === 'quiz')     body = (typeof buildAIQuizUI==='function' ? buildAIQuizUI(subject, subjectId) : buildQuizTab(subject, subjectId));
     if (activeTab === 'homework') body = buildHomeworkTool(subjectId);
   } catch(tabErr) {
     body = '<div style="padding:20px;color:var(--text-muted)">خطأ في تحميل التبويب: ' + tabErr.message + '</div>';

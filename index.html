@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
@@ -11,6 +12,13 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
 
 <script>
+
+// ── Utility: escape HTML to prevent XSS in user inputs ──
+function escHTML(s) {
+  var d = document.createElement('div');
+  d.appendChild(document.createTextNode(s));
+  return d.innerHTML;
+}
 
 const CURRICULUM = {
   statistics: {
@@ -6120,7 +6128,7 @@ async function engAICheck(text) {
   el.innerHTML = '<div style="padding:10px;color:var(--text-muted);font-size:0.82rem">🤖 يفحص النص...</div>';
   try {
     const r = await zadFetch({
-        model:'claude-sonnet-4-6', max_tokens:800,
+        model:'llama-3.3-70b-versatile', max_tokens:800,
         system:`أنت مصحّح قواعد لغة إنجليزية لطلاب جامعيين سعوديين.
 صحّح النص واشرح الأخطاء بالعربية بشكل مبسّط جداً.
 الأسلوب: مشجّع، واضح، مبسّط.
@@ -6147,7 +6155,7 @@ async function engExplainWord(word, arabic) {
   el.innerHTML = '<div style="color:var(--text-muted);font-size:0.8rem">🤖 يشرح الكلمة...</div>';
   try {
     const r = await zadFetch({
-        model:'claude-sonnet-4-6', max_tokens:600,
+        model:'llama-3.3-70b-versatile', max_tokens:600,
         system:`أنت معلم لغة إنجليزية لطلاب لديهم صعوبات تعلم.
 اشرح الكلمة الإنجليزية بطريقة ممتعة وسهلة جداً:
 ١. المعنى بالعربية (جملة واحدة واضحة)
@@ -7371,7 +7379,7 @@ async function engAskAI(question) {
   msgs.innerHTML += `<div style="display:flex;justify-content:flex-start;margin-bottom:10px">
     <div style="background:rgba(33,150,243,0.12);border:1px solid rgba(33,150,243,0.2);
       border-radius:12px 12px 4px 12px;padding:10px 14px;max-width:85%;font-size:0.85rem;direction:rtl">
-      ${question}
+      ${escHTML(question)}
     </div>
   </div>
   <div id="eng-ai-typing" style="padding:8px 14px;color:var(--text-muted);font-size:0.8rem">🤖 يفكر...</div>`;
@@ -7379,7 +7387,7 @@ async function engAskAI(question) {
   
   try {
     const r = await zadFetch({
-        model:'claude-sonnet-4-6', max_tokens:700,
+        model:'llama-3.3-70b-versatile', max_tokens:700,
         system:`أنت معلم لغة إنجليزية متخصص لطلاب جامعيين سعوديين لديهم صعوبات تعلم.
 أسلوبك: بسيط جداً، واضح، مشجّع، مع أمثلة من الحياة اليومية والبيئة السعودية.
 استخدم: ✅❌💡📌🔑 لتنظيم شرحك. اكتب بالعربية مع الإنجليزية بين قوسين.`,
@@ -19192,12 +19200,20 @@ function clearSettingsApiKey() {
 function updateApiKeyStatusDisplay() {
   var el = document.getElementById('api-key-status-display');
   if (!el) return;
-  var key = getApiKey ? getApiKey() : '';
-  if (key) {
+  var personalKey = getApiKey ? getApiKey() : '';
+  var platformKey = window._ZAD_PLATFORM_KEY || '';
+  var backendActive = !!(window._ZAD_BACKEND_URL || 'https://zad-proxy.atif-alamodi.workers.dev');
+
+  if (personalKey) {
     el.style.background = 'rgba(102,187,106,0.1)';
     el.style.borderColor = 'rgba(102,187,106,0.3)';
     el.style.color = '#66BB6A';
-    el.innerHTML = '✅ مفعّل — ' + key.slice(0,16) + '...';
+    el.innerHTML = '✅ مفعّل — مفتاحك الشخصي';
+  } else if (platformKey || backendActive) {
+    el.style.background = 'rgba(102,187,106,0.1)';
+    el.style.borderColor = 'rgba(102,187,106,0.3)';
+    el.style.color = '#66BB6A';
+    el.innerHTML = '✅ نشط — خادم المنصة يعمل تلقائياً';
   } else {
     el.style.background = 'rgba(239,83,80,0.08)';
     el.style.borderColor = 'rgba(239,83,80,0.25)';
@@ -19240,14 +19256,7 @@ function updateApiBanner() {
   }
 }
 
-// ── Platform Key Loader ─────────────────────────────────────────
-window._ZAD_PLATFORM_KEY = '';
-
-/* [dup removed: loadPlatformKey] */
-
-loadPlatformKey();
-// Reload key every 10 minutes in case admin updates
-setInterval(loadPlatformKey, 600000);
+// ── Platform Key Loader (defined below after ZAD_CONFIG) ─────
 
 /* [dup removed: buildAdminPlatformKeySection] */
 
@@ -19294,8 +19303,17 @@ async function loadPlatformKey() {
     const r = await fetch(ZAD_CONFIG.rawURL + '?t=' + Date.now());
     if (!r.ok) return;
     const cfg = await r.json();
-    if (cfg && cfg.platform_key) {
-      window._ZAD_PLATFORM_KEY = cfg.platform_key;
+    var key = '';
+    // v2 encoded format: {k: base64(reversed_key), v: 2}
+    if (cfg && cfg.v === 2 && cfg.k) {
+      try { key = atob(cfg.k).split('').reverse().join(''); } catch(e) {}
+    }
+    // v1 plain format: {platform_key: '...'}
+    else if (cfg && cfg.platform_key) {
+      key = cfg.platform_key;
+    }
+    if (key) {
+      window._ZAD_PLATFORM_KEY = key;
       if (typeof updateApiBanner          === 'function') updateApiBanner();
       if (typeof updateApiKeyStatusDisplay === 'function') updateApiKeyStatusDisplay();
     }
@@ -21026,7 +21044,7 @@ async function labAskQuestion(subjectId) {
 
   // Add question to chat
   history.innerHTML += '<div style="margin-bottom:12px;text-align:right">'
-    + '<div style="display:inline-block;background:rgba(108,99,255,0.15);border-radius:12px 12px 2px 12px;padding:8px 12px;font-size:0.85rem;max-width:85%">'+question+'</div>'
+    + '<div style="display:inline-block;background:rgba(108,99,255,0.15);border-radius:12px 12px 2px 12px;padding:8px 12px;font-size:0.85rem;max-width:85%">'+escHTML(question)+'</div>'
     + '</div>';
 
   // Add loading
@@ -21050,7 +21068,7 @@ async function labAskQuestion(subjectId) {
 
     var loadEl = document.getElementById('lab-loading');
     if (loadEl) loadEl.outerHTML = '<div style="margin-bottom:12px">'
-      + '<div style="display:inline-block;background:rgba(0,191,165,0.1);border:1px solid rgba(0,191,165,0.2);border-radius:12px 12px 12px 2px;padding:10px 14px;font-size:0.83rem;line-height:1.6;max-width:90%;white-space:pre-wrap">'+answer+'</div>'
+      + '<div style="display:inline-block;background:rgba(0,191,165,0.1);border:1px solid rgba(0,191,165,0.2);border-radius:12px 12px 12px 2px;padding:10px 14px;font-size:0.83rem;line-height:1.6;max-width:90%;white-space:pre-wrap">'+escHTML(answer)+'</div>'
       + '</div>';
     history.scrollTop = history.scrollHeight;
   } catch(err) {
@@ -21687,7 +21705,7 @@ async function engLabAsk() {
   var bundle = uploads[idx];
   var context = bundle ? 'Lesson: ' + (bundle.lesson&&bundle.lesson.title||'') + '\nDefinition: ' + ((bundle.lesson&&bundle.lesson.content&&bundle.lesson.content.definition)||'') : 'English grammar lesson';
 
-  hist.innerHTML += '<div style="text-align:right;margin-bottom:8px"><span style="background:rgba(108,99,255,0.15);padding:6px 10px;border-radius:10px;display:inline-block;direction:rtl">'+question+'</span></div>';
+  hist.innerHTML += '<div style="text-align:right;margin-bottom:8px"><span style="background:rgba(108,99,255,0.15);padding:6px 10px;border-radius:10px;display:inline-block;direction:rtl">'+escHTML(question)+'</span></div>';
   hist.innerHTML += '<div id="eng-ans-loading" style="color:var(--text-muted);font-size:0.78rem">⏳ Thinking...</div>';
   hist.scrollTop = hist.scrollHeight;
 
@@ -21700,7 +21718,7 @@ async function engLabAsk() {
     var data = await resp.json();
     var answer = data.content&&data.content[0]&&data.content[0].text || 'Sorry, could not get an answer.';
     var loading = document.getElementById('eng-ans-loading');
-    if (loading) loading.outerHTML = '<div style="background:rgba(0,191,165,0.08);border-radius:10px;padding:8px 12px;margin-bottom:8px;font-size:0.82rem;line-height:1.6;direction:rtl">'+answer+'</div>';
+    if (loading) loading.outerHTML = '<div style="background:rgba(0,191,165,0.08);border-radius:10px;padding:8px 12px;margin-bottom:8px;font-size:0.82rem;line-height:1.6;direction:rtl">'+escHTML(answer)+'</div>';
     hist.scrollTop = hist.scrollHeight;
   } catch(err) {
     var l = document.getElementById('eng-ans-loading');
@@ -22000,7 +22018,9 @@ async function translateQuizItemsToEnglish(questions) {
 
     if (!resp.ok) return questions;
     var data = await resp.json();
-    var raw = (data.choices && data.choices[0].message.content) || '[]';
+    var raw = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content)
+           || (data.content && data.content[0] && data.content[0].text)
+           || '[]';
     raw = raw.replace(/```json|```/g, '').trim();
     var translated = JSON.parse(raw);
 

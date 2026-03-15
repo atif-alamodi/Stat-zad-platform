@@ -17777,49 +17777,93 @@ function refreshApiKeyStatus() {
   }
 }
 
-function buildAIQuizUI(questions, title) {
-  subject = getSubjectWithUploads(subjectId) || subject;
-  if (!questions || !questions.length) return '<div style="color:var(--text-muted);text-align:center;padding:20px">لا توجد أسئلة</div>';
-  
-  window._ZAD_AI_QUIZ_STATE = { questions, current: 0, answers: [], score: 0 };
-  
-  return `<div style="direction:rtl">
-    <div style="font-weight:800;font-size:0.9rem;margin-bottom:14px;color:var(--primary)">
-      ❓ اختبار من المحتوى المرفوع — ${title||''}
-    </div>
-    <div id="ai-quiz-q-area">${renderAIQuizQuestion()}</div>
-  </div>`;
+function buildAIQuizUI(subject, subjectId) {
+  if (subjectId) subject = getSubjectWithUploads(subjectId) || subject;
+  if (!subjectId && subject) subjectId = subject.id;
+
+  var questions = generateQuiz(subjectId, 10, 'mixed');
+  if (!questions || !questions.length) {
+    return '<div style="text-align:center;padding:40px;color:var(--text-muted)">'
+      + '<div style="font-size:2.5rem;margin-bottom:12px">❓</div>'
+      + '<div style="font-weight:700;margin-bottom:6px">لا توجد أسئلة بعد</div>'
+      + '<div style="font-size:0.82rem">ارفع محتوى أو أكمل الدروس لتفعيل الاختبار</div>'
+      + '</div>';
+  }
+
+  window._ZAD_AI_QUIZ_STATE = {
+    questions: questions,
+    current: 0,
+    answers: [],
+    score: 0,
+    subjectId: subjectId,
+    subjectTitle: (subject && subject.title) || subjectId
+  };
+  window._ZAD_AI_QUIZ_SELECTED = -1;
+
+  return '<div style="direction:rtl">'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">'
+      + '<div>'
+        + '<div style="font-weight:900;font-size:0.95rem">❓ الاختبارات</div>'
+        + '<div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px">'+(subject?subject.title:subjectId)+' — '+questions.length+' سؤال</div>'
+      + '</div>'
+      + '<div style="display:flex;gap:6px">'
+        + '<button onclick="window._ZAD_QUIZ_DIFF=\'easy\';buildAIQuizUI(null,\''+subjectId+'\')" style="padding:5px 10px;border-radius:8px;border:1px solid rgba(40,202,65,0.4);background:rgba(40,202,65,0.08);color:#66BB6A;font-size:0.72rem;cursor:pointer;font-weight:700">سهل</button>'
+        + '<button onclick="window._ZAD_QUIZ_DIFF=\'medium\';buildAIQuizUI(null,\''+subjectId+'\')" style="padding:5px 10px;border-radius:8px;border:1px solid rgba(255,167,38,0.4);background:rgba(255,167,38,0.08);color:#FFA726;font-size:0.72rem;cursor:pointer;font-weight:700">متوسط</button>'
+        + '<button onclick="window._ZAD_QUIZ_DIFF=\'hard\';buildAIQuizUI(null,\''+subjectId+'\')" style="padding:5px 10px;border-radius:8px;border:1px solid rgba(239,83,80,0.4);background:rgba(239,83,80,0.08);color:#EF5350;font-size:0.72rem;cursor:pointer;font-weight:700">صعب</button>'
+      + '</div>'
+    + '</div>'
+    + '<div id="ai-quiz-q-area">'+renderAIQuizQuestion()+'</div>'
+  + '</div>';
 }
 
 function renderAIQuizQuestion() {
   var state = window._ZAD_AI_QUIZ_STATE;
   if (!state) return '';
+  if (state.current >= state.questions.length) return buildAIQuizResult();
   var q = state.questions[state.current];
   if (!q) return buildAIQuizResult();
-  
-  var opts = q.options.map(function(opt, i) {
-    return `<div onclick="selectAIQuizOption(${i})" id="aiqopt-${i}"
-      style="padding:12px 16px;border-radius:12px;border:1.5px solid rgba(255,255,255,0.12);
-      background:rgba(255,255,255,0.04);cursor:pointer;transition:all 0.2s;
-      font-size:0.84rem;margin-bottom:6px;direction:rtl"
-      onmouseover="if(!this.dataset.selected)this.style.borderColor='rgba(108,99,255,0.5)'"
-      onmouseout="if(!this.dataset.selected)this.style.borderColor='rgba(255,255,255,0.12)'">
-      <span style="color:var(--text-muted);margin-left:8px">${['أ','ب','ج','د'][i]})</span> ${opt}
-    </div>`;
+
+  var pct = Math.round((state.current / state.questions.length) * 100);
+  var diffColor = q.difficulty==='easy' ? '#66BB6A' : q.difficulty==='hard' ? '#EF5350' : '#FFA726';
+  var diffLabel = q.difficulty==='easy' ? 'سهل' : q.difficulty==='hard' ? 'صعب' : 'متوسط';
+
+  var opts = (q.options||[]).map(function(opt, i) {
+    return '<div onclick="selectAIQuizOption('+i+')" id="aiqopt-'+i+'"'
+      + ' style="padding:12px 16px;border-radius:12px;border:1.5px solid rgba(255,255,255,0.1);'
+      + 'background:rgba(255,255,255,0.04);cursor:pointer;transition:all 0.2s;'
+      + 'font-size:0.85rem;margin-bottom:8px;direction:rtl;display:flex;align-items:center;gap:10px">'
+      + '<span style="width:26px;height:26px;border-radius:50%;background:rgba(108,99,255,0.15);'
+      + 'display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:800;'
+      + 'color:var(--primary);flex-shrink:0">'+['أ','ب','ج','د'][i]+'</span>'
+      + '<span>'+opt+'</span>'
+      + '</div>';
   }).join('');
-  
-  return `<div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.1);
-    border-radius:14px;padding:16px;margin-bottom:12px">
-    <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:8px">
-      سؤال ${state.current+1} من ${state.questions.length}
-    </div>
-    <div style="font-weight:700;font-size:0.9rem;margin-bottom:14px;line-height:1.6">${q.q}</div>
-    ${opts}
-    <div id="ai-quiz-feedback" style="display:none;margin-top:10px;padding:10px;border-radius:10px;font-size:0.82rem"></div>
-  </div>
-  <button onclick="submitAIQuiz()" style="width:100%;padding:11px;border-radius:12px;border:none;
-    cursor:pointer;background:linear-gradient(135deg,var(--primary),#a78bfa);color:white;
-    font-family:var(--font);font-size:0.86rem;font-weight:800">تأكيد الإجابة ←</button>`;
+
+  return '<div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:16px;margin-bottom:12px">'
+    // Progress bar
+    + '<div style="background:rgba(255,255,255,0.06);border-radius:99px;height:4px;margin-bottom:14px">'
+      + '<div style="height:4px;background:linear-gradient(90deg,var(--primary),#a78bfa);width:'+pct+'%;border-radius:99px"></div>'
+    + '</div>'
+    // Meta row: question number + difficulty + lesson info
+    + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">'
+      + '<span style="font-size:0.7rem;color:var(--text-muted);font-weight:700">سؤال '+(state.current+1)+' / '+state.questions.length+'</span>'
+      + '<span style="font-size:0.68rem;padding:2px 8px;border-radius:20px;background:'+diffColor+'18;color:'+diffColor+';border:1px solid '+diffColor+'40">'+diffLabel+'</span>'
+      + (q.lesson ? '<span style="font-size:0.68rem;color:var(--text-muted);margin-right:auto">📖 '+q.lesson+'</span>' : '')
+      + (q.page ? '<span style="font-size:0.68rem;padding:2px 8px;border-radius:20px;background:rgba(255,255,255,0.06);color:var(--text-muted)">📄 ص '+q.page+'</span>' : '')
+    + '</div>'
+    // Question text
+    + '<div style="font-weight:800;font-size:0.92rem;margin-bottom:16px;line-height:1.7;direction:rtl">'+q.q+'</div>'
+    // Options
+    + opts
+    // Hint button (hidden by default)
+    + (q.hint ? '<button onclick="document.getElementById(\'quiz-hint-box\').style.display=\'block\';this.style.display=\'none\'" style="margin-top:8px;padding:6px 14px;border-radius:8px;border:1px solid rgba(255,214,0,0.3);background:rgba(255,214,0,0.06);color:#FFD600;font-size:0.78rem;cursor:pointer;font-family:var(--font)">💡 تلميح</button>' : '')
+    + (q.hint ? '<div id="quiz-hint-box" style="display:none;margin-top:8px;padding:10px;border-radius:10px;background:rgba(255,214,0,0.06);border:1px solid rgba(255,214,0,0.2);font-size:0.8rem;color:#FFD600;direction:rtl">💡 '+q.hint+'</div>' : '')
+    // Feedback area
+    + '<div id="ai-quiz-feedback" style="display:none;margin-top:12px;padding:12px;border-radius:12px;font-size:0.83rem;line-height:1.6"></div>'
+  + '</div>'
+  + '<button onclick="submitAIQuiz()" style="width:100%;padding:12px;border-radius:12px;border:none;'
+    + 'cursor:pointer;background:linear-gradient(135deg,var(--primary),#a78bfa);color:white;'
+    + 'font-family:var(--font);font-size:0.88rem;font-weight:800">تأكيد الإجابة ←</button>';
 }
 
 window._ZAD_AI_QUIZ_SELECTED = -1;
@@ -17842,46 +17886,139 @@ function selectAIQuizOption(i) {
 function submitAIQuiz() {
   var selected = window._ZAD_AI_QUIZ_SELECTED;
   var state = window._ZAD_AI_QUIZ_STATE;
-  if (selected < 0) return showToast('اختر إجابة أولاً', 'error');
+  if (selected === undefined || selected < 0) return showToast('اختر إجابة أولاً', 'error');
   var q = state.questions[state.current];
   var correct = selected === q.answer;
   if (correct) state.score++;
   state.answers.push(selected);
-  
+
+  // Color options
+  document.querySelectorAll('[id^="aiqopt-"]').forEach(function(el, i) {
+    el.onclick = null;
+    if (i === q.answer) {
+      el.style.background = 'rgba(102,187,106,0.18)';
+      el.style.borderColor = '#66BB6A';
+    } else if (i === selected && !correct) {
+      el.style.background = 'rgba(239,83,80,0.14)';
+      el.style.borderColor = '#EF5350';
+    } else {
+      el.style.opacity = '0.5';
+    }
+  });
+
+  // Rich feedback
   var fb = document.getElementById('ai-quiz-feedback');
   if (fb) {
     fb.style.display = 'block';
-    fb.style.background = correct ? 'rgba(102,187,106,0.15)' : 'rgba(239,83,80,0.12)';
-    fb.style.border = '1px solid ' + (correct ? 'rgba(102,187,106,0.4)' : 'rgba(239,83,80,0.3)');
-    fb.style.color = correct ? '#66BB6A' : '#EF5350';
-    fb.innerHTML = (correct ? '✅ صحيح! ' : '❌ خطأ — الصحيح: '+q.options[q.answer]+' — ') + (q.explanation||'');
+    fb.style.background = correct ? 'rgba(102,187,106,0.1)' : 'rgba(239,83,80,0.08)';
+    fb.style.border = '1.5px solid ' + (correct ? 'rgba(102,187,106,0.35)' : 'rgba(239,83,80,0.3)');
+    var fbHTML = '<div style="font-weight:800;font-size:0.88rem;margin-bottom:6px;color:'+(correct?'#66BB6A':'#EF5350')+'">'
+      + (correct ? '✅ إجابة صحيحة!' : '❌ إجابة خاطئة')
+      + '</div>';
+    if (!correct) {
+      fbHTML += '<div style="font-size:0.83rem;margin-bottom:6px">'
+        + '✔️ الإجابة الصحيحة: <strong style="color:#66BB6A">'+(q.options[q.answer]||'')+'</strong></div>';
+    }
+    if (q.hint) {
+      fbHTML += '<div style="font-size:0.8rem;color:#FFD600;margin-bottom:5px">💡 التلميح: '+q.hint+'</div>';
+    }
+    if (q.explanation) {
+      fbHTML += '<div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:5px;line-height:1.6">📝 الشرح: '+q.explanation+'</div>';
+    }
+    if (q.lesson || q.chapter || q.page) {
+      fbHTML += '<div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.07);display:flex;flex-wrap:wrap;gap:10px">';
+      if (q.lesson)  fbHTML += '<span>📖 الدرس: '+q.lesson+'</span>';
+      if (q.chapter) fbHTML += '<span>📂 الفصل: '+q.chapter+'</span>';
+      if (q.page)    fbHTML += '<span>📄 الصفحة: '+q.page+'</span>';
+      fbHTML += '</div>';
+    }
+    fb.innerHTML = fbHTML;
   }
-  
+
+  // Hide hint button
+  var hb = document.querySelector('button[onclick*="quiz-hint-box"]');
+  if (hb) hb.style.display = 'none';
+  var hbox = document.getElementById('quiz-hint-box');
+  if (hbox) { hbox.style.display = 'block'; }
+
   state.current++;
   window._ZAD_AI_QUIZ_SELECTED = -1;
-  
+
+  // Disable confirm button
+  var confirmBtn = document.querySelector('button[onclick="submitAIQuiz()"]');
+  if (confirmBtn) {
+    confirmBtn.disabled = true;
+    confirmBtn.style.opacity = '0.5';
+    confirmBtn.textContent = state.current >= state.questions.length ? '⏳ النتيجة...' : '⏭️ السؤال التالي...';
+  }
+
   setTimeout(function() {
     var area = document.getElementById('ai-quiz-q-area');
     if (area) area.innerHTML = renderAIQuizQuestion();
-  }, 2000);
+  }, state.current >= state.questions.length ? 1200 : 2200);
 }
 
 function buildAIQuizResult() {
   var state = window._ZAD_AI_QUIZ_STATE;
-  var score = Math.round((state.score / state.questions.length) * 100);
-  var col = score>=70?'#66BB6A':score>=50?'#FFA726':'#EF5350';
-  return `<div style="text-align:center;padding:24px">
-    <div style="font-size:3rem;margin-bottom:8px">${score>=70?'🏆':score>=50?'👍':'💪'}</div>
-    <div style="font-size:2rem;font-weight:900;color:${col};margin-bottom:6px">${score}%</div>
-    <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:14px">
-      ${state.score} صحيح من ${state.questions.length} سؤال
-    </div>
-    <button onclick="window._ZAD_AI_QUIZ_STATE.current=0;window._ZAD_AI_QUIZ_STATE.score=0;window._ZAD_AI_QUIZ_STATE.answers=[];
-      document.getElementById('ai-quiz-q-area').innerHTML=renderAIQuizQuestion()"
-      style="padding:10px 24px;border-radius:12px;border:1px solid rgba(108,99,255,0.4);
-      background:rgba(108,99,255,0.1);color:var(--primary);cursor:pointer;font-family:var(--font);font-weight:700">
-      🔄 إعادة الاختبار</button>
-  </div>`;
+  if (!state || !state.questions.length) return '';
+  var total = state.questions.length;
+  var score = state.score;
+  var pct = Math.round((score / total) * 100);
+  var col = pct>=70 ? '#66BB6A' : pct>=50 ? '#FFA726' : '#EF5350';
+  var emoji = pct>=90?'🏆':pct>=70?'⭐':pct>=50?'👍':'💪';
+  var msg = pct>=90?'ممتاز! أداء رائع'
+           :pct>=70?'جيد جداً! استمر'
+           :pct>=50?'جيد، يمكنك تحسينه'
+           :'راجع المادة مجدداً';
+
+  // Track quiz completion
+  if (typeof trackQuizCompleted === 'function') trackQuizCompleted(state.subjectId, pct);
+
+  var reviewHTML = state.questions.map(function(q, i) {
+    var userAns = state.answers[i];
+    var isCorrect = userAns === q.answer;
+    return '<div style="padding:12px;border-radius:12px;border:1px solid '+(isCorrect?'rgba(102,187,106,0.2)':'rgba(239,83,80,0.2)')+';'
+      + 'background:'+(isCorrect?'rgba(102,187,106,0.05)':'rgba(239,83,80,0.05)')+';margin-bottom:8px">'
+      + '<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px">'
+        + '<span style="font-size:1rem;flex-shrink:0">'+(isCorrect?'✅':'❌')+'</span>'
+        + '<div style="font-size:0.83rem;font-weight:700;line-height:1.5;flex:1">'+(i+1)+'. '+q.q+'</div>'
+      + '</div>'
+      + (!isCorrect ? '<div style="font-size:0.78rem;color:#66BB6A;margin-bottom:4px">✔️ الصحيح: '+(q.options[q.answer]||'')+'</div>' : '')
+      + (q.explanation ? '<div style="font-size:0.76rem;color:var(--text-muted);margin-bottom:4px">📝 '+q.explanation+'</div>' : '')
+      + '<div style="font-size:0.7rem;color:var(--text-muted);display:flex;gap:10px;flex-wrap:wrap">'
+        + (q.lesson  ? '<span>📖 '+q.lesson+'</span>'  : '')
+        + (q.chapter ? '<span>📂 '+q.chapter+'</span>' : '')
+        + (q.page    ? '<span>📄 ص '+q.page+'</span>'  : '')
+      + '</div>'
+    + '</div>';
+  }).join('');
+
+  return '<div style="direction:rtl">'
+    // Score card
+    + '<div style="text-align:center;padding:24px;background:rgba(255,255,255,0.03);border-radius:18px;margin-bottom:16px">'
+      + '<div style="font-size:3rem;margin-bottom:6px">'+emoji+'</div>'
+      + '<div style="font-size:2.5rem;font-weight:900;color:'+col+';margin-bottom:4px">'+pct+'%</div>'
+      + '<div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:4px">'+score+' صحيح من '+total+' سؤال</div>'
+      + '<div style="font-size:0.88rem;font-weight:700;color:'+col+'">'+msg+'</div>'
+    + '</div>'
+    // Action buttons
+    + '<div style="display:flex;gap:8px;margin-bottom:18px">'
+      + '<button onclick="'
+        + 'window._ZAD_AI_QUIZ_STATE.current=0;'
+        + 'window._ZAD_AI_QUIZ_STATE.score=0;'
+        + 'window._ZAD_AI_QUIZ_STATE.answers=[];'
+        + 'window._ZAD_AI_QUIZ_SELECTED=-1;'
+        + 'document.getElementById(\'ai-quiz-q-area\').innerHTML=renderAIQuizQuestion()"'
+        + ' style="flex:1;padding:11px;border-radius:12px;border:none;cursor:pointer;'
+        + 'background:linear-gradient(135deg,var(--primary),#a78bfa);color:white;'
+        + 'font-family:var(--font);font-weight:800;font-size:0.85rem">🔄 إعادة الاختبار</button>'
+      + '<button onclick="document.getElementById(\'quiz-review\').style.display=document.getElementById(\'quiz-review\').style.display===\'none\'?\'block\':\'none\'"'
+        + ' style="flex:1;padding:11px;border-radius:12px;border:1px solid var(--border);background:rgba(255,255,255,0.04);'
+        + 'cursor:pointer;font-family:var(--font);font-weight:700;font-size:0.85rem;color:var(--text-muted)">📋 مراجعة الإجابات</button>'
+    + '</div>'
+    // Review section (collapsed)
+    + '<div id="quiz-review" style="display:none">'+reviewHTML+'</div>'
+  + '</div>';
 }
 
 function buildAIMindMap(lesson) {

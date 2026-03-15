@@ -13582,15 +13582,15 @@ function showSubject(subjectId, activeTab) {
 
   var TABS = [
     { id: 'lessons',  icon: '📖', label: 'الدروس'         },
-    { id: 'cards',    icon: '🃏', label: 'بطاقات المعلومات'},
-    { id: 'mindmaps', icon: '🧠', label: 'الخرائط الذهنية'},
+    { id: 'cards',    icon: '🃏', label: 'بطاقات'},
+    { id: 'mindmaps', icon: '🧠', label: 'الخرائط'},
     { id: 'lab',      icon: '✏️', label: 'المختبر'         },
-    { id: 'adaptive', icon: '🧬', label: 'مستواك الذكي'   },
-    { id: 'homework', icon: '✏️', label: 'تصحيح الواجبات'  },
-    { id: 'upload',   icon: '📤', label: 'رفع محتوى'       }
+    { id: 'adaptive', icon: '🧬', label: 'مستواك'   },
+    { id: 'homework', icon: '✏️', label: 'تصحيح'  },
+    { id: 'upload',   icon: '📤', label: 'رفع'       }
   ];
 
-  var tabsHTML = '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px">'
+  var tabsHTML = '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px;direction:ltr">'
     + TABS.slice(0,4).map(function(t) {
         var active = t.id === activeTab;
         return '<button onclick="showSubject(\'' + subjectId + '\',\'' + t.id + '\')"'
@@ -13606,7 +13606,7 @@ function showSubject(subjectId, activeTab) {
           + '</button>';
       }).join('')
     + '</div>'
-    + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:18px">'
+    + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:18px;direction:ltr">'
     + TABS.slice(4).map(function(t) {
         var active = t.id === activeTab;
         return '<button onclick="showSubject(\'' + subjectId + '\',\'' + t.id + '\')"'

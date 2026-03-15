@@ -13635,6 +13635,7 @@ function showSubject(subjectId, activeTab) {
     { id: 'lessons',  icon: '📖', label: 'الدروس'        },
     { id: 'cards',    icon: '🃏', label: 'البطاقات'      },
     { id: 'mindmaps', icon: '🧠', label: 'الخرائط'       },
+    { id: 'quiz',     icon: '❓', label: 'اختبار'         },
     { id: 'lab',      icon: '✏️', label: 'المختبر'        },
     { id: 'adaptive', icon: '🧬', label: 'مستواك'        },
     { id: 'homework', icon: '✏️', label: 'الواجبات'      },
@@ -13681,6 +13682,7 @@ function showSubject(subjectId, activeTab) {
       else body=buildEmbeddedLab(subjectId);
     }
     if (activeTab === 'upload')   body = buildUploadTab(subjectId);
+    if (activeTab === 'quiz')     body = buildAIQuizUI(subject, subjectId);
     if (activeTab === 'homework') body = buildHomeworkTool(subjectId);
   } catch(tabErr) {
     body = '<div style="padding:20px;color:var(--text-muted)">خطأ في تحميل التبويب: ' + tabErr.message + '</div>';

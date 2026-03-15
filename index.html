@@ -17888,7 +17888,11 @@ async function zadFetch(body) {
   var groqData = await resp.json();
   if (groqData.error) throw new Error('Groq: ' + (groqData.error.message || JSON.stringify(groqData.error)));
 
-  var text = groqData.choices?.[0]?.message?.content || '';
+  // Handle both Groq native format AND Worker's Anthropic-like format
+  var text = groqData.choices?.[0]?.message?.content
+          || (groqData.content && groqData.content[0] && groqData.content[0].text)
+          || '';
+  console.log('[ZAD] zadFetch got text length:', text.length, 'format:', groqData.choices ? 'groq' : 'worker');
   return {
     status: 200,
     json: async function() { return { content: [{ type:'text', text: text }] }; }
@@ -21239,7 +21243,9 @@ async function translateQuizItemsToEnglish(questions) {
 
     if (!resp.ok) return questions;
     var data = await resp.json();
-    var raw = (data.choices && data.choices[0].message.content) || '[]';
+    var raw = (data.choices && data.choices[0].message.content)
+           || (data.content && data.content[0] && data.content[0].text)
+           || '[]';
     raw = raw.replace(/```json|```/g, '').trim();
     var translated = JSON.parse(raw);
 

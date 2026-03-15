@@ -13276,17 +13276,13 @@ function showSection(name) {
   if (typeof refreshProgressBars === 'function') setTimeout(function(){ try { refreshProgressBars(); } catch(e){} }, 500);
   }
   if (name === 'subjects') renderAllSubjects();
-  if (name === 'exam-generator') {
+  if (name === 'exam-generator' && !window._egBuilding) {
     var _egc = document.getElementById('exam-generator-content');
     if (_egc && !_egc.innerHTML.trim()) {
-      // Only rebuild if empty (not mid-exam)
-      var _totalQ = Object.keys(CURRICULUM).reduce(function(s,sid) {
-        var subj = CURRICULUM[sid];
-        var cnt = 0;
-        (subj.chapters||[]).forEach(function(ch){ (ch.lessons||[]).forEach(function(l){ if(l.quiz) cnt+=l.quiz.length; }); });
-        return s + cnt;
-      }, 0);
-      if (typeof showExamGenerator === 'function' && _totalQ > 0) showExamGenerator();
+      window._egBuilding = true;
+      if (typeof showExamGenerator === 'function') {
+        setTimeout(function() { showExamGenerator(); window._egBuilding = false; }, 50);
+      }
     }
   }
 

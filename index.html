@@ -13543,32 +13543,61 @@ function buildLessonsTab(subject, subjectId) {
       }
       var icon = isUpload ? '📄' : (typeof getLessonTypeIcon==='function' ? getLessonTypeIcon(l.type) : '💡');
       lessonsHtml += '<div class="lesson-item"'
-        + (isUpload ? ' style="border-right:3px solid var(--primary)"' : '')
-        + ' onclick="openLesson(\''+subjectId+'\',\''+safeLId+'\')"'
-        + ' oncontextmenu="event.preventDefault();showDeleteLessonConfirm(\''+subjectId+'\',\''+safeLId+'\',\''+safeLTitle+'\',\''+safeUpRef+'\')"'
-        + ' ontouchstart="startLongPress(event,\''+safeLId+'\',\''+safeUpRef+'\',\''+subjectId+'\',\''+safeLTitle+'\')" ontouchend="clearLongPress()" ontouchmove="clearLongPress()">'
-        + '<span class="lesson-icon">'+icon+'</span>'
-        + '<span class="lesson-name" style="flex:1">'+(l.title||'درس')+'</span>'
+        + (isUpload ? ' style="border-right:3px solid rgba(108,99,255,0.6);background:rgba(108,99,255,0.03)"' : '')
+        + ' onclick="openLesson(\'' + subjectId + '\',\'' + safeLId + '\')"'
+        + ' oncontextmenu="event.preventDefault();showDeleteLessonConfirm(\'' + subjectId + '\',\'' + safeLId + '\',\'' + safeLTitle + '\',\'' + safeUpRef + '\')"'
+        + ' ontouchstart="startLongPress(event,\'' + safeLId + '\',\'' + safeUpRef + '\',\'' + subjectId + '\',\'' + safeLTitle + '\')" ontouchend="clearLongPress()" ontouchmove="clearLongPress()">'
+        + '<span class="lesson-icon">' + icon + '</span>'
+        + '<span class="lesson-name" style="flex:1">' + (l.title||'درس') + '</span>'
         + badge2
-        + (!isUpload && typeof getLessonTypeLabel==='function' ? '<span class="lesson-type type-'+(l.type||'concept')+'">'+getLessonTypeLabel(l.type)+'</span>' : '')
+        + (!isUpload && typeof getLessonTypeLabel==='function' ? '<span class="lesson-type type-'+(l.type||'concept')+'">' + getLessonTypeLabel(l.type) + '</span>' : '')
+        + (isUpload ? '<span style="font-size:0.65rem;color:var(--primary);opacity:0.8">◀ افتح</span>' : '')
         + '</div>';
     });
 
     var isOpen = i===0 || isUpload;
-    chapHtml += '<div class="chapter-item'+(isOpen?' open':'')+'" id="ch-'+safeChId+'">'
-      + '<div class="chapter-header"'
-      + ' onclick="toggleChapter(\''+safeChId+'\')"'
-      + ' oncontextmenu="event.preventDefault();showDeleteChapterConfirm(\''+subjectId+'\',\''+safeChId+'\',\''+safeChTitle+'\')"'
-      + ' ontouchstart="startLongPress(event,\'__ch__'+safeChId+'\',\'\',\''+subjectId+'\',\''+safeChTitle+'\');" ontouchend="clearLongPress()" ontouchmove="clearLongPress()">'
-      + '<div class="chapter-num">'+(i+1)+'</div>'
-      + '<div class="chapter-info">'
-        + '<div class="chapter-title" style="display:flex;align-items:center;gap:6px">'+(ch.icon||'📘')+' '+(ch.title||'')+' '+badge+'</div>'
-        + '<div class="chapter-pages">📄 '+(ch.pages||'')+'</div>'
-      + '</div>'
-      + '<i class="fas fa-chevron-left chapter-chevron"></i>'
-      + '</div>'
-      + '<div class="lesson-list">'+lessonsHtml+'</div>'
-      + '</div>';
+    var numStyle = isUpload
+      ? 'background:linear-gradient(135deg,#6C63FF,#a78bfa)'
+      : 'background:linear-gradient(135deg,var(--primary),var(--secondary))';
+    var chBorderStyle = isUpload
+      ? ' style="border-color:rgba(108,99,255,0.35);background:rgba(108,99,255,0.04)"'
+      : '';
+    var lessCntBadge = isUpload
+      ? '<div style="display:flex;align-items:center;gap:6px;margin-top:4px">'
+          + '<span style="font-size:0.65rem;padding:2px 8px;background:rgba(108,99,255,0.18);'
+          + 'color:var(--primary);border-radius:10px;border:1px solid rgba(108,99,255,0.3);font-weight:700">✨ مرفوع</span>'
+          + '<span style="font-size:0.68rem;color:var(--text-muted)">' + lessCnt + ' درس</span>'
+          + '</div>'
+      : '<div class="chapter-pages">📄 ' + (ch.pages||'') + '</div>';
+
+    var _chOpen  = isOpen ? ' open' : '';
+    var _chStyle = chBorderStyle;
+    var _chNum   = isUpload ? 'background:linear-gradient(135deg,#6C63FF,#a78bfa)' : 'background:linear-gradient(135deg,var(--primary),var(--secondary))';
+    chapHtml += [
+      '<div class="chapter-item'+_chOpen+'" id="ch-'+safeChId+'"'+_chStyle+'>',
+        '<div class="chapter-header"',
+          ' onclick="toggleChapter('+JSON.stringify(safeChId)+')"',
+          ' oncontextmenu="event.preventDefault();showDeleteChapterConfirm('+JSON.stringify(subjectId)+','+JSON.stringify(safeChId)+','+JSON.stringify(safeChTitle)+')"',
+          ' ontouchstart="startLongPress(event,'+JSON.stringify('__ch__'+safeChId)+',\'\','+JSON.stringify(subjectId)+','+JSON.stringify(safeChTitle)+');" ontouchend="clearLongPress()" ontouchmove="clearLongPress()"',
+        '>',
+          '<div class="chapter-num" style="'+_chNum+'">'+(i+1)+'</div>',
+          '<div class="chapter-info">',
+            '<div class="chapter-title" style="display:flex;align-items:center;gap:6px;font-size:'+(isUpload?'0.92':'0.88')+'rem">',
+              (ch.icon||'📘')+' '+(ch.title||'')+(isUpload?'':' '+badge),
+            '</div>',
+            lessCntBadge,
+          '</div>',
+          '<i class="fas fa-chevron-left chapter-chevron"></i>',
+        '</div>',
+        '<div class="lesson-list">'+lessonsHtml+'</div>',
+      '</div>'
+    ].join('');
+    chapHtml += lessCntBadge;
+    chapHtml += '</div>';
+    chapHtml += '<i class="fas fa-chevron-left chapter-chevron"></i>';
+    chapHtml += '</div>';
+    chapHtml += '<div class="lesson-list">' + lessonsHtml + '</div>';
+    chapHtml += '</div>';
   });
 
   return '<div class="chapter-list">'+chapHtml+'</div>';
@@ -20347,44 +20376,65 @@ function getSubjectWithUploads(subjectId) {
       };
     });
 
-  // Add each upload as its own chapter at the top
+  // ── Group uploads by their source file (fileName) into chapters ──
+  // Each distinct fileName = one chapter; lessons within = individual topics
   var uploads = ZAD_UPLOADS.getAll().filter(function(u) {
     var lid = u.lessonId || ('ai-'+u.id);
     return u.subjectId === subjectId
       && !isLessonDeleted(subjectId, lid)
-      && !isChapterDeleted(subjectId, 'up-ch-'+u.id);
+      && !isChapterDeleted(subjectId, 'up-ch-'+u.id.replace(/_[0-9]+$/, ''));
   });
 
-  var upload_chapters = uploads.map(function(u) {
-    var l   = u.lesson || {};
-    var lid = u.lessonId || ('ai-'+u.id);
-    var title = (l.title) || u.title || u.fileName || 'درس مرفوع';
-    return {
-      id:      'up-ch-' + u.id,
-      title:   title,
-      pages:   '✨ مرفوع',
-      icon:    '📄',
-      lessons: [{
-        id: lid,
-        title: title,
-        type: 'concept',
+  // Build a map: chapterKey → { id, title, fileName, lessons[] }
+  var chapMap = {};
+  var chapOrder = [];
+  uploads.forEach(function(u) {
+    // Use the base uploadId (strip _0, _1... topic suffix) as chapter key
+    var baseId = u.id.replace(/_[0-9]+$/, '');
+    var chKey  = 'up-ch-' + baseId;
+
+    if (!chapMap[chKey]) {
+      // Chapter title = fileName without extension, or fallback
+      var rawName = u.fileName || u.title || 'ملف مرفوع';
+      var chapterName = rawName.replace(/\.[^.]+$/, ''); // strip extension
+      chapMap[chKey] = {
+        id:      chKey,
+        title:   chapterName,
+        pages:   '✨ مرفوع',
+        icon:    '📂',
         aiGenerated: true,
-        sourceUploadId: u.id,
-        content: (l.content) || {
-          definition: l.definition||'',
-          whyLearn: l.whyLearn||[],
-          keyTerms: l.keyTerms||[],
-          realExamples: l.examples||[],
-          steps: l.steps||[],
-          properties: l.properties||[],
-          types: l.types||[],
-          mindMap: null
-        },
-        quiz: l.quiz || [],
-        summary: l.summary || ''
-      }]
-    };
+        lessons: []
+      };
+      chapOrder.push(chKey);
+    }
+
+    var l   = u.lesson || {};
+    var lid = u.lessonId || ('ai-' + u.id);
+    var lessonTitle = (l.title) || u.title || u.fileName || 'درس مرفوع';
+
+    chapMap[chKey].lessons.push({
+      id:             lid,
+      title:          lessonTitle,
+      type:           'concept',
+      aiGenerated:    true,
+      sourceUploadId: u.id,
+      sourceFile:     u.fileName || '',
+      content: (l.content) || {
+        definition:   l.definition   || '',
+        whyLearn:     l.whyLearn     || [],
+        keyTerms:     l.keyTerms     || [],
+        realExamples: l.examples     || [],
+        steps:        l.steps        || [],
+        properties:   l.properties   || [],
+        types:        l.types        || [],
+        mindMap:      null
+      },
+      quiz:    l.quiz    || [],
+      summary: l.summary || ''
+    });
   });
+
+  var upload_chapters = chapOrder.map(function(k){ return chapMap[k]; });
 
   return {
     id: subjectId,

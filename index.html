@@ -3444,7 +3444,8 @@ function buildOSMemoryPanel() {
         <div id="os-mem-bar" style="height:100%;width:0%;border-radius:5px;transition:width 0.4s;
           background:linear-gradient(90deg,#e879f9,#a78bfa)"></div>
       </div>
-      <div id="os-mem-list" style="display:flex;flex-direction:column;gap:7px;margin-top:12px"></div>
+      <div id="os-mem-log" style="margin-top:10px;min-height:0"></div>
+      <div id="os-mem-list" style="display:flex;flex-direction:column;gap:7px;margin-top:10px"></div>
     </div>
   </div>`;
 }
@@ -3465,10 +3466,32 @@ function oslabInitMemory() {
 }
 
 function oslabAddMemBlock() {
+  const total = 16;
+  const used  = _memBlocks.reduce((s,b)=>s+b.size,0);
+  const free  = total - used;
+  if (free <= 0) {
+    showToast('⚠️ الذاكرة ممتلئة! أزل برنامجاً أولاً', 'error');
+    return;
+  }
   const name = _memNames[_memNext % _memNames.length];
-  const size = Math.floor(Math.random()*3)+1;
+  const size = Math.min(Math.floor(Math.random()*3)+1, free); // don't overflow
   _memBlocks.push({name, size, color:_memColors[(_memNext)%_memColors.length]});
   _memNext++;
+
+  // Show a step-by-step explanation
+  const log = document.getElementById('os-mem-log');
+  if (log) {
+    const addrStart = _memBlocks.slice(0,-1).reduce((s,b)=>s+b.size,0);
+    log.innerHTML = '<div style="padding:10px 12px;background:rgba(0,191,165,0.08);border:1px solid rgba(0,191,165,0.25);border-radius:10px;font-size:0.75rem;line-height:1.8">'
+      + '<div style="font-weight:800;color:#00BFA5;margin-bottom:4px">📥 تحميل برنامج: ' + name + '</div>'
+      + '<div>1️⃣ OS يبحث عن مساحة حرة متجاورة بحجم ' + size + ' MB</div>'
+      + '<div>2️⃣ وجد ' + free + ' MB حرة — يخصص من العنوان 0x' + (addrStart*1048576).toString(16).toUpperCase().padStart(8,'0') + '</div>'
+      + '<div>3️⃣ تحديث جدول العمليات (PCB) — Process ID جديد</div>'
+      + '<div>4️⃣ البرنامج أصبح جاهزاً في RAM ✅</div>'
+      + '<div style="margin-top:4px;color:rgba(255,255,255,0.4)">المساحة المتبقية: ' + (free-size) + ' MB</div>'
+    + '</div>';
+  }
+
   oslabRenderMemory();
 }
 
@@ -3479,56 +3502,118 @@ function oslabClearMem() {
 }
 
 function oslabFreeBlock(i) {
-  if (_memBlocks[i]?.locked) return;
+  if (_memBlocks[i] && _memBlocks[i].locked) return;
+  const b = _memBlocks[i];
+  if (!b) return;
   _memBlocks.splice(i,1);
+  const log = document.getElementById('os-mem-log');
+  if (log) {
+    log.innerHTML = '<div style="padding:10px 12px;background:rgba(255,82,82,0.08);border:1px solid rgba(255,82,82,0.25);border-radius:10px;font-size:0.75rem;line-height:1.8">'
+      + '<div style="font-weight:800;color:#FF5252;margin-bottom:4px">🗑️ إنهاء برنامج: ' + b.name + '</div>'
+      + '<div>1️⃣ OS يرسل إشارة إنهاء (SIGTERM) للعملية</div>'
+      + '<div>2️⃣ العملية تحرر مواردها وتُغلق الملفات المفتوحة</div>'
+      + '<div>3️⃣ OS يُحرر ' + b.size + ' MB من RAM — يُضاف للمساحة الحرة</div>'
+      + '<div>4️⃣ يُحذف من جدول العمليات (Process Table) ✅</div>'
+    + '</div>';
+  }
   oslabRenderMemory();
 }
 
 function oslabRenderMemory() {
   const total = 16;
-  const used = _memBlocks.reduce((s,b)=>s+b.size,0);
-  const free = total - used;
+  const used  = _memBlocks.reduce((s,b)=>s+b.size,0);
+  const free  = Math.max(0, total - used);
+  const usedPct = Math.round(used/total*100);
 
-  const map = document.getElementById('os-mem-map');
-  const list = document.getElementById('os-mem-list');
-  const stats = document.getElementById('os-mem-stats');
-  if (!map || !list || !stats) return;
+  const map   = document.getElementById('os-mem-map');
+  const list  = document.getElementById('os-mem-list');
+  const label = document.getElementById('os-mem-label');
+  const bar   = document.getElementById('os-mem-bar');
+  const pctEl = document.getElementById('os-mem-pct');
+  if (!map || !list) return;
 
+  // ── Memory map (horizontal width-based) ──────────────
   let mapHTML = '';
-  let pct = 0;
   _memBlocks.forEach(b => {
-    const h = (b.size/total*100).toFixed(1);
-    mapHTML += `<div style="height:${h}%;background:${b.color};display:flex;align-items:center;justify-content:center;
-      font-size:0.75rem;font-weight:700;color:white;text-shadow:0 1px 3px rgba(0,0,0,0.5);
-      border-bottom:1px solid rgba(255,255,255,0.15);min-height:20px;position:relative">
-      ${b.name} (${b.size}MB)
+    const w = (b.size/total*100).toFixed(1);
+    mapHTML += `<div title="${b.name}: ${b.size}MB" style="width:${w}%;background:${b.color};display:flex;align-items:center;justify-content:center;
+      font-size:0.65rem;font-weight:700;color:white;text-shadow:0 1px 3px rgba(0,0,0,0.6);
+      border-left:1px solid rgba(255,255,255,0.15);overflow:hidden;min-width:0;flex-shrink:0;
+      position:relative;cursor:default">
+      <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 3px">${b.size>=2?b.name+' '+b.size+'M':''}</span>
     </div>`;
-    pct += b.size;
   });
   if (free > 0) {
-    mapHTML += `<div style="flex:1;height:${(free/total*100).toFixed(1)}%;background:repeating-linear-gradient(45deg,rgba(255,255,255,0.02),rgba(255,255,255,0.02) 4px,transparent 4px,transparent 10px);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.3);font-size:0.8rem;min-height:20px">
+    mapHTML += `<div style="flex:1;background:repeating-linear-gradient(45deg,rgba(255,255,255,0.02),rgba(255,255,255,0.02) 4px,transparent 4px,transparent 10px);
+      display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.3);font-size:0.72rem">
       حر ${free}MB</div>`;
   }
   map.innerHTML = mapHTML;
 
-  list.innerHTML = _memBlocks.map((b,i)=>`
-    <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:rgba(255,255,255,0.03);border:1px solid ${b.color}40;border-radius:10px">
-      <div style="width:12px;height:12px;border-radius:3px;background:${b.color};flex-shrink:0"></div>
-      <div style="flex:1;font-size:0.83rem;font-weight:700;color:${b.color};text-align:right">${b.name}</div>
-      <div style="font-size:0.78rem;color:var(--text-muted)">${b.size} MB</div>
-      ${b.locked ? '<div style="font-size:0.7rem;color:#E91E63">🔒</div>' : `<button onclick="oslabFreeBlock(${i})" style="width:22px;height:22px;border-radius:6px;border:none;background:rgba(255,82,82,0.15);color:#FF5252;cursor:pointer;font-size:0.8rem">×</button>`}
-    </div>`).join('');
+  // ── Stats bar ─────────────────────────────────────────
+  if (label) label.textContent = 'مستخدم: ' + used + ' MB / ' + total + ' MB';
+  if (pctEl) { pctEl.textContent = usedPct + '%'; pctEl.style.color = usedPct>85?'#FF5252':usedPct>60?'#FFD600':'#e879f9'; }
+  if (bar)   { bar.style.width = usedPct + '%'; bar.style.background = usedPct>85?'linear-gradient(90deg,#FF5252,#f97316)':usedPct>60?'linear-gradient(90deg,#FFD600,#f97316)':'linear-gradient(90deg,#e879f9,#a78bfa)'; }
 
-  const usedPct = Math.round(used/total*100);
-  stats.innerHTML = `
-    <div style="display:flex;justify-content:space-between;margin-bottom:8px">
-      <span style="color:var(--text-muted)">مُستخدم</span>
-      <strong style="color:#FF7043">${used} / ${total} MB (${usedPct}%)</strong>
-    </div>
-    <div style="height:8px;border-radius:4px;background:rgba(255,255,255,0.08);overflow:hidden">
-      <div style="height:100%;width:${usedPct}%;background:${usedPct>85?'#FF5252':usedPct>60?'#FFD600':'#00BFA5'};border-radius:4px;transition:width 0.4s"></div>
-    </div>
-    <div style="margin-top:8px;font-size:0.78rem;color:var(--text-muted)">متاح: <strong style="color:#00BFA5">${free} MB</strong> ${free<2?'⚠️ تحذير: ذاكرة منخفضة!':''}</div>`;
+  // ── Block list with detailed explanation ─────────────
+  list.innerHTML = '';
+  const listDiv = list;
+
+  // Add warning if overflow
+  if (used > total) {
+    listDiv.innerHTML += `<div style="padding:8px 12px;background:rgba(255,82,82,0.1);border:1px solid #FF525250;border-radius:10px;font-size:0.78rem;color:#FF5252;margin-bottom:6px">
+      ⚠️ تجاوز سعة RAM! التأثير: swap أو crash — ${used-total} MB تجاوزت الحد
+    </div>`;
+  }
+
+  _memBlocks.forEach((b,i) => {
+    const addrStart = _memBlocks.slice(0,i).reduce((s,x)=>s+x.size,0);
+    const addrEnd   = addrStart + b.size;
+    const segments  = Math.ceil(b.size * 4); // 4 segments/MB
+    listDiv.innerHTML += `
+    <div style="background:rgba(255,255,255,0.03);border:1px solid ${b.color}40;border-radius:12px;padding:10px 14px;margin-bottom:6px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <div style="width:12px;height:12px;border-radius:3px;background:${b.color};flex-shrink:0"></div>
+        <div style="flex:1;font-weight:800;color:${b.color}">${b.name}</div>
+        <div style="font-size:0.72rem;color:var(--text-muted)">${b.size} MB</div>
+        ${b.locked
+          ? '<span style="font-size:0.65rem;background:rgba(233,30,99,0.2);color:#E91E63;padding:2px 7px;border-radius:10px">🔒 Kernel</span>'
+          : `<button onclick="oslabFreeBlock(${i})" style="padding:3px 9px;border-radius:7px;border:none;background:rgba(255,82,82,0.15);color:#FF5252;cursor:pointer;font-size:0.75rem;font-weight:700">× حرّر</button>`}
+      </div>
+      <!-- Address range -->
+      <div style="font-size:0.68rem;color:var(--text-muted);margin-bottom:6px;font-family:monospace;direction:ltr">
+        عنوان: 0x${(addrStart*1048576).toString(16).padStart(8,'0').toUpperCase()} → 0x${(addrEnd*1048576).toString(16).padStart(8,'0').toUpperCase()}
+        &nbsp;|&nbsp; ${addrStart}MB – ${addrEnd}MB &nbsp;|&nbsp; ${segments} block
+      </div>
+      <!-- Mini memory segments visualization -->
+      <div style="display:flex;gap:2px;flex-wrap:wrap">
+        ${Array.from({length:Math.min(segments,24)},(_,si)=>
+          `<div title="Block ${addrStart*4+si}" style="width:${Math.max(8,Math.min(20,Math.floor(200/segments)))}px;height:14px;border-radius:3px;background:${b.color}${si===0?'FF':'88'};border:1px solid ${b.color}55;font-size:0.5rem;display:flex;align-items:center;justify-content:center;color:white;font-family:monospace">${si===0?'↑':si===segments-1?'↓':''}</div>`
+        ).join('')}
+      </div>
+      <!-- Impact explanation -->
+      <div style="margin-top:7px;font-size:0.7rem;color:var(--text-muted);line-height:1.5">
+        ${b.name==='Kernel OS' ? '⚙️ نواة نظام التشغيل — لا يمكن إزالتها أثناء التشغيل' :
+          b.size >= 4 ? '🔴 برنامج ثقيل — يستهلك '+b.size+'MB من الذاكرة' :
+          b.size >= 2 ? '🟡 استخدام متوسط' : '🟢 استخدام خفيف'}
+      </div>
+    </div>`;
+  });
+
+  // Free space block
+  if (free > 0) {
+    listDiv.innerHTML += `
+    <div style="background:rgba(0,191,165,0.04);border:1px dashed rgba(0,191,165,0.3);border-radius:12px;padding:10px 14px;margin-bottom:6px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="width:12px;height:12px;border-radius:3px;background:rgba(0,191,165,0.3);flex-shrink:0"></div>
+        <div style="flex:1;color:rgba(0,191,165,0.8);font-weight:700;font-size:0.82rem">ذاكرة حرة (Free RAM)</div>
+        <div style="font-size:0.72rem;color:#00BFA5">${free} MB</div>
+      </div>
+      <div style="font-size:0.68rem;color:var(--text-muted);margin-top:5px">
+        ✅ ${free}MB جاهزة للبرامج الجديدة — كلما زادت، كلما كان أداء الجهاز أفضل
+      </div>
+    </div>`;
+  }
 }
 
 function buildOSFSPanel() {

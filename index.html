@@ -10628,55 +10628,9 @@ VIOLATION: Writing Arabic in quiz.q or quiz.options is a critical error.`
       : `أنت مدرس خبير في ${subTitle}. اشرح بشكل مبسط جداً ومفصل ودقيق كأنك تشرح لمبتدئ.
 التعريف: 4-6 جمل مفصلة. الأمثلة: تطبيقية من الواقع. الأسئلة: من المحتوى مع شرح وافٍ.`;
 
-    const jsonTemplateAR = `{
-  "lessonTitle": "عنوان دقيق",
-  "definition": "تعريف مفصل وشامل (4-6 جمل مبسطة)",
-  "whyLearn": ["أهمية 1", "أهمية 2", "أهمية 3"],
-  "keyTerms": [{"term":"مصطلح","def":"تعريف مفصل"},{"term":"م2","def":"تعريف"},{"term":"م3","def":"تعريف"},{"term":"م4","def":"تعريف"},{"term":"م5","def":"تعريف"}],
-  "examples": [{"icon":"💡","title":"مثال 1","content":"شرح مفصل"},{"icon":"📌","title":"مثال 2","content":"شرح"},{"icon":"🔍","title":"مثال 3","content":"شرح"}],
-  "steps": ["نقطة مفصلة 1","نقطة 2","نقطة 3","نقطة 4","نقطة 5"],
-  "properties": ["خاصية 1","خاصية 2","خاصية 3"],
-  "types": ["نوع 1","نوع 2","نوع 3"],
-  "mindMapBranches": [
-    {"label":"محور 1","color":"#6C63FF","children":["فرع 1","فرع 2","فرع 3"]},
-    {"label":"محور 2","color":"#FF6584","children":["فرع 1","فرع 2","فرع 3"]},
-    {"label":"محور 3","color":"#00BFA5","children":["فرع 1","فرع 2"]},
-    {"label":"محور 4","color":"#FFD600","children":["فرع 1","فرع 2"]}
-  ],
-  "quiz": [
-    {"q":"سؤال 1؟","options":["صحيح","خطأ1","خطأ2","خطأ3"],"answer":0,"hint":"تلميح","explanation":"شرح مفصل"},
-    {"q":"سؤال 2؟","options":["صحيح","خطأ1","خطأ2","خطأ3"],"answer":0,"hint":"تلميح","explanation":"شرح"},
-    {"q":"سؤال 3؟","options":["صحيح","خطأ1","خطأ2","خطأ3"],"answer":0,"hint":"تلميح","explanation":"شرح"},
-    {"q":"سؤال 4؟","options":["صحيح","خطأ1","خطأ2","خطأ3"],"answer":0,"hint":"تلميح","explanation":"شرح"},
-    {"q":"سؤال 5؟","options":["صحيح","خطأ1","خطأ2","خطأ3"],"answer":0,"hint":"تلميح","explanation":"شرح"}
-  ],
-  "summary": "ملخص شامل ومفصل"
-}`;
+    const jsonTemplateAR = "{\n  \"lessonTitle\": \"عنوان دقيق\",\n  \"definition\": \"تعريف مفصل وشامل (4-6 جمل مبسطة)\",\n  \"whyLearn\": [\"أهمية 1\", \"أهمية 2\", \"أهمية 3\"],\n  \"keyTerms\": [{\"term\":\"مصطلح\",\"def\":\"تعريف مفصل\"},{\"term\":\"م2\",\"def\":\"تعريف\"},{\"term\":\"م3\",\"def\":\"تعريف\"},{\"term\":\"م4\",\"def\":\"تعريف\"},{\"term\":\"م5\",\"def\":\"تعريف\"}],\n  \"examples\": [{\"icon\":\"💡\",\"title\":\"مثال 1\",\"content\":\"شرح مفصل\"},{\"icon\":\"📌\",\"title\":\"مثال 2\",\"content\":\"شرح\"},{\"icon\":\"🔍\",\"title\":\"مثال 3\",\"content\":\"شرح\"}],\n  \"steps\": [\"نقطة 1\",\"نقطة 2\",\"نقطة 3\",\"نقطة 4\",\"نقطة 5\"],\n  \"properties\": [\"خاصية 1\",\"خاصية 2\",\"خاصية 3\"],\n  \"types\": [\"نوع 1\",\"نوع 2\",\"نوع 3\"],\n  \"mindMapBranches\": [{\"label\":\"محور 1\",\"color\":\"#6C63FF\",\"children\":[\"فرع 1\",\"فرع 2\",\"فرع 3\"]},{\"label\":\"محور 2\",\"color\":\"#FF6584\",\"children\":[\"فرع 1\",\"فرع 2\",\"فرع 3\"]},{\"label\":\"محور 3\",\"color\":\"#00BFA5\",\"children\":[\"فرع 1\",\"فرع 2\"]},{\"label\":\"محور 4\",\"color\":\"#FFD600\",\"children\":[\"فرع 1\",\"فرع 2\"]}],\n  \"quiz\": [{\"q\":\"سؤال 1؟\",\"options\":[\"صحيح\",\"خطأ1\",\"خطأ2\",\"خطأ3\"],\"answer\":0,\"hint\":\"تلميح\",\"explanation\":\"شرح مفصل\"},{\"q\":\"سؤال 2؟\",\"options\":[\"صحيح\",\"خطأ1\",\"خطأ2\",\"خطأ3\"],\"answer\":0,\"hint\":\"تلميح\",\"explanation\":\"شرح\"},{\"q\":\"سؤال 3؟\",\"options\":[\"صحيح\",\"خطأ1\",\"خطأ2\",\"خطأ3\"],\"answer\":0,\"hint\":\"تلميح\",\"explanation\":\"شرح\"},{\"q\":\"سؤال 4؟\",\"options\":[\"صحيح\",\"خطأ1\",\"خطأ2\",\"خطأ3\"],\"answer\":0,\"hint\":\"تلميح\",\"explanation\":\"شرح\"},{\"q\":\"سؤال 5؟\",\"options\":[\"صحيح\",\"خطأ1\",\"خطأ2\",\"خطأ3\"],\"answer\":0,\"hint\":\"تلميح\",\"explanation\":\"شرح\"}],\n  \"summary\": \"ملخص شامل ومفصل\"\n}";
 
-    const jsonTemplateEN = `{
-  "lessonTitle": "Accurate English Title",
-  "definition": "Detailed definition in Arabic (4-6 simple sentences)",
-  "whyLearn": ["Importance 1 in Arabic", "Importance 2", "Importance 3"],
-  "keyTerms": [{"term":"English Term","def":"تعريف عربي مفصل"},{"term":"Term 2","def":"تعريف"},{"term":"Term 3","def":"تعريف"},{"term":"Term 4","def":"تعريف"},{"term":"Term 5","def":"تعريف"}],
-  "examples": [{"icon":"💡","title":"Example 1 in English","content":"Explanation in Arabic"},{"icon":"📌","title":"Example 2","content":"Explanation"},{"icon":"🔍","title":"Example 3","content":"Explanation"}],
-  "steps": ["Point 1 in Arabic","Point 2","Point 3","Point 4","Point 5"],
-  "properties": ["Property 1 in Arabic","Property 2","Property 3"],
-  "types": ["Type 1 in Arabic","Type 2","Type 3"],
-  "mindMapBranches": [
-    {"label":"Branch 1 EN","color":"#6C63FF","children":["Sub 1 EN","Sub 2 EN","Sub 3 EN"]},
-    {"label":"Branch 2 EN","color":"#FF6584","children":["Sub 1 EN","Sub 2 EN","Sub 3 EN"]},
-    {"label":"Branch 3 EN","color":"#00BFA5","children":["Sub 1 EN","Sub 2 EN"]},
-    {"label":"Branch 4 EN","color":"#FFD600","children":["Sub 1 EN","Sub 2 EN"]}
-  ],
-  "quiz": [
-    {"q":"Question 1 in English?","options":["Correct answer","Wrong option 1","Wrong option 2","Wrong option 3"],"answer":0,"hint":"Helpful hint in English","explanation":"شرح عربي مفصل للإجابة الصحيحة"},
-    {"q":"Question 2 in English?","options":["Correct answer","Wrong 1","Wrong 2","Wrong 3"],"answer":0,"hint":"English hint","explanation":"شرح عربي"},
-    {"q":"Question 3 in English?","options":["Correct","Wrong 1","Wrong 2","Wrong 3"],"answer":0,"hint":"English hint","explanation":"شرح عربي"},
-    {"q":"Question 4 in English?","options":["Correct","Wrong 1","Wrong 2","Wrong 3"],"answer":0,"hint":"English hint","explanation":"شرح عربي"},
-    {"q":"Question 5 in English?","options":["Correct","Wrong 1","Wrong 2","Wrong 3"],"answer":0,"hint":"English hint","explanation":"شرح عربي"}
-  ],
-  "summary": "ملخص شامل بالعربي"
-}`;
+    const jsonTemplateEN = "{\n  \"lessonTitle\": \"Accurate English Title\",\n  \"definition\": \"Arabic explanation (4-6 simple sentences)\",\n  \"whyLearn\": [\"Arabic importance 1\", \"Importance 2\", \"Importance 3\"],\n  \"keyTerms\": [{\"term\":\"English Term\",\"def\":\"Arabic definition\"},{\"term\":\"Term 2\",\"def\":\"def\"},{\"term\":\"Term 3\",\"def\":\"def\"},{\"term\":\"Term 4\",\"def\":\"def\"},{\"term\":\"Term 5\",\"def\":\"def\"}],\n  \"examples\": [{\"icon\":\"💡\",\"title\":\"English Example 1\",\"content\":\"Arabic explanation\"},{\"icon\":\"📌\",\"title\":\"Example 2\",\"content\":\"explanation\"},{\"icon\":\"🔍\",\"title\":\"Example 3\",\"content\":\"explanation\"}],\n  \"steps\": [\"Arabic point 1\",\"Point 2\",\"Point 3\",\"Point 4\",\"Point 5\"],\n  \"properties\": [\"Arabic property 1\",\"Property 2\",\"Property 3\"],\n  \"types\": [\"Arabic type 1\",\"Type 2\",\"Type 3\"],\n  \"mindMapBranches\": [{\"label\":\"Branch 1\",\"color\":\"#6C63FF\",\"children\":[\"Sub 1\",\"Sub 2\",\"Sub 3\"]},{\"label\":\"Branch 2\",\"color\":\"#FF6584\",\"children\":[\"Sub 1\",\"Sub 2\",\"Sub 3\"]},{\"label\":\"Branch 3\",\"color\":\"#00BFA5\",\"children\":[\"Sub 1\",\"Sub 2\"]},{\"label\":\"Branch 4\",\"color\":\"#FFD600\",\"children\":[\"Sub 1\",\"Sub 2\"]}],\n  \"quiz\": [{\"q\":\"Question 1 in English?\",\"options\":[\"Correct answer\",\"Wrong 1\",\"Wrong 2\",\"Wrong 3\"],\"answer\":0,\"hint\":\"English hint\",\"explanation\":\"Arabic explanation of correct answer\"},{\"q\":\"Question 2?\",\"options\":[\"Correct\",\"Wrong 1\",\"Wrong 2\",\"Wrong 3\"],\"answer\":0,\"hint\":\"Hint\",\"explanation\":\"Arabic explanation\"},{\"q\":\"Question 3?\",\"options\":[\"Correct\",\"Wrong 1\",\"Wrong 2\",\"Wrong 3\"],\"answer\":0,\"hint\":\"Hint\",\"explanation\":\"Arabic explanation\"},{\"q\":\"Question 4?\",\"options\":[\"Correct\",\"Wrong 1\",\"Wrong 2\",\"Wrong 3\"],\"answer\":0,\"hint\":\"Hint\",\"explanation\":\"Arabic explanation\"},{\"q\":\"Question 5?\",\"options\":[\"Correct\",\"Wrong 1\",\"Wrong 2\",\"Wrong 3\"],\"answer\":0,\"hint\":\"Hint\",\"explanation\":\"Arabic explanation\"}],\n  \"summary\": \"Arabic summary\"\n}";
 
     const jsonTemplate = isEng ? jsonTemplateEN : jsonTemplateAR;
 

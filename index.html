@@ -18014,7 +18014,8 @@ function buildAIQuizUI(subject, subjectId) {
     answers: [],
     score: 0,
     subjectId: subjectId,
-    subjectTitle: (subject && subject.title) || subjectId
+    subjectTitle: (subject && subject.title) || subjectId,
+    isEnglish: subjectId === 'english'
   };
   window._ZAD_AI_QUIZ_SELECTED = -1;
 
@@ -18041,7 +18042,7 @@ function renderAIQuizQuestion() {
   var q = state.questions[state.current];
   if (!q) return buildAIQuizResult();
 
-  var isEng = state.subjectId === 'english';
+  var isEng = state.isEnglish || state.subjectId === 'english';
   var pct = Math.round((state.current / state.questions.length) * 100);
   var diffColor = q.difficulty==='easy' ? '#66BB6A' : q.difficulty==='hard' ? '#EF5350' : '#FFA726';
   var diffLabel = q.difficulty==='easy'  ? (isEng?'Easy':'سهل')
@@ -18091,7 +18092,7 @@ function selectAIQuizOption(i) {
   var correct = i === q.answer;
   if (correct) state.score++;
   state.answers.push(i);
-  var isEng = state.subjectId === 'english';
+  var isEng = state.isEnglish || state.subjectId === 'english';
 
   // Color options
   document.querySelectorAll('[id^="aiqopt-"]').forEach(function(el, idx) {

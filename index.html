@@ -12543,6 +12543,7 @@ body {
       </div>
       <div class="topbar-actions">
         <div class="icon-btn" onclick="showSearchSection()" title="بحث">🔍</div>
+        <div class="icon-btn" id="theme-toggle-btn" onclick="toggleTheme()" title="تغيير المظهر">🌙</div>
         <div class="streak-badge">
           🔥 <span id="streak-count">1</span> يوم متواصل
         </div>
@@ -16535,6 +16536,8 @@ function setTheme(mode) {
     darkBtn.style.borderColor   = mode === 'dark' ? '#7C6FFF' : '';
     darkBtn.style.boxShadow     = mode === 'dark' ? '0 4px 15px rgba(108,99,255,0.4)' : '';
   }
+  var btn = document.getElementById('theme-toggle-btn');
+  if (btn) btn.textContent = mode === 'light' ? '☀️' : '🌙';
 }
 
 function changeFontSize(dir) {

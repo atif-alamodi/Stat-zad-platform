@@ -13297,7 +13297,7 @@ function initDashboard() {
     var b = document.getElementById('api-key-banner');
     if (b) b.style.display = 'none';
   }
-  renderSubjectCards('quick-subjects', 6);
+  try { renderSubjectCards('quick-subjects', 6); } catch(e) { console.error('renderSubjectCards:', e); }
   try { renderProgressChart(); } catch(e) {}
   try { updateStats(); } catch(e) {}
   if (typeof refreshUserCurriculumSection === 'function') {
@@ -13336,975 +13336,49 @@ function updateStats() {
 }
 
 function renderSubjectCards(containerId, limit) {
-  const container = document.getElementById(containerId);
+  var container = document.getElementById(containerId);
   if (!container) return;
 
-  const subjects = Object.values(CURRICULUM).slice(0, limit || 99);
-  container.innerHTML = subjects.map(s => {
-    const prog      = (typeof calcSubjectProgress === 'function') ? calcSubjectProgress(s.id) : (APP.progress.subjectProgress[s.id] || 0);
-    const chapters  = s.chapters ? s.chapters.length : 0;
-    const isCustom  = s.id && s.id.startsWith('custom_');
-    const color     = s.color || '#6C63FF';
-    const totalLessons = s.chapters ? s.chapters.reduce(function(acc,ch){ return acc+(ch.lessons?ch.lessons.length:0); },0) : 0;
-    return `
-      <div class="subject-card" data-subject-id="${s.id}" style="position:relative" onclick="showSubject('${s.id}')">
-        <button onclick="event.stopPropagation();deleteSubject('${s.id}')"
-          style="position:absolute;top:8px;left:8px;z-index:2;width:28px;height:28px;border-radius:50%;border:none;
-          background:rgba(255,82,82,0.15);color:#FF5252;font-size:0.8rem;cursor:pointer;display:flex;align-items:center;justify-content:center"
-          title="حذف المادة من حسابي">🗑️</button>
-        <div class="subject-icon-wrap" style="background: ${color}22; color: ${color}">
-          ${s.icon || '📚'}
-        </div>
-        <div class="subject-title">${s.title}</div>
-        <div class="subject-desc">${s.description || ''}</div>
-        <div class="progress-bar-wrap">
-          <div class="progress-label">
-            <span>التقدم</span>
-            <span>${prog}%</span>
-          </div>
-          <div class="progress-bar">
-            <div class="progress-fill" style="width: ${prog}%; background: linear-gradient(to right, ${color}, ${color}88)"></div>
-          </div>
-        </div>
-        <div class="subject-meta">
-          <span class="subject-chapters">${chapters} فصول • ${totalLessons} درس</span>
-          <button class="subject-start-btn" style="background: linear-gradient(135deg, ${color}, ${color}88)">
-            ابدأ →
-          </button>
-        </div>
-      </div>
-    `;
-  }).join('');
-}
-
-function renderAllSubjects() {
-  renderSubjectCards('all-subjects-grid', 10);
-}
-
-function renderProgressChart() {
-  const ctx = document.getElementById('progressChart');
-  if (!ctx) return;
-  
-  const subjects = Object.values(CURRICULUM);
-  const data = subjects.map(s => APP.progress.subjectProgress[s.id] || 0);
-  
-  if (APP.charts.progress) APP.charts.progress.destroy();
-  
-  APP.charts.progress = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: subjects.map(s => s.icon + ' ' + s.titleEn),
-      datasets: [{
-        label: 'نسبة الإتمام %',
-        data: data,
-        backgroundColor: subjects.map(s => s.color + '66'),
-        borderColor: subjects.map(s => s.color),
-        borderWidth: 2,
-        borderRadius: 10,
-      }]
-    },
-    options: {
-      responsive: true,
-      plugins: {
-        legend: { display: false },
-      },
-      scales: {
-        y: {
-          beginAtZero: true,
-          max: 100,
-          grid: { color: 'rgba(255,255,255,0.05)' },
-          ticks: { color: 'rgba(255,255,255,0.5)', callback: v => v + '%' }
-        },
-        x: {
-          grid: { display: false },
-          ticks: { color: 'rgba(255,255,255,0.5)', font: { size: 11 } }
-        }
-      }
-    }
-  });
-}
-
-function showSubject(subjectId, activeTab) {
-  if (typeof trackUserActivity === 'function') trackUserActivity('subject:'+subjectId);
-  if (!window._MM_DONE) { injectAllMindMaps(); window._MM_DONE = true; }
-  // Always restore user lessons before showing subject
-  if (typeof restoreCustomSubjects === 'function') restoreCustomSubjects();
-  if (typeof restoreUserLessons === 'function') restoreUserLessons();
-  APP.currentSubject = subjectId;
-  const subject = CURRICULUM[subjectId] || { id: subjectId, title: subjectId, chapters: [], icon:'📚', color:'#6C63FF' };
-  if (APP.student.email) saveLocation({ type: 'subject', subjectId });
-  activeTab = activeTab || 'lessons';
-  showSection('subject-detail');
-  const container = document.getElementById('subject-detail-content');
-
-  const TABS = [
-    { id:'lessons',  icon:'📖', label:'الدروس'           },
-    { id:'cards',    icon:'🃏', label:'بطاقات المعلومات' },
-    { id:'mindmaps', icon:'🧠', label:'الخرائط الذهنية'  },
-    { id:'lab',      icon:'🧪', label:'المختبر'           },
-    { id:'upload',   icon:'📤', label:'رفع محتوى'       },
-    { id:'homework',  icon:'✏️', label:'تصحيح الواجبات'  },
-    { id:'adaptive',  icon:'🧬', label:'مستواك الذكي'     },
-  ];
-
-  const tabBar = `<div style="display:flex;gap:5px;margin-bottom:20px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:16px;padding:5px;flex-wrap:wrap">
-    ${TABS.map(t=>`<button onclick="showSubject('${subjectId}','${t.id}')" style="flex:1;min-width:72px;padding:9px 12px;border-radius:11px;border:none;cursor:pointer;font-family:var(--font);font-size:0.82rem;font-weight:700;transition:all 0.2s;${t.id===activeTab?'background:linear-gradient(135deg,var(--primary),var(--secondary));color:white;box-shadow:0 4px 14px rgba(108,99,255,0.3)':'background:transparent;color:var(--text-muted)'}">${t.icon} ${t.label}</button>`).join('')}
-  </div>`;
-
-  let body = '';
-  if (activeTab === 'lessons')  try { body = buildLessonsTab(subject, subjectId); } catch(e) { console.error('buildLessonsTab:', e); body = '<div style="padding:20px;color:var(--text-muted)">خطأ في عرض الدروس: '+e.message+'</div>'; }
-  if (activeTab === 'cards')    body = buildInfoCards(subject, subjectId);
-  if (activeTab === 'mindmaps') body = buildAllMindMaps(subject, subjectId);
-  if (activeTab === 'lab') {
-    var _labUploads = ZAD_UPLOADS.getAll().filter(function(u){ return u.subjectId === subjectId && u.lesson; });
-    if (_labUploads.length > 0) {
-      // If there are uploaded lessons, show content lab + original lab
-      var _origLab = '';
-      if (subjectId === 'communication') _origLab = buildCommLab();
-      else if (subjectId === 'english') _origLab = buildEnglishLab();
-      else if (subjectId === 'os') _origLab = buildOSLab();
-      else _origLab = buildEmbeddedLab(subjectId);
-      body = buildContentLab(subjectId)
-        + '<div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">'
-        + '<div style="font-weight:800;font-size:0.85rem;margin-bottom:12px;color:var(--text-muted)">🔬 المختبر التقني</div>'
-        + _origLab + '</div>';
-    } else if (subjectId === 'communication') body = buildCommLab();
-    else if (subjectId === 'english') body = buildEnglishLab();
-    else if (subjectId === 'os') body = buildOSLab();
-    else body = buildEmbeddedLab(subjectId);
-  }
-  if (activeTab === 'upload') body = buildUploadTab(subjectId);
-  if (activeTab === 'homework') body = buildHomeworkTool(subjectId);
-  if (activeTab === 'adaptive') body = buildAdaptiveDashboard(subjectId);
-
-  container.innerHTML = `
-    <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px;flex-wrap:wrap">
-      <button class="back-btn" onclick="showSection('dashboard')">←</button>
-      <div style="flex:1;min-width:0">
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-          <div style="font-size:1.7rem;font-weight:900">${subject.icon} ${subject.title}</div>
-          <button onclick="showSubjectProfileModal('${subjectId}')" style="padding:4px 10px;border-radius:8px;border:1px solid rgba(108,99,255,0.4);background:rgba(108,99,255,0.1);color:var(--primary);font-size:0.72rem;cursor:pointer">✏️ تعديل</button>
-        </div>
-        <div style="color:var(--text-muted);font-size:0.85rem;margin-top:2px">${subject.description}</div>
-      </div>
-      <button style="padding:10px 20px;background:linear-gradient(135deg,var(--primary),var(--secondary));border:none;border-radius:12px;color:white;font-family:var(--font);font-weight:700;font-size:0.88rem;cursor:pointer;white-space:nowrap" onclick="startQuizForSubject('${subjectId}')">⚡ اختبر نفسك</button>
-    </div>
-    ${tabBar}${body}`;
-
-  if (activeTab === 'lab' && subjectId !== 'communication' && subjectId !== 'english') { _elabXlInited = false; setTimeout(() => initEmbeddedLab(subjectId), 150); }
-  if (activeTab === 'lessons') { setTimeout(function(){ patchChapterHeaders(subjectId); }, 100); }
-  if (activeTab === 'lab' && subjectId === 'english') { setTimeout(engInitTensePractice, 100); }
-}
-
-function buildLessonsTab(subject, subjectId) {
-  var merged = getSubjectWithUploads(subjectId);
-  if (!merged || !merged.chapters || !merged.chapters.length) {
-    return '<div style="text-align:center;padding:40px;color:var(--text-muted)"><div style="font-size:2rem;margin-bottom:10px">📂</div><div>لا توجد دروس — ارفع محتوى من تبويب رفع محتوى</div></div>';
-  }
-
-  var chapHtml = '';
-  merged.chapters.forEach(function(ch, i) {
-    var isUpload  = ch.id && ch.id.startsWith('up-ch-');
-    var safeChId  = (ch.id||'').replace(/['"\\]/g,'');
-    var safeChTitle = (ch.title||'').replace(/['"\\]/g,'');
-    var lessCnt   = (ch.lessons||[]).length;
-
-    var badge = '';
-    if (isUpload) {
-      badge = '<span style="font-size:0.7rem;padding:2px 8px;background:rgba(108,99,255,0.15);color:var(--primary);border-radius:10px;border:1px solid rgba(108,99,255,0.3)">✨ مرفوع</span>';
-    } else {
-      var done = (ch.lessons||[]).filter(function(l){ var d=getLessonCompletion(subjectId,l.id); return d&&d.status==="completed"; }).length;
-      if (done===lessCnt && lessCnt>0) badge = '<span style="font-size:0.72rem;background:rgba(40,202,65,0.15);color:#28CA41;padding:2px 8px;border-radius:20px">✅ مكتمل</span>';
-      else if (done>0) badge = '<span style="font-size:0.72rem;background:rgba(255,214,0,0.12);color:#FFD600;padding:2px 8px;border-radius:20px">'+done+'/'+lessCnt+'</span>';
-    }
-
-    var lessonsHtml = '';
-    (ch.lessons||[]).forEach(function(l) {
-      var safeLId    = (l.id||'').replace(/['"\\]/g,'');
-      var safeLTitle = (l.title||'').replace(/['"\\]/g,'');
-      var safeUpRef  = (l.sourceUploadId||'').replace(/['"\\]/g,'');
-      var comp = !isUpload ? getLessonCompletion(subjectId, l.id) : null;
-      var badge2 = '';
-      if (comp) {
-        if      (comp.status==="completed") badge2 = '<span style="font-size:0.72rem;background:rgba(40,202,65,0.12);color:#28CA41;padding:2px 8px;border-radius:20px;white-space:nowrap">✅ '+(comp.label||'مكتمل')+'</span>';
-        else if (comp.status==="partial")   badge2 = '<span style="font-size:0.72rem;background:rgba(255,214,0,0.1);color:#FFD600;padding:2px 8px;border-radius:20px;white-space:nowrap">⚠️ '+(comp.label||'جزئي')+'</span>';
-      }
-      lessonsHtml += '<div class="lesson-item"'
-        + (isUpload ? ' style="border-right:3px solid var(--primary)"' : '')
-        + ' onclick="openLesson(\''+subjectId+'\',\''+safeLId+'\')"'
-        + ' oncontextmenu="event.preventDefault();showDeleteLessonConfirm(\''+subjectId+'\',\''+safeLId+'\',\''+safeLTitle+'\',\''+safeUpRef+'\')"'
-        + ' ontouchstart="startLongPress(event,\''+safeLId+'\',\''+safeUpRef+'\',\''+subjectId+'\',\''+safeLTitle+'\')" ontouchend="clearLongPress()" ontouchmove="clearLongPress()">'
-        + '<span class="lesson-icon">' + (isUpload ? '📄' : getLessonTypeIcon(l.type)) + '</span>'
-        + '<span class="lesson-name" style="flex:1">' + (l.title||'درس') + '</span>'
-        + badge2
-        + (isUpload ? '' : '<span class="lesson-type type-'+(l.type||'concept')+'">' + getLessonTypeLabel(l.type) + '</span>')
-        + '</div>';
-    });
-
-    chapHtml += '<div class="chapter-item' + (i===0 || isUpload ? ' open' : '') + '" id="ch-' + safeChId + '">'
-      + '<div class="chapter-header"'
-      + ' onclick="toggleChapter(\''+safeChId+'\')"'
-      + ' oncontextmenu="event.preventDefault();showDeleteChapterConfirm(\''+subjectId+'\',\''+safeChId+'\',\''+safeChTitle+'\')"'
-      + ' ontouchstart="startLongPress(event,\'__ch__'+safeChId+'\',\'\',\''+subjectId+'\',\''+safeChTitle+'\');" ontouchend="clearLongPress()" ontouchmove="clearLongPress()">'
-      + '<div class="chapter-num">' + (i+1) + '</div>'
-      + '<div class="chapter-info">'
-        + '<div class="chapter-title" style="display:flex;align-items:center;gap:8px">' + (ch.icon||'📘') + ' ' + (ch.title||'') + ' ' + badge + '</div>'
-        + '<div class="chapter-pages">📄 ' + (ch.pages||'') + '</div>'
-      + '</div>'
-      + '<i class="fas fa-chevron-left chapter-chevron"></i>'
-      + '</div>'
-      + '<div class="lesson-list">' + lessonsHtml + '</div>'
-      + '</div>';
-  });
-
-  return '<div class="chapter-list">' + chapHtml + '</div>';
-}
-
-function buildMindMap(mm) {
-  if (!mm || !mm.branches) return '';
-  var branches = mm.branches || [];
-  var center = (mm.center || '').replace(/</g,'&lt;');
-  var n = branches.length;
-  var PALETTE = ['#6C63FF','#00BFA5','#FF7043','#FFD600','#E91E63','#00B0FF','#8BC34A','#FF5722'];
-
-  var W = 900, H = 560, cx = 450, cy = 280;
-  var R = 155;
-  var RC = 290;
-
-  var svgLines = '', svgNodes = '';
-
-  for (var i = 0; i < branches.length; i++) {
-    var b = branches[i];
-    var col = b.color || PALETTE[i % PALETTE.length];
-    var ang = (2 * Math.PI * i / n) - Math.PI / 2;
-    var bx = Math.round(cx + R * Math.cos(ang));
-    var by = Math.round(cy + R * Math.sin(ang));
-    var lbl = (b.label || '').replace(/</g,'&lt;');
-
-    var brx = Math.min(Math.max(lbl.length * 6 + 18, 52), 110);
-
-    svgLines += '<line x1="' + cx + '" y1="' + cy + '" x2="' + bx + '" y2="' + by + '" stroke="' + col + '" stroke-width="2.5" stroke-opacity="0.5" stroke-dasharray="8,4"/>';
-
-    svgNodes += '<ellipse cx="' + bx + '" cy="' + by + '" rx="' + brx + '" ry="22" fill="' + col + '28" stroke="' + col + '" stroke-width="2.2"/>';
-    svgNodes += '<text x="' + bx + '" y="' + (by + 5) + '" text-anchor="middle" dominant-baseline="middle" font-family="Cairo,sans-serif" font-size="12" fill="' + col + '" font-weight="900">' + lbl + '</text>';
-
-    var children = b.children || [];
-    var nch = children.length;
-    var spreadStep = Math.min(0.45, 1.0 / Math.max(nch, 1));
-
-    for (var j = 0; j < nch; j++) {
-      var cs = String(children[j]).replace(/</g,'&lt;');
-      var ca = ang + (j - (nch - 1) / 2) * spreadStep;
-      var chx = Math.round(cx + RC * Math.cos(ca));
-      var chy = Math.round(cy + RC * Math.sin(ca));
-      var crx = Math.min(Math.max(cs.length * 5.5 + 14, 42), 100);
-
-      svgLines += '<line x1="' + bx + '" y1="' + by + '" x2="' + chx + '" y2="' + chy + '" stroke="' + col + '" stroke-width="1.4" stroke-opacity="0.4"/>';
-
-      svgNodes += '<rect x="' + (chx - crx) + '" y="' + (chy - 13) + '" width="' + (crx * 2) + '" height="26" rx="13" fill="' + col + '1a" stroke="' + col + '60" stroke-width="1.2"/>';
-      svgNodes += '<text x="' + chx + '" y="' + (chy + 4) + '" text-anchor="middle" dominant-baseline="middle" font-family="Cairo,sans-serif" font-size="11" fill="' + col + '">' + cs + '</text>';
-    }
-  }
-
-  var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;overflow:visible">';
-
-  svg += '<defs><radialGradient id="mmGlow" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#6C63FF" stop-opacity="0.08"/><stop offset="100%" stop-color="#6C63FF" stop-opacity="0"/></radialGradient></defs>';
-  svg += '<ellipse cx="' + cx + '" cy="' + cy + '" rx="' + (W/2 - 10) + '" ry="' + (H/2 - 10) + '" fill="url(#mmGlow)"/>';
-
-  svg += svgLines;
-  svg += svgNodes;
-
-  svg += '<ellipse cx="' + cx + '" cy="' + cy + '" rx="72" ry="30" fill="#6C63FF" opacity="0.95"/>';
-  svg += '<text x="' + cx + '" y="' + (cy + 5) + '" text-anchor="middle" dominant-baseline="middle" font-family="Cairo,sans-serif" font-size="13.5" fill="white" font-weight="900">' + center + '</text>';
-
-  svg += '</svg>';
-
-  var cards = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:8px;margin-top:14px;direction:rtl">';
-  for (var i = 0; i < branches.length; i++) {
-    var b = branches[i];
-    var col = b.color || PALETTE[i % PALETTE.length];
-    var children = b.children || [];
-    cards += '<div style="background:' + col + '10;border:1.5px solid ' + col + '35;border-radius:13px;padding:11px 10px;direction:rtl;text-align:right">';
-    cards += '<div style="font-weight:800;font-size:0.8rem;color:' + col + ';margin-bottom:7px;padding-bottom:6px;border-bottom:1px solid ' + col + '28;word-break:break-word;white-space:normal">' + (b.label || '') + '</div>';
-    cards += '<div style="display:flex;flex-direction:column;gap:4px">';
-    for (var j = 0; j < children.length; j++) {
-      cards += '<div style="font-size:0.76rem;line-height:1.6;color:var(--text);padding:4px 8px;background:' + col + '14;border-radius:7px;border-right:2px solid ' + col + '60;word-break:break-word;white-space:normal;direction:rtl;text-align:right">' + String(children[j]) + '</div>';
-    }
-    cards += '</div></div>';
-  }
-  cards += '</div>';
-
-  return '<div style="margin-top:20px;direction:rtl">'
-    + '<div style="font-size:0.95rem;font-weight:700;margin-bottom:10px;color:var(--primary);direction:rtl;text-align:right">🧠 الخريطة الذهنية</div>'
-    + '<div style="background:rgba(0,0,0,0.2);border:1px solid rgba(108,99,255,0.25);border-radius:18px;padding:12px;overflow:visible">'
-    + svg
-    + '</div>'
-    + cards
-    + '</div>';
-}
-
-function buildEmbeddedLab(subjectId) {
-  return `
-    <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
-      <button id="elab-tab-py" onclick="elabSwitch('py')" style="flex:1;min-width:120px;padding:11px 18px;border-radius:13px;border:2px solid #3776AB;background:rgba(55,118,171,0.2);color:#6ab0e8;font-family:var(--font);font-size:0.88rem;font-weight:700;cursor:pointer;transition:all 0.2s">🐍 بيئة Python</button>
-      <button id="elab-tab-xl" onclick="elabSwitch('xl')" style="flex:1;min-width:120px;padding:11px 18px;border-radius:13px;border:2px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.04);color:var(--text-muted);font-family:var(--font);font-size:0.88rem;font-weight:700;cursor:pointer;transition:all 0.2s">📊 بيئة Excel</button>
-    </div>
-    <div id="elab-py">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;flex-wrap:wrap;gap:8px">
-        <div style="display:flex;align-items:center;gap:8px">
-          <div id="elab-py-dot" style="width:9px;height:9px;border-radius:50%;background:#555;transition:background 0.3s"></div>
-          <span id="elab-py-status" style="font-size:0.77rem;color:var(--text-muted)">جاري تحميل Python...</span>
-        </div>
-        <div style="display:flex;gap:7px;flex-wrap:wrap">
-          <select id="elab-py-tmpl" onchange="elabLoadPyTmpl()" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:5px 9px;border-radius:8px;font-family:var(--font);font-size:0.78rem;cursor:pointer">
-            <option value="">📋 قوالب...</option>
-            <option value="mean">المتوسط</option><option value="median">الوسيط والمنوال</option>
-            <option value="variance">التباين والانحراف</option><option value="zscore">Z-Score</option>
-            <option value="correlation">الارتباط r</option><option value="regression">خط الانحدار</option>
-            <option value="histogram">مدرج تكراري</option><option value="scatter">مخطط تشتت</option>
-            <option value="countif">دوال COUNTIF</option>
-          </select>
-          <button onclick="elabClearPy()" style="padding:5px 11px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-muted);font-family:var(--font);font-size:0.78rem;cursor:pointer">🗑️</button>
-          <button onclick="elabRunPy()" id="elab-run-btn" style="padding:7px 16px;border-radius:10px;border:none;background:linear-gradient(135deg,#3776AB,#1a4a7a);color:white;font-weight:700;font-size:0.86rem;cursor:pointer;font-family:var(--font)">▶ تشغيل</button>
-        </div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:11px" id="elab-py-grid">
-        <div style="background:#1e1e2e;border-radius:14px;overflow:hidden;border:1px solid rgba(55,118,171,0.3)">
-          <div style="background:#2d2d3e;padding:7px 13px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.07)">
-            <span style="font-size:0.73rem;color:#6ab0e8;font-weight:600">🐍 المحرر</span>
-            <div style="display:flex;gap:4px"><div style="width:8px;height:8px;border-radius:50%;background:#FF5F57"></div><div style="width:8px;height:8px;border-radius:50%;background:#FFBD2E"></div><div style="width:8px;height:8px;border-radius:50%;background:#28CA41"></div></div>
-          </div>
-          <div style="position:relative">
-            <div id="elab-lnums" style="position:absolute;left:0;top:0;width:34px;background:#1a1a2a;padding:11px 0;text-align:center;font-size:0.7rem;color:#555;line-height:1.6;font-family:monospace;pointer-events:none;user-select:none;min-height:280px">1</div>
-            <textarea id="elab-editor" spellcheck="false" style="width:100%;min-height:280px;background:transparent;border:none;outline:none;color:#cdd6f4;font-family:'Fira Code','Courier New',monospace;font-size:0.82rem;line-height:1.6;padding:11px 11px 11px 44px;resize:vertical;box-sizing:border-box;tab-size:4;direction:ltr;text-align:left" placeholder="# اكتب كودك هنا..." oninput="elabUpdateLines()" onkeydown="elabTab(event)"></textarea>
-          </div>
-        </div>
-        <div style="background:#0d1117;border-radius:14px;overflow:hidden;border:1px solid rgba(55,118,171,0.16)">
-          <div style="background:#161b22;padding:7px 13px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.05)">
-            <span style="font-size:0.73rem;color:#8b949e;font-weight:600">📟 النتيجة</span>
-            <button onclick="document.getElementById('elab-out').innerHTML=''" style="background:none;border:none;color:#555;cursor:pointer;font-size:0.7rem">✕</button>
-          </div>
-          <div id="elab-out" style="padding:11px;min-height:280px;font-family:'Fira Code','Courier New',monospace;font-size:0.8rem;color:#e6edf3;white-space:pre-wrap;overflow-y:auto;line-height:1.6;direction:ltr;text-align:left"><span style="color:#555">// اضغط ▶ تشغيل</span></div>
-        </div>
-      </div>
-      <div id="elab-chart-wrap" style="display:none;margin-top:11px;background:white;border-radius:13px;padding:14px;text-align:center"><canvas id="elab-chart-canvas" style="max-width:100%;max-height:340px"></canvas></div>
-      <div style="margin-top:9px;padding:9px 13px;background:rgba(55,118,171,0.07);border-radius:9px;border:1px solid rgba(55,118,171,0.17);font-size:0.75rem;color:#6ab0e8">💡 متاح: numpy · statistics · matplotlib. اضغط Tab للمسافة.</div>
-    </div>
-    <div id="elab-xl" style="display:none">
-      <div style="display:flex;gap:7px;margin-bottom:9px;flex-wrap:wrap;align-items:center">
-        <select id="elab-xl-tmpl" onchange="elabLoadXlTmpl()" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:5px 9px;border-radius:8px;font-family:var(--font);font-size:0.78rem;cursor:pointer">
-          <option value="">📋 قوالب...</option>
-          <option value="grades">درجات الطلاب</option><option value="stats">تحليل إحصائي</option>
-          <option value="sales">بيانات مبيعات</option><option value="employees">موظفون ورواتب</option>
-        </select>
-        <button onclick="elabXlAddRow()" style="padding:5px 10px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--text);font-family:var(--font);font-size:0.78rem;cursor:pointer">+ صف</button>
-        <button onclick="elabXlAddCol()" style="padding:5px 10px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--text);font-family:var(--font);font-size:0.78rem;cursor:pointer">+ عمود</button>
-        <button onclick="elabXlChart()" style="padding:5px 11px;border-radius:7px;border:1px solid rgba(232,160,32,0.4);background:rgba(232,160,32,0.1);color:#E8A020;font-family:var(--font);font-size:0.78rem;cursor:pointer;font-weight:600">📊 رسم</button>
-        <button onclick="elabXlValidate()" style="padding:5px 11px;border-radius:7px;border:1px solid rgba(0,191,165,0.4);background:rgba(0,191,165,0.1);color:#00BFA5;font-family:var(--font);font-size:0.78rem;cursor:pointer;font-weight:600">✅ تحقق</button>
-        <button onclick="elabXlClear()" style="padding:5px 10px;border-radius:7px;border:1px solid var(--border);background:rgba(255,82,82,0.07);color:#FF5252;font-family:var(--font);font-size:0.78rem;cursor:pointer">🗑️</button>
-      </div>
-      <div style="display:flex;align-items:center;gap:7px;margin-bottom:7px;background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:6px 11px">
-        <span id="elab-xl-ref" style="font-size:0.8rem;color:var(--primary);font-weight:700;min-width:32px">A1</span>
-        <div style="width:1px;height:16px;background:var(--border)"></div>
-        <span style="font-size:0.8rem;color:var(--text-muted)">fx</span>
-        <input id="elab-xl-fbar" type="text" placeholder="=AVERAGE(A1:A5)" style="flex:1;background:transparent;border:none;outline:none;color:var(--text);font-family:'Fira Code',monospace;font-size:0.82rem;direction:ltr;text-align:left" onkeydown="if(event.key==='Enter'){elabXlFbarCommit();event.preventDefault()}" oninput="elabXlFbarInput()">
-      </div>
-      <div style="border-radius:11px;overflow:auto;border:1px solid rgba(255,255,255,0.08);background:#1a1a2a;max-height:360px" id="elab-xl-grid"></div>
-      <div id="elab-xl-stats" style="margin-top:11px;display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:7px"></div>
-      <div id="elab-xl-chart-wrap" style="display:none;margin-top:11px;background:white;border-radius:13px;padding:14px"><canvas id="elab-xl-chart" style="max-width:100%;max-height:300px"></canvas></div>
-      <div id="elab-xl-feedback" style="display:none;margin-top:11px"></div>
-      <div style="margin-top:11px;padding:11px 13px;background:rgba(232,160,32,0.06);border-radius:9px;border:1px solid rgba(232,160,32,0.17)">
-        <div style="font-size:0.73rem;color:#E8A020;font-weight:700;margin-bottom:6px">📖 الدوال:</div>
-        <div id="elab-xl-fnref" style="display:flex;flex-wrap:wrap;gap:5px"></div>
-      </div>
-    </div>`;
-}
-
-function getLessonTypeIcon(type) {
-  return { concept: '💡', calculation: '📐', code: '💻' }[type] || '📖';
-}
-function getLessonTypeLabel(type) {
-  return { concept: 'مفهوم', calculation: 'حساب', code: 'برمجة' }[type] || 'درس';
-}
-
-function toggleChapter(id) {
-  const el = document.getElementById(`ch-${id}`);
-  el.classList.toggle('open');
-}
-
-function openLesson(subjectId, lessonId) {
-  if (typeof trackUserActivity === 'function') trackUserActivity('درس: '+lessonId);
-  // Track lesson opened for progress
-  if (subjectId && lessonId && typeof trackLessonOpened === 'function') {
-    trackLessonOpened(subjectId, lessonId);
-  }
-  // Push to history for back button
-  try { history.pushState({ zad: 'lesson', subjectId: subjectId, lessonId: lessonId }, '', '#lesson-'+lessonId); } catch(ex) {}
-
-  // 1. Check ZAD_UPLOADS first
-  var uploads = ZAD_UPLOADS.getAll();
-  var bundle  = uploads.find(function(u) {
-    return u.lessonId === lessonId || ('ai-'+u.id) === lessonId || u.id === lessonId;
-  });
-
-  if (bundle) {
-    var ul = bundle.lesson || {};
-    var aiLesson = {
-      lessonTitle:     ul.title || bundle.title || bundle.fileName || 'درس مرفوع',
-      definition:      (ul.content && ul.content.definition)    || '',
-      whyLearn:        (ul.content && ul.content.whyLearn)      || [],
-      keyTerms:        (ul.content && ul.content.keyTerms)      || [],
-      examples:        (ul.content && ul.content.realExamples)  || [],
-      steps:           (ul.content && ul.content.steps)         || [],
-      properties:      (ul.content && ul.content.properties)    || [],
-      types:           (ul.content && ul.content.types)         || [],
-      mindMapBranches: ul.content && ul.content.mindMap ? ul.content.mindMap.branches : [],
-      quiz:            ul.quiz  || [],
-      summary:         ul.summary || ''
-    };
-    window._ZAD_AI_LESSON = { lesson: aiLesson, subjectId: subjectId };
-    window._ZAD_AI_QUIZ   = aiLesson.quiz;
-    showSection('lesson');
-    showPage('page-app');
-    var lc = document.getElementById('lesson-content');
-    if (lc) {
-      lc.innerHTML = '<div style="direction:rtl;padding:0">'
-        + '<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">'
-        + '<button class="back-btn" onclick="showSubject(\''+subjectId+'\',\'lessons\')">←</button>'
-        + '<div><div style="font-size:1.1rem;font-weight:900">'+aiLesson.lessonTitle+'</div>'
-        + '<div style="font-size:0.75rem;color:var(--text-muted)">✨ '+bundle.fileName+'</div></div></div>'
-        + (renderAILesson(aiLesson)||buildAILessonFallback(aiLesson))+'</div>';
-    }
-    return;
-  }
-
-  // 2. Standard CURRICULUM lesson
-  var merged = getSubjectWithUploads(subjectId);
-  if (!merged) return;
-  var subject = merged; // alias for template compatibility
-  var allLessons = [];
-  merged.chapters.forEach(function(ch) {
-    (ch.lessons||[]).forEach(function(l) { allLessons.push({lesson:l,chapter:ch}); });
-  });
-  var idx = allLessons.findIndex(function(e) { return e.lesson.id === lessonId; });
-  if (idx === -1) return;
-  var currentIdx = idx; // alias for template
-
-  var lesson  = allLessons[idx].lesson;
-  var chapter = allLessons[idx].chapter;
-  var prev    = idx > 0 ? allLessons[idx-1] : null;
-  var next    = idx < allLessons.length-1 ? allLessons[idx+1] : null;
-  const lessonNum = currentIdx + 1;
-  const totalLessons = allLessons.length;
-
-  APP.currentLesson = lesson;
-  if (APP.student.email) saveLocation({ type: 'lesson', subjectId, lessonId });
-
-  showSection('lesson');
-  const container = document.getElementById('lesson-content');
-
-  APP.progress.lessons++;
-  APP.progress.subjectProgress[subjectId] = Math.min(100,
-    (APP.progress.subjectProgress[subjectId] || 0) + 10);
-  saveProgress();
-  updateStats();
-  addActivity(subject.icon + ' ' + lesson.title);
-
-  const progressPct = Math.round((lessonNum / totalLessons) * 100);
-
-  container.innerHTML = `
-    <!-- Top nav bar -->
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
-      <button class="back-btn" onclick="showSubject('${subjectId}')" title="العودة للمادة">←</button>
-      <div style="flex:1;min-width:0;">
-        <div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:3px;">
-          ${subject.icon} ${subject.title} &rsaquo; ${chapter.title}
-        </div>
-        <div style="font-size:1.4rem;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${lesson.title}</div>
-      </div>
-      <div style="font-size:0.78rem;color:var(--text-muted);background:rgba(255,255,255,0.06);padding:4px 10px;border-radius:20px;white-space:nowrap;">
-        ${lessonNum} / ${totalLessons}
-      </div>
-    </div>
-
-    <!-- Progress bar -->
-    <div style="height:5px;background:rgba(255,255,255,0.07);border-radius:10px;margin-bottom:24px;overflow:hidden;">
-      <div style="height:100%;width:${progressPct}%;background:linear-gradient(90deg,var(--primary),var(--secondary));border-radius:10px;transition:width 0.5s ease;"></div>
-    </div>
-
-    ${buildLessonBody(lesson, subject)}
-
-    ${lesson.quiz ? buildInlineQuiz(lesson.quiz, lesson.title, chapter.pages) : ''}
-
-    <!-- Bottom navigation -->
-    <div style="display:flex;align-items:stretch;gap:12px;margin-top:32px;padding-top:20px;border-top:1px solid var(--border);">
-      ${prevEntry ? `
-        <button onclick="openLesson('${subjectId}','${prevEntry.lesson.id}')" style="
-          flex:1;display:flex;align-items:center;gap:10px;
-          padding:14px 18px;border-radius:14px;border:1px solid var(--border);
-          background:rgba(255,255,255,0.04);color:var(--text);cursor:pointer;
-          font-family:var(--font);font-size:0.9rem;font-weight:600;
-          transition:all 0.2s;text-align:right;
-        " onmouseenter="this.style.background='rgba(255,255,255,0.08)'" onmouseleave="this.style.background='rgba(255,255,255,0.04)'">
-          <span style="font-size:1.3rem;">→</span>
-          <div style="flex:1;min-width:0;">
-            <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:2px;">الدرس السابق</div>
-            <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${prevEntry.lesson.title}</div>
-          </div>
-        </button>
-      ` : `<div style="flex:1;"></div>`}
-
-      <button onclick="showSubject('${subjectId}')" style="
-        padding:14px 16px;border-radius:14px;border:1px solid var(--border);
-        background:rgba(255,255,255,0.04);color:var(--text-muted);cursor:pointer;
-        font-family:var(--font);font-size:1.2rem;transition:all 0.2s;flex-shrink:0;
-      " title="قائمة الدروس"
-      onmouseenter="this.style.background='rgba(255,255,255,0.08)'" onmouseleave="this.style.background='rgba(255,255,255,0.04)'">☰</button>
-
-      ${nextEntry ? `
-        <div style="flex:1;display:flex;flex-direction:column;gap:6px">
-          <button onclick="openLesson('${subjectId}','${nextEntry.lesson.id}')" style="
-            width:100%;display:flex;align-items:center;gap:10px;
-            padding:14px 18px;border-radius:14px;border:none;
-            background:linear-gradient(135deg,var(--primary),var(--secondary));
-            color:white;cursor:pointer;font-family:var(--font);font-size:0.9rem;
-            font-weight:700;transition:all 0.2s;text-align:right;
-            box-shadow:0 4px 15px rgba(108,99,255,0.3);
-          " onmouseenter="this.style.transform='translateY(-2px)'" onmouseleave="this.style.transform='translateY(0)'">
-            <div style="flex:1;min-width:0;">
-              <div style="font-size:0.7rem;opacity:0.8;margin-bottom:2px;">الدرس التالي ⬅</div>
-              <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${nextEntry.lesson.title}</div>
-            </div>
-            <span style="font-size:1.3rem;">←</span>
-          </button>
-          <button onclick="resumeCurrentLesson('${subjectId}','${lessonId}')" style="
-            width:100%;padding:8px 14px;border-radius:10px;border:1px solid rgba(232,160,32,0.4);
-            background:rgba(232,160,32,0.08);color:var(--primary);
-            cursor:pointer;font-family:var(--font);font-size:0.8rem;font-weight:700;
-            display:flex;align-items:center;justify-content:center;gap:6px;transition:all 0.2s;
-          " onmouseenter="this.style.background='rgba(232,160,32,0.15)'" onmouseleave="this.style.background='rgba(232,160,32,0.08)'">
-            🔖 استمر من حيث توقفت
-          </button>
-        </div>
-      ` : `
-        <div style="flex:1;display:flex;flex-direction:column;gap:6px">
-          <button onclick="showSubject('${subjectId}')" style="
-            width:100%;display:flex;align-items:center;justify-content:center;gap:10px;
-            padding:14px 18px;border-radius:14px;border:none;
-            background:linear-gradient(135deg,#00BFA5,#00897B);
-            color:white;cursor:pointer;font-family:var(--font);font-size:0.95rem;
-            font-weight:700;transition:all 0.2s;
-            box-shadow:0 4px 15px rgba(0,191,165,0.3);
-          " onmouseenter="this.style.transform='translateY(-2px)'" onmouseleave="this.style.transform='translateY(0)'">
-            🎉 أنهيت جميع الدروس!
-          </button>
-          <button onclick="resumeCurrentLesson('${subjectId}','${lessonId}')" style="
-            width:100%;padding:8px 14px;border-radius:10px;border:1px solid rgba(232,160,32,0.4);
-            background:rgba(232,160,32,0.08);color:var(--primary);
-            cursor:pointer;font-family:var(--font);font-size:0.8rem;font-weight:700;
-            display:flex;align-items:center;justify-content:center;gap:6px;
-          ">
-            🔖 استمر من حيث توقفت
-          </button>
-        </div>
-      `}
-    </div>
-  `;
-
-  const mobileToggle = document.querySelector('.mobile-toggle');
-  if (mobileToggle) mobileToggle.style.display = 'none';
-
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-  setTimeout(animateSteps, 300);
-
-  setTimeout(addTypeCardClickHandlers, 120);
-}
-
-function buildLessonBody(lesson, subject) {
-  if (lesson.type === 'concept') return buildConceptLesson(lesson);
-  if (lesson.type === 'calculation') return buildCalculationLesson(lesson);
-  if (lesson.type === 'code') return buildCodeLesson(lesson, subject);
-  return '';
-}
-
-function buildConceptLesson(lesson) {
-  var c = lesson.content;
-  var html = '';
-
-  if (c.definition) {
-    html += '<div style="margin-bottom:22px;padding:20px;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:16px;direction:rtl;text-align:right"><div style="font-size:0.8rem;font-weight:700;color:var(--primary);margin-bottom:8px">📖 التعريف</div><div style="font-size:0.95rem;line-height:1.85;color:var(--text)">' + c.definition + '</div></div>';
-  }
-
-  if (c.whyLearn && c.whyLearn.length) {
-    html += '<div style="margin-bottom:22px"><div style="font-size:1.05rem;font-weight:800;margin-bottom:12px;direction:rtl;text-align:right"> لماذا نتعلم هذا؟</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">';
-    c.whyLearn.forEach(function(w) {
-      var icon = w.split(' ')[0];
-      var text = w.substring(w.indexOf(' ')+1);
-      html += '<div style="background:rgba(255,214,0,0.07);border:1px solid rgba(255,214,0,0.2);border-radius:13px;padding:14px;display:flex;gap:10px;align-items:flex-start;direction:rtl;text-align:right;transition:transform 0.2s" onmouseenter="this.style.transform=\'translateY(-3px)\'" onmouseleave="this.style.transform=\'none\'"><span style="font-size:1.4rem;flex-shrink:0">' + icon + '</span><span style="font-size:0.88rem;line-height:1.6;color:var(--text)">' + text + '</span></div>';
-    });
-    html += '</div></div>';
-  }
-
-  if (c.types && c.types.length) {
-    var COLORS = ['#6C63FF','#00BFA5','#FF7043','#FFD600','#E91E63','#00B0FF'];
-    html += '<div style="margin-bottom:22px"><div style="font-size:1.05rem;font-weight:800;margin-bottom:12px;direction:rtl;text-align:right">📌 الأنواع والتصنيفات</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px">';
-    c.types.forEach(function(type, i) {
-      var col = COLORS[i % COLORS.length];
-      var typeJson = JSON.stringify(type).replace(/"/g, '&quot;');
-      html += '<div class="type-card-clickable" data-type-card="' + typeJson + '" data-type-color="' + col + '" style="background:' + col + '0d;border:1.5px solid ' + col + '30;border-radius:16px;padding:18px;direction:rtl;text-align:right;transition:all 0.22s;cursor:pointer;position:relative;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1)"><div style="position:absolute;top:-8px;right:-8px;font-size:3.5rem;opacity:0.08">' + (type.icon||'📌') + '</div><div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><div style="width:40px;height:40px;border-radius:12px;background:' + col + '25;display:flex;align-items:center;justify-content:center;font-size:1.5rem;flex-shrink:0">' + (type.icon||'📌') + '</div><div style="font-weight:800;font-size:0.92rem;color:' + col + '">' + type.name + '</div></div><div style="font-size:0.83rem;color:var(--text-muted);line-height:1.7;margin-bottom:8px">' + type.desc + '</div><div style="font-size:0.7rem;color:' + col + ';opacity:0.8;display:flex;align-items:center;gap:4px"><span>👆</span> اضغط لرؤية مثال</div></div>';
-    });
-    html += '</div></div>';
-    setTimeout(addTypeCardClickHandlers, 50);
-  }
-
-  if (c.keyTerms && c.keyTerms.length) {
-    html += '<div style="margin-bottom:22px"><div style="font-size:1.05rem;font-weight:800;margin-bottom:12px;direction:rtl;text-align:right">🔑 المصطلحات والقوانين</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px">';
-    c.keyTerms.forEach(function(kt) {
-      var def = kt.def || '';
-      var hasArabic = /[؀-ۿ]/.test(def);
-      var isFormula = !hasArabic && (/[=+÷×∑√μσ]/.test(def) || /[\^₀-₉]/.test(def));
-      html += '<div style="background:' + (isFormula?'rgba(108,99,255,0.1)':'rgba(255,255,255,0.04)') + ';border:1px solid ' + (isFormula?'rgba(108,99,255,0.3)':'var(--border)') + ';border-radius:13px;padding:14px;transition:border-color 0.2s;direction:rtl" onmouseenter="this.style.borderColor=\'var(--primary)\'" onmouseleave="this.style.borderColor=\'' + (isFormula?'rgba(108,99,255,0.3)':'var(--border)') + '\'"><div style="font-weight:800;color:var(--primary);font-size:0.88rem;margin-bottom:8px;text-align:right">' + kt.term + '</div>' + (isFormula ? '<div style="font-family:\'Fira Code\',monospace;font-size:0.9rem;background:rgba(0,0,0,0.3);padding:8px 12px;border-radius:8px;color:#79c0ff;direction:ltr;text-align:left;overflow-x:auto">' + def + '</div>' : '<div style="font-size:0.84rem;color:var(--text-muted);line-height:1.7;text-align:right;white-space:pre-line">' + def + '</div>') + '</div>';
-    });
-    html += '</div></div>';
-  }
-
-  if (c.steps && c.steps.length) {
-    html += '<div style="margin-bottom:22px"><div style="font-size:1.05rem;font-weight:800;margin-bottom:14px;direction:rtl;text-align:right">📋 الخطوات</div>';
-    c.steps.forEach(function(step, i) {
-      html += '<div style="display:flex;gap:14px;padding:14px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:14px;margin-bottom:10px;align-items:flex-start;direction:rtl;text-align:right"><div style="min-width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--secondary));display:flex;align-items:center;justify-content:center;font-weight:900;font-size:0.9rem;color:white;flex-shrink:0">' + (i+1) + '</div><div style="flex:1">' + (typeof step==='string' ? '<div style="font-size:0.9rem;line-height:1.7">' + step + '</div>' : '<div style="font-weight:700;margin-bottom:4px">' + (step.name||step.title||'') + '</div><div style="font-size:0.83rem;color:var(--text-muted);line-height:1.6">' + (step.desc||step.description||'') + '</div>') + '</div></div>';
-    });
-    html += '</div>';
-  }
-
-  if (c.components && c.components.length) {
-    html += '<div style="margin-bottom:22px"><div style="font-size:1.05rem;font-weight:800;margin-bottom:14px;direction:rtl;text-align:right">⚙️ المكونات</div>';
-    c.components.forEach(function(comp, i) {
-      html += '<div style="display:flex;gap:14px;padding:14px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:14px;margin-bottom:10px;align-items:flex-start;direction:rtl;text-align:right"><div style="min-width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--secondary));display:flex;align-items:center;justify-content:center;font-weight:900;font-size:0.9rem;color:white;flex-shrink:0">' + (i+1) + '</div><div><div style="font-weight:700;margin-bottom:4px">' + comp.name + '</div><div style="font-size:0.83rem;color:var(--text-muted);line-height:1.6">' + comp.desc + '</div></div></div>';
-    });
-    html += '</div>';
-  }
-
-  if (c.properties && c.properties.length) {
-    html += '<div style="background:rgba(0,191,165,0.08);border:1px solid rgba(0,191,165,0.25);border-radius:14px;padding:18px;margin-bottom:22px;direction:rtl;text-align:right"><div style="font-size:1rem;font-weight:800;color:#00BFA5;margin-bottom:10px">✅ خصائص مهمة</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px">';
-    c.properties.forEach(function(p) {
-      html += '<div style="display:flex;gap:8px;align-items:flex-start;padding:6px 0"><span style="color:#00BFA5;font-weight:900;flex-shrink:0">✓</span><span style="font-size:0.87rem;line-height:1.6">' + p + '</span></div>';
-    });
-    html += '</div></div>';
-  }
-
-  if (c.realExamples && c.realExamples.length) {
-    html += '<div style="margin-bottom:22px"><div style="font-size:1.05rem;font-weight:800;margin-bottom:12px;direction:rtl;text-align:right">🌍 أمثلة من الواقع</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px">';
-    c.realExamples.forEach(function(ex) {
-      html += '<div style="background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:15px;padding:18px;text-align:center;direction:rtl;transition:all 0.2s;cursor:default" onmouseenter="this.style.transform=\'translateY(-4px)\';this.style.borderColor=\'var(--primary)\'" onmouseleave="this.style.transform=\'none\';this.style.borderColor=\'var(--border)\'"><div style="font-size:2.2rem;margin-bottom:10px">' + (ex.icon||'🌐') + '</div><div style="font-weight:700;font-size:0.9rem;margin-bottom:6px">' + ex.title + '</div><div style="font-size:0.78rem;color:var(--text-muted);line-height:1.6">' + ex.desc + '</div></div>';
-    });
-    html += '</div></div>';
-  }
-
-  if (c.types && c.types.length >= 2 && !c.steps) {
-    var COLORS2 = ['#6C63FF','#00BFA5','#FF7043','#FFD600'];
-    html += '<div style="margin-bottom:22px"><div style="font-size:1rem;font-weight:800;margin-bottom:12px;color:var(--primary);direction:rtl;text-align:right">📊 مقارنة بصرية</div><div style="background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:16px;padding:18px;overflow-x:auto"><svg viewBox="0 0 500 160" style="width:100%;min-width:300px;max-height:160px" xmlns="http://www.w3.org/2000/svg">';
-    var barW = Math.min(80, Math.floor(460/c.types.length)-12);
-    var spacing = Math.floor(500/c.types.length);
-    c.types.forEach(function(type, i) {
-      var col = COLORS2[i%COLORS2.length];
-      var h = 60 + (i%3)*20;
-      var x = 30 + i*spacing;
-      html += '<rect x="' + x + '" y="' + (120-h) + '" width="' + barW + '" height="' + h + '" rx="8" fill="' + col + '" opacity="0.8"/>';
-      var lbl = (type.name||'').replace(/\(.+\)/,'').trim().slice(0,8);
-      html += '<text x="' + (x+barW/2) + '" y="140" text-anchor="middle" font-family="Cairo,sans-serif" font-size="10" fill="' + col + '">' + lbl + '</text>';
-    });
-    html += '</svg></div></div>';
-  }
-
-  if (c.mindMap) {
-    html += buildMindMap(c.mindMap);
-  }
-
-  return '<div class="lesson-content-wrap" style="padding:0;direction:rtl">' + html + '</div>';
-}
-
-function buildCalculationLesson(lesson) {
-  const steps = lesson.content.steps || [];
-  const interactive = lesson.interactive;
-  
-  return `
-    <div>
-      ${steps.map((step, si) => `
-        <div style="margin-bottom: 30px;">
-          <div style="font-size: 1.2rem; font-weight: 800; margin-bottom: 15px;">${step.title}</div>
-          
-          ${step.formula ? `<div class="formula-box">${step.formula}</div>` : ''}
-          
-          ${step.explanation ? `
-            <div style="
-              color: var(--text-muted);
-              font-size: 0.95rem;
-              line-height: 1.7;
-              margin-bottom: 20px;
-              padding: 0 10px;
-            ">${step.explanation}</div>
-          ` : ''}
-          
-          ${step.example ? `
-            <div style="
-              background: rgba(255,255,255,0.04);
-              border: 1px solid var(--border);
-              border-radius: 20px;
-              padding: 25px;
-            ">
-              <div style="font-weight: 700; margin-bottom: 15px;">
-                📋 مثال: البيانات: [${Array.isArray(step.example.data) ? step.example.data.join(', ') : step.example.data}]
-              </div>
-              
-              <!-- Video-style solution -->
-              <div class="video-player">
-                <div class="video-screen" id="video-${si}">
-                  <div style="color: var(--text-muted); font-size: 0.9rem;">▶ اضغط تشغيل لمشاهدة الحل خطوة بخطوة</div>
-                </div>
-                <div class="video-controls">
-                  <button class="video-btn play-btn" onclick="playVideoStep(${si}, ${JSON.stringify(step.example.solution).replace(/"/g, '&quot;')}, 0)">▶</button>
-                  <div class="video-timeline">
-                    <div class="video-progress" id="vp-${si}" style="width: 0%"></div>
-                  </div>
-                  <div class="video-counter" id="vc-${si}">0 / ${step.example.solution.length}</div>
-                </div>
-              </div>
-            </div>
-          ` : ''}
-        </div>
-      `).join('')}
-      
-      ${interactive && interactive.type === 'calculator' ? buildStatsCalculator() : ''}
-    </div>
-  `;
-}
-
-function buildStatsCalculator() {
-  return `
-    <div class="interactive-calc">
-      <div class="calc-title">🧮 احسب بنفسك! - أداة تفاعلية</div>
-      <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 15px;">
-        أدخل أرقامك مفصولة بفواصل (مثال: 10, 20, 30, 40)
-      </p>
-      <div class="calc-input-wrap">
-        <input type="text" class="calc-input" id="numbers-input" 
-               placeholder="أدخل الأرقام هنا... مثال: 5, 10, 15, 20" 
-               dir="ltr">
-        <button class="calc-btn" onclick="calculateStats()">احسب!</button>
-      </div>
-      <div class="calc-result" id="calc-result">
-        <div class="result-row">
-          <span class="result-label">📊 المتوسط (Mean)</span>
-          <span class="result-value" id="r-mean">-</span>
-        </div>
-        <div class="result-row">
-          <span class="result-label">📍 الوسيط (Median)</span>
-          <span class="result-value" id="r-median">-</span>
-        </div>
-        <div class="result-row">
-          <span class="result-label">🔄 المنوال (Mode)</span>
-          <span class="result-value" id="r-mode">-</span>
-        </div>
-        <div class="result-row">
-          <span class="result-label">📉 الانحراف المعياري</span>
-          <span class="result-value" id="r-std">-</span>
-        </div>
-        <div class="result-row">
-          <span class="result-label">⬆️ الأكبر (Max)</span>
-          <span class="result-value" id="r-max">-</span>
-        </div>
-        <div class="result-row">
-          <span class="result-label">⬇️ الأصغر (Min)</span>
-          <span class="result-value" id="r-min">-</span>
-        </div>
-        <div class="result-row">
-          <span class="result-label">➕ المجموع (Sum)</span>
-          <span class="result-value" id="r-sum">-</span>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-function buildCodeLesson(lesson, subject) {
-  const c = lesson.content;
-  return `
-    <div>
-      ${c.intro ? `
-        <div style="
-          background: linear-gradient(135deg, rgba(255,214,0,0.1), transparent);
-          border-right: 4px solid #FFD600;
-          border-radius: 12px;
-          padding: 20px;
-          margin-bottom: 25px;
-          font-size: 1rem;
-        ">${c.intro}</div>
-      ` : ''}
-      
-      ${(c.codeExamples || []).map((ex, i) => `
-        <div style="margin-bottom: 30px;">
-          <div style="font-size: 1.1rem; font-weight: 700; margin-bottom: 15px;">💻 ${ex.title}</div>
-          ${buildCodeBlock(ex.code, ex.output)}
-          ${buildPythonPlayground(ex.code, 'playground-' + i)}
-        </div>
-      `).join('')}
-    </div>
-  `;
-}
-
-function buildCodeBlock(code, output) {
-  const highlighted = highlightPython(code);
-  const escaped = escapeCode(code);
-  return `
-    <div class="code-block">
-      <button class="copy-code-btn" onclick="copyCode(this, '${escaped.replace(/'/g, "\\'")}')">نسخ</button>
-      <pre>${highlighted}</pre>
-      ${output ? `
-        <div class="output-sep">
-          # الناتج:<br>
-          ${output.replace(/\n/g, '<br>')}
-        </div>
-      ` : ''}
-    </div>
-  `;
-}
-
-function buildPythonPlayground(initialCode, id) {
-  const safeCode = initialCode.replace(/`/g, '`').replace(/\$/g, '\\$');
-  return `
-    <div class="python-playground">
-      <div class="playground-header">
-        <div class="playground-dots">
-          <div class="dot dot-red"></div>
-          <div class="dot dot-yellow"></div>
-          <div class="dot dot-green"></div>
-        </div>
-        <span class="playground-title">🐍 جرب الكود بنفسك!</span>
-      </div>
-      <textarea class="playground-editor" id="${id}-editor" 
-                spellcheck="false">${initialCode}</textarea>
-      <div class="playground-controls">
-        <button class="run-btn" onclick="runPython('${id}')">
-          ▶ تشغيل
-        </button>
-        <button class="clear-btn" onclick="clearPlayground('${id}')">مسح</button>
-        <span style="font-size: 0.8rem; color: var(--text-muted); margin-right: auto;">
-          اكتب الكود وانقر تشغيل!
-        </span>
-      </div>
-      <div class="playground-output" id="${id}-output"></div>
-    </div>
-  `;
-}
-
-function highlightPython(code) {
-  return code
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/(#[^\n]*)/g, '<span class="comment">$1</span>')
-    .replace(/\b(import|from|def|class|return|if|elif|else|for|while|in|and|or|not|True|False|None|print|len|sum|max|min|range|append|extend)\b/g, '<span class="keyword">$1</span>')
-    .replace(/(["'])((?:(?!\1)[^\\]|\\.)*)(\1)/g, '<span class="string">$1$2$3</span>')
-    .replace(/\b(\d+\.?\d*)\b/g, '<span class="number">$1</span>');
-}
-
-function escapeCode(code) {
-  return code.replace(/\\/g, '\\\\').replace(/`/g, '`').replace(/\$/g, '\\$');
-}
-
-function copyCode(btn, code) {
-  navigator.clipboard.writeText(code).then(() => {
-    btn.textContent = '✓ تم النسخ';
-    setTimeout(() => btn.textContent = 'نسخ', 2000);
-  });
-}
-
-/* [dup removed: runPython] */
-
-function simulatePython(code) {
-  const lines = code.split('\n');
-  const outputs = [];
-  const vars = {};
-  
-  function evalExpr(expr) {
-    expr = expr.trim();
-
-    if ((expr.startsWith('"') || expr.startsWith("'")) && expr.includes('{')) {
-
-      return expr.replace(/\{([^}]+)\}/g, (m, k) => {
-        k = k.trim().split(':')[0];
-        if (k in vars) return vars[k];
-        return eval(k);
-      }).replace(/^['"f]|['"]$/g, '');
-    }
-    if (expr.startsWith('f"') || expr.startsWith("f'")) {
-      let s = expr.slice(2, -1);
-      s = s.replace(/\{([^}]+)\}/g, (m, k) => {
-        const [vn, fmt] = k.split(':');
-        const val = vars[vn.trim()] || eval(vn.trim());
-        if (fmt && fmt.includes('f')) return parseFloat(val).toFixed(2);
-        return val;
-      });
-      return s;
-    }
-    if (expr.startsWith('"') || expr.startsWith("'")) return expr.slice(1,-1);
-    if (!isNaN(expr)) return parseFloat(expr);
-    if (expr in vars) return vars[expr];
-    return expr;
-  }
-  
-  lines.forEach(line => {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) return;
-    
-
-    const printMatch = trimmed.match(/^print\((.+)\)$/);
-    if (printMatch) {
-      const arg = printMatch[1].trim();
-      let out = '';
-      if (arg.startsWith('f"') || arg.startsWith("f'")) {
-        let s = arg.slice(2, -1);
-        s = s.replace(/\{([^}]+)\}/g, (m, k) => {
-          const [vn, fmt] = k.split(':');
-          const val = vars[vn.trim()] !== undefined ? vars[vn.trim()] : '';
-          if (fmt && fmt.includes('.')) {
-            const decimals = parseInt(fmt.replace(/[^0-9]/g,''));
-            return parseFloat(val).toFixed(decimals || 2);
-          }
-          return val;
+  try {
+    var subjects = Object.values(CURRICULUM).slice(0, limit || 99);
+    container.innerHTML = subjects.map(function(s) {
+      var prog = 0;
+      try { prog = typeof calcSubjectProgress === 'function' ? calcSubjectProgress(s.id) : (APP.progress.subjectProgress[s.id] || 0); } catch(e2) {}
+      var chapters = s.chapters ? s.chapters.length : 0;
+      var isCustom  = s.id && s.id.startsWith('custom_');
+      var color     = s.color || '#6C63FF';
+      var totalDone = 0, totalLessons = 0;
+      try {
+        (s.chapters||[]).forEach(function(ch) {
+          (ch.lessons||[]).forEach(function(l) {
+            totalLessons++;
+            var comp = typeof getLessonCompletion === 'function' ? getLessonCompletion(s.id, l.id) : null;
+            if (comp && comp.status === 'completed') totalDone++;
+          });
         });
-        out = s;
-      } else if (arg.startsWith('"') || arg.startsWith("'")) {
-        out = arg.slice(1, -1);
-      } else {
-        out = vars[arg] !== undefined ? vars[arg] : arg;
-      }
-      outputs.push(`<span style="color: #00E676">>> </span>${out}`);
-      return;
-    }
-    
+      } catch(e3) {}
 
-    const assignMatch = trimmed.match(/^(\w+)\s*=\s*(.+)$/);
-    if (assignMatch && !trimmed.startsWith('if') && !trimmed.startsWith('for')) {
-      const [, vname, vval] = assignMatch;
-      const val = vval.trim();
-      if (val.startsWith('[') && val.endsWith(']')) {
-        try { vars[vname] = JSON.parse(val.replace(/'/g, '"')); } catch { vars[vname] = val; }
-      } else if (!isNaN(val)) {
-        vars[vname] = parseFloat(val);
-      } else if (val.startsWith('"') || val.startsWith("'")) {
-        vars[vname] = val.slice(1, -1);
-      } else if (val.startsWith('sum(') && vars[val.slice(4,-1)]) {
-        vars[vname] = vars[val.slice(4,-1)].reduce((a,b)=>a+b, 0);
-      } else {
-        vars[vname] = val;
-      }
-    }
-    
+      return '<div class="subject-card" data-subject-id="' + s.id + '" onclick="showSubject(\'' + s.id + '\')"'
+        + ' style="border-color:' + color + '30;position:relative">'
+        + (isCustom ? '<button onclick="event.stopPropagation();deleteSubject(\'' + s.id + '\')" style="position:absolute;top:8px;left:8px;background:rgba(255,82,82,0.12);border:none;border-radius:6px;color:#FF5252;cursor:pointer;padding:3px 7px;font-size:0.72rem">🗑️</button>' : '')
+        + '<div class="subject-icon">' + (s.icon||'📚') + '</div>'
+        + '<div class="subject-title">' + (s.title||'') + '</div>'
+        + '<div class="subject-chapters"><i class="fas fa-book-open"></i> ' + chapters + ' فصل</div>'
+        + '<div class="progress-label" style="font-size:0.72rem;color:var(--text-muted);margin-bottom:4px;display:flex;justify-content:space-between">'
+          + '<span>' + totalDone + '/' + totalLessons + ' درس</span>'
+          + '<span style="color:' + color + '">' + prog + '%</span></div>'
+        + '<div class="progress-bar"><div class="progress-fill" style="width:' + prog + '%;background:' + color + '"></div></div>'
+        + '</div>';
+    }).join('');
 
-    if (trimmed.startsWith('for ')) return;
-    if (trimmed.startsWith('if ')) return;
-  });
-  
-  return outputs.join('<br>') || '<span style="color: var(--text-muted)">لا يوجد ناتج (لا print في الكود)</span>';
+    if (typeof refreshProgressBars === 'function') setTimeout(function(){ try { refreshProgressBars(); } catch(e) {} }, 400);
+  } catch(err) {
+    console.error('renderSubjectCards:', err);
+    container.innerHTML = '<div style="padding:20px;color:var(--text-muted)">جاري التحميل...</div>';
+    setTimeout(function() {
+      try { renderSubjectCards(containerId, limit); } catch(e2) {}
+    }, 500);
+  }
 }
 
 function clearPlayground(id) {
@@ -20622,135 +19696,298 @@ document.addEventListener('DOMContentLoaded', function() {
   try { history.replaceState({ zad: 'section', name: 'dashboard' }, '', '#dashboard'); } catch(e) {}
 })();
 
-// ══════════════════════════════════════════════════════════════
-// DEVELOPER SUMMARY TAB (Admin only)
-// ══════════════════════════════════════════════════════════════
-var ZAD_DEV_SUMMARIES_KEY = 'zad_dev_summaries_v1';
 
-function getDevSummaries() {
+// ── Safe Android back button handler ─────────────────────────
+// Runs after all functions are defined
+window.addEventListener('load', function() {
+  // Push initial state
+  try { history.replaceState({ zad: 'dashboard' }, '', location.href); } catch(e) {}
+
+  // Intercept back
+  window.addEventListener('popstate', function(e) {
+    e.preventDefault();
+    var cur = document.querySelector('.section.active, .page.active');
+
+    // If on a lesson, go back to subject
+    if (document.getElementById('section-lesson') &&
+        document.getElementById('section-lesson').classList.contains('active') &&
+        APP.currentSubject) {
+      try { history.pushState({ zad: 'subject' }, '', location.href); } catch(ex) {}
+      showSubject(APP.currentSubject, 'lessons');
+      return;
+    }
+
+    // If on a subject detail, go back to dashboard
+    if (document.getElementById('section-subject-detail') &&
+        document.getElementById('section-subject-detail').classList.contains('active')) {
+      try { history.pushState({ zad: 'dashboard' }, '', location.href); } catch(ex) {}
+      showSection('dashboard');
+      return;
+    }
+
+    // Any other section → dashboard
+    var onDash = document.getElementById('section-dashboard') &&
+                 document.getElementById('section-dashboard').classList.contains('active');
+    if (!onDash) {
+      try { history.pushState({ zad: 'dashboard' }, '', location.href); } catch(ex) {}
+      showSection('dashboard');
+    }
+  });
+});
+
+// ══════════════════════════════════════════════════════════════
+// DEVELOPER SUMMARY SYSTEM — Full AI processing
+// Admin uploads summaries → AI builds lessons → students learn
+// ══════════════════════════════════════════════════════════════
+var ZAD_DEV_SUMMARIES_KEY = 'zad_dev_lessons_v2';
+
+function getDevLessons() {
   try { return JSON.parse(localStorage.getItem(ZAD_DEV_SUMMARIES_KEY) || '[]'); }
   catch(e) { return []; }
 }
-function saveDevSummaries(list) {
+function saveDevLessons(list) {
   localStorage.setItem(ZAD_DEV_SUMMARIES_KEY, JSON.stringify(list));
 }
 
+// ── Admin: Build the developer tab in admin panel ──────────────
 function buildDevSummaryTab() {
-  if (!isAdmin()) return '<div style="padding:40px;text-align:center;color:var(--text-muted)">🔒 متاح للمطور فقط</div>';
+  var lessons = getDevLessons();
 
-  var summaries = getDevSummaries();
-  var listHTML = summaries.length
-    ? summaries.map(function(s, i) {
+  var listHTML = lessons.length
+    ? lessons.map(function(l, i) {
+        var prog = l.keyTerms ? l.keyTerms.length + ' مصطلح' : '';
+        var qCount = l.quiz ? l.quiz.length + ' سؤال' : '';
         return '<div style="background:rgba(255,214,0,0.06);border:1.5px solid rgba(255,214,0,0.2);border-radius:14px;padding:14px 16px;margin-bottom:10px">'
-          + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">'
-            + '<div style="flex:1"><div style="font-weight:800;font-size:0.9rem">'+s.title+'</div>'
-            + '<div style="font-size:0.72rem;color:var(--text-muted)">'+new Date(s.createdAt).toLocaleDateString('ar')+'</div></div>'
-            + '<button onclick="downloadDevSummary('+i+')" style="padding:5px 10px;border-radius:8px;border:1px solid rgba(255,214,0,0.4);background:rgba(255,214,0,0.08);color:#FFD600;font-size:0.75rem;cursor:pointer">⬇️ تنزيل</button>'
-            + '<button onclick="deleteDevSummary('+i+')" style="padding:5px 8px;border-radius:8px;border:none;background:rgba(255,82,82,0.1);color:#FF5252;cursor:pointer;font-size:0.75rem">🗑️</button>'
+          + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px">'
+            + '<div style="flex:1"><div style="font-weight:800;font-size:0.88rem">📋 ' + (l.lessonTitle||l.title||'ملخص') + '</div>'
+            + '<div style="font-size:0.7rem;color:var(--text-muted);margin-top:2px">' + prog + (prog&&qCount?' • ':'') + qCount + '</div></div>'
+            + '<button onclick="devDownloadSummary(' + i + ')" style="padding:5px 10px;border-radius:8px;border:1px solid rgba(255,214,0,0.4);background:rgba(255,214,0,0.08);color:#FFD600;font-size:0.72rem;cursor:pointer;font-weight:700">⬇️ تنزيل</button>'
+            + '<button onclick="devDeleteLesson(' + i + ')" style="padding:5px 8px;border-radius:8px;border:none;background:rgba(255,82,82,0.1);color:#FF5252;cursor:pointer;font-size:0.72rem">🗑️</button>'
           + '</div>'
-          + '<div style="font-size:0.82rem;line-height:1.6;color:var(--text-muted)">'+s.content.slice(0,150)+'...</div>'
+          + '<div style="font-size:0.78rem;color:var(--text-muted);line-height:1.5">' + ((l.definition||'').slice(0,120)) + (l.definition&&l.definition.length>120?'...':'') + '</div>'
           + '</div>';
       }).join('')
-    : '<div style="text-align:center;padding:30px;color:var(--text-muted)">لا توجد ملخصات بعد</div>';
+    : '<div style="text-align:center;padding:30px;color:var(--text-muted)">لا توجد ملخصات بعد — ارفع ملفاً أو اكتب نصاً</div>';
 
   return '<div style="direction:rtl">'
     + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">'
-      + '<div style="font-weight:900;font-size:0.95rem">📋 ملخصات المطور</div>'
-      + '<button onclick="showDevSummaryUpload()" style="padding:8px 14px;border-radius:10px;border:none;background:linear-gradient(135deg,#FFD600,#FF8C00);color:#1C1917;font-family:var(--font);font-weight:800;font-size:0.82rem;cursor:pointer">+ رفع ملخص</button>'
+      + '<div style="font-weight:900;font-size:0.95rem">📋 ملخصات المطور (' + lessons.length + ')</div>'
+      + '<button onclick="devShowUploadArea()" style="padding:8px 14px;border-radius:10px;border:none;background:linear-gradient(135deg,#FFD600,#FF8C00);color:#1C1917;font-family:var(--font);font-weight:800;font-size:0.82rem;cursor:pointer">+ إضافة ملخص</button>'
     + '</div>'
-    + '<div id="dev-summary-upload-area" style="display:none;background:rgba(255,214,0,0.06);border:1.5px dashed rgba(255,214,0,0.3);border-radius:16px;padding:16px;margin-bottom:16px">'
+
+    + '<div id="dev-upload-area" style="display:none;background:rgba(255,214,0,0.05);border:1.5px dashed rgba(255,214,0,0.3);border-radius:16px;padding:16px;margin-bottom:16px">'
+      + '<div style="font-weight:800;font-size:0.85rem;margin-bottom:10px">📤 رفع ملخص جديد</div>'
       + '<input id="dev-sum-title" placeholder="عنوان الملخص..." style="width:100%;box-sizing:border-box;padding:9px 12px;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text);font-family:var(--font);font-size:0.85rem;outline:none;direction:rtl;margin-bottom:8px">'
-      + '<textarea id="dev-sum-content" rows="6" placeholder="محتوى الملخص..." style="width:100%;box-sizing:border-box;padding:9px 12px;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text);font-family:var(--font);font-size:0.85rem;outline:none;resize:vertical;direction:rtl;margin-bottom:8px"></textarea>'
-      + '<div style="display:flex;gap:8px">'
-        + '<label style="flex:1;padding:9px;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,0.04);color:var(--text-muted);cursor:pointer;text-align:center;font-size:0.82rem">📎 رفع ملف<input type="file" accept="*/*" style="display:none" onchange="devSummaryFromFile(this)"></label>'
-        + '<button onclick="saveDevSummary()" style="flex:2;padding:9px;border-radius:10px;border:none;background:#FFD600;color:#1C1917;font-family:var(--font);font-weight:800;cursor:pointer">💾 حفظ</button>'
+      + '<textarea id="dev-sum-text" rows="5" placeholder="الصق النص هنا أو ارفع ملفاً..." style="width:100%;box-sizing:border-box;padding:9px 12px;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text);font-family:var(--font);font-size:0.83rem;outline:none;resize:vertical;direction:rtl;margin-bottom:8px"></textarea>'
+      + '<div id="dev-upload-status" style="font-size:0.78rem;margin-bottom:8px;color:var(--text-muted)"></div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap">'
+        + '<label style="flex:1;min-width:100px;padding:9px;border-radius:10px;border:1px dashed var(--border);background:rgba(255,255,255,0.03);color:var(--text-muted);cursor:pointer;text-align:center;font-size:0.8rem">📎 ارفع ملفاً<input type="file" accept="*/*" style="display:none" onchange="devLoadFile(this)"></label>'
+        + '<button onclick="devProcessAndSave()" style="flex:2;padding:9px;border-radius:10px;border:none;background:linear-gradient(135deg,#FFD600,#FF8C00);color:#1C1917;font-family:var(--font);font-weight:800;cursor:pointer;font-size:0.85rem">⚡ معالجة بالذكاء الاصطناعي وحفظ</button>'
       + '</div>'
     + '</div>'
-    + '<div id="dev-summaries-list">' + listHTML + '</div>'
-    + '</div>';
+
+    + '<div id="dev-lessons-list">' + listHTML + '</div>'
+  + '</div>';
 }
 
-function showDevSummaryUpload() {
-  var area = document.getElementById('dev-summary-upload-area');
-  if (area) area.style.display = area.style.display === 'none' ? 'block' : 'none';
+function devShowUploadArea() {
+  var a = document.getElementById('dev-upload-area');
+  if (a) a.style.display = a.style.display === 'none' ? 'block' : 'none';
 }
 
-async function devSummaryFromFile(input) {
+async function devLoadFile(input) {
   var file = input.files[0];
   if (!file) return;
-  var titleInp = document.getElementById('dev-sum-title');
-  if (titleInp && !titleInp.value) titleInp.value = file.name.replace(/\.[^/.]+$/,'');
-  var contentArea = document.getElementById('dev-sum-content');
-  if (!contentArea) return;
+  var t = document.getElementById('dev-sum-title');
+  var tx = document.getElementById('dev-sum-text');
+  if (t && !t.value) t.value = file.name.replace(/\.[^/.]+$/, '');
+  var st = document.getElementById('dev-upload-status');
+  if (st) st.innerHTML = '⏳ جاري قراءة الملف...';
   try {
-    var text = await file.text();
-    contentArea.value = text;
-  } catch(e) {}
+    var text = '';
+    var ext = file.name.split('.').pop().toLowerCase();
+    if (ext === 'pdf') {
+      text = await extractPdfText(file);
+    } else {
+      text = await file.text();
+    }
+    if (tx) tx.value = text;
+    if (st) st.innerHTML = '✅ قُرئ ' + text.length.toLocaleString() + ' حرف';
+  } catch(e) {
+    if (st) st.innerHTML = '❌ خطأ: ' + e.message;
+  }
 }
 
-function saveDevSummary() {
-  var title   = (document.getElementById('dev-sum-title') || {}).value || '';
-  var content = (document.getElementById('dev-sum-content') || {}).value || '';
-  if (!title.trim() || !content.trim()) { showToast('أدخل العنوان والمحتوى', 'error'); return; }
-  var summaries = getDevSummaries();
-  summaries.unshift({ id: 'dev-' + Date.now(), title: title.trim(), content: content.trim(), createdAt: Date.now() });
-  saveDevSummaries(summaries);
-  document.getElementById('dev-sum-title').value = '';
-  document.getElementById('dev-sum-content').value = '';
-  document.getElementById('dev-summary-upload-area').style.display = 'none';
-  showToast('✅ تم حفظ الملخص', 'success');
-  // Refresh
+async function devProcessAndSave() {
+  var title = (document.getElementById('dev-sum-title') || {}).value || '';
+  var text  = (document.getElementById('dev-sum-text')  || {}).value || '';
+  var st = document.getElementById('dev-upload-status');
+
+  if (!title.trim()) { if (st) st.innerHTML = '❌ أدخل العنوان'; return; }
+  if (text.trim().length < 20) { if (st) st.innerHTML = '❌ المحتوى قصير جداً'; return; }
+
+  if (st) st.innerHTML = '🤖 الذكاء الاصطناعي يحلل المحتوى...';
+
+  try {
+    var resp = await zadFetch({
+      model: 'llama-3.3-70b-versatile',
+      max_tokens: 6000,
+      system: 'أنت مساعد تعليمي. أجب بـ JSON صالح فقط بدون أي نص خارجه.',
+      messages: [{
+        role: 'user',
+        content: `أنت مدرس خبير. حلل هذا الملخص التعليمي وأنتج درساً شاملاً مفصلاً.
+عنوان الملخص: "${title}"
+المحتوى:
+${text.slice(0, 12000)}
+
+أجب بـ JSON:
+{
+  "lessonTitle": "${title}",
+  "definition": "شرح مفصل وشامل للموضوع (4-6 جمل واضحة)",
+  "whyLearn": ["أهمية 1", "أهمية 2", "أهمية 3"],
+  "keyTerms": [{"term":"مصطلح","def":"تعريف مفصل"},{"term":"م2","def":"تعريف"},{"term":"م3","def":"تعريف"},{"term":"م4","def":"تعريف"},{"term":"م5","def":"تعريف"}],
+  "examples": [{"icon":"💡","title":"مثال 1","content":"شرح مفصل"},{"icon":"📌","title":"مثال 2","content":"شرح"},{"icon":"🔍","title":"مثال 3","content":"شرح"}],
+  "steps": ["نقطة مفصلة 1","نقطة 2","نقطة 3","نقطة 4","نقطة 5"],
+  "mindMapBranches": [
+    {"label":"محور 1","color":"#6C63FF","children":["فرع 1","فرع 2","فرع 3"]},
+    {"label":"محور 2","color":"#FF6584","children":["فرع 1","فرع 2","فرع 3"]},
+    {"label":"محور 3","color":"#00BFA5","children":["فرع 1","فرع 2"]},
+    {"label":"محور 4","color":"#FFD600","children":["فرع 1","فرع 2"]}
+  ],
+  "quiz": [
+    {"q":"سؤال 1 من المحتوى","options":["صحيح","خطأ1","خطأ2","خطأ3"],"answer":0,"explanation":"شرح"},
+    {"q":"سؤال 2","options":["صحيح","خطأ1","خطأ2","خطأ3"],"answer":0,"explanation":"شرح"},
+    {"q":"سؤال 3","options":["صحيح","خطأ1","خطأ2","خطأ3"],"answer":0,"explanation":"شرح"},
+    {"q":"سؤال 4","options":["صحيح","خطأ1","خطأ2","خطأ3"],"answer":0,"explanation":"شرح"},
+    {"q":"سؤال 5","options":["صحيح","خطأ1","خطأ2","خطأ3"],"answer":0,"explanation":"شرح"}
+  ],
+  "summary": "ملخص شامل ومفصل للدرس",
+  "rawText": ""
+}`
+      }]
+    });
+
+    var data = await resp.json();
+    if (!data.content || !data.content[0]) throw new Error('رد فارغ');
+    var lesson = repairAndParseJSON((data.content[0].text||'').trim());
+    if (!lesson) throw new Error('فشل تحليل JSON');
+
+    lesson.lessonTitle = lesson.lessonTitle || title;
+    lesson.rawText     = text;
+    lesson.createdAt   = Date.now();
+    lesson.id          = 'dev-' + Date.now();
+
+    var lessons = getDevLessons();
+    lessons.unshift(lesson);
+    saveDevLessons(lessons);
+
+    if (st) st.innerHTML = '✅ تم الحفظ! ' + (lesson.keyTerms||[]).length + ' مصطلح، ' + (lesson.quiz||[]).length + ' سؤال';
+    document.getElementById('dev-sum-title').value = '';
+    document.getElementById('dev-sum-text').value  = '';
+
+    // Refresh list
+    var body = document.getElementById('admin-body');
+    if (body) body.innerHTML = buildDevSummaryTab();
+
+    showToast('✅ تم حفظ "' + lesson.lessonTitle + '" وتحليله', 'success');
+
+  } catch(err) {
+    if (st) st.innerHTML = '❌ خطأ: ' + err.message;
+  }
+}
+
+function devDeleteLesson(idx) {
+  var lessons = getDevLessons();
+  var title = lessons[idx] && (lessons[idx].lessonTitle || lessons[idx].title) || 'الملخص';
+  if (!confirm('هل أنت متأكد من حذف "' + title + '"؟')) return;
+  lessons.splice(idx, 1);
+  saveDevLessons(lessons);
   var body = document.getElementById('admin-body');
   if (body) body.innerHTML = buildDevSummaryTab();
+  showToast('🗑️ تم الحذف', 'success');
 }
 
-function deleteDevSummary(idx) {
-  var summaries = getDevSummaries();
-  summaries.splice(idx, 1);
-  saveDevSummaries(summaries);
-  var body = document.getElementById('admin-body');
-  if (body) body.innerHTML = buildDevSummaryTab();
-}
-
-function downloadDevSummary(idx) {
-  var s = getDevSummaries()[idx];
-  if (!s) return;
-  var blob = new Blob([s.content], { type: 'text/plain;charset=utf-8' });
+function devDownloadSummary(idx) {
+  var l = getDevLessons()[idx];
+  if (!l) return;
+  var content = '# ' + (l.lessonTitle||'ملخص') + '\n\n'
+    + '## التعريف\n' + (l.definition||'') + '\n\n'
+    + '## المصطلحات\n' + (l.keyTerms||[]).map(function(k){ return '- ' + k.term + ': ' + k.def; }).join('\n') + '\n\n'
+    + '## النقاط الرئيسية\n' + (l.steps||[]).map(function(s,i){ return (i+1)+'. '+s; }).join('\n') + '\n\n'
+    + '## الملخص\n' + (l.summary||'') + '\n\n'
+    + (l.rawText ? '## النص الأصلي\n' + l.rawText : '');
+  var blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
   var a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = s.title + '.txt';
+  a.download = (l.lessonTitle||'ملخص') + '.md';
   a.click();
   URL.revokeObjectURL(a.href);
   showToast('⬇️ جاري التنزيل', 'success');
 }
 
-// Make dev summaries accessible to students (read-only + download)
+// ── Student: View developer summaries as real lessons ──────────
 function buildStudentDevSummaries() {
-  var summaries = getDevSummaries();
-  if (!summaries.length) return '<div style="text-align:center;padding:40px;color:var(--text-muted)">لا توجد ملخصات من المطور بعد</div>';
+  var lessons = getDevLessons();
+  if (!lessons.length) return '<div style="text-align:center;padding:40px;color:var(--text-muted)"><div style="font-size:2.5rem;margin-bottom:10px">📋</div><div>لا توجد ملخصات من المطور حتى الآن</div></div>';
+
   return '<div style="direction:rtl">'
-    + '<div style="font-weight:900;font-size:0.95rem;margin-bottom:14px">📋 ملخصات المطور</div>'
-    + summaries.map(function(s, i) {
-        return '<div style="background:rgba(255,214,0,0.06);border:1.5px solid rgba(255,214,0,0.2);border-radius:14px;padding:14px 16px;margin-bottom:10px">'
-          + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">'
-            + '<div style="flex:1"><div style="font-weight:800;font-size:0.9rem">'+s.title+'</div>'
-            + '<div style="font-size:0.72rem;color:var(--text-muted)">'+new Date(s.createdAt).toLocaleDateString('ar')+'</div></div>'
-            + '<button onclick="downloadDevSummary('+i+')" style="padding:6px 12px;border-radius:8px;border:1px solid rgba(255,214,0,0.4);background:rgba(255,214,0,0.08);color:#FFD600;font-size:0.78rem;cursor:pointer;font-weight:700">⬇️ تنزيل</button>'
+    + '<div style="font-weight:900;font-size:0.95rem;margin-bottom:14px">📋 ملخصات المطور (' + lessons.length + ')</div>'
+    + lessons.map(function(l, i) {
+        var qCnt = (l.quiz||[]).length;
+        var tCnt = (l.keyTerms||[]).length;
+        return '<div style="background:rgba(255,214,0,0.06);border:1.5px solid rgba(255,214,0,0.2);border-radius:16px;padding:16px;margin-bottom:12px;cursor:pointer" onclick="openDevLesson(' + i + ')">'
+          + '<div style="display:flex;align-items:center;gap:10px">'
+            + '<div style="width:44px;height:44px;border-radius:12px;background:rgba(255,214,0,0.15);display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0">📋</div>'
+            + '<div style="flex:1">'
+              + '<div style="font-weight:800;font-size:0.9rem">' + (l.lessonTitle||l.title||'ملخص') + '</div>'
+              + '<div style="font-size:0.72rem;color:var(--text-muted);margin-top:2px">' + tCnt + ' مصطلح • ' + qCnt + ' سؤال • ' + new Date(l.createdAt||Date.now()).toLocaleDateString('ar') + '</div>'
+            + '</div>'
+            + '<button onclick="event.stopPropagation();devDownloadSummary(' + i + ')" style="padding:6px 10px;border-radius:8px;border:1px solid rgba(255,214,0,0.3);background:transparent;color:#FFD600;font-size:0.72rem;cursor:pointer">⬇️</button>'
           + '</div>'
-          + '<div style="font-size:0.83rem;line-height:1.7">'+s.content.slice(0,300)+(s.content.length>300?'...':'')+'</div>'
-          + '</div>';
+          + (l.definition ? '<div style="font-size:0.8rem;color:var(--text-muted);margin-top:8px;line-height:1.5">' + l.definition.slice(0,100) + (l.definition.length>100?'...':'') + '</div>' : '')
+        + '</div>';
       }).join('')
+    + '</div>';
+}
+
+function openDevLesson(idx) {
+  var l = getDevLessons()[idx];
+  if (!l) return;
+  showSection('lesson');
+  var lc = document.getElementById('lesson-content');
+  if (!lc) return;
+  var aiLesson = {
+    lessonTitle:     l.lessonTitle || l.title || 'ملخص',
+    definition:      l.definition || '',
+    whyLearn:        l.whyLearn || [],
+    keyTerms:        l.keyTerms || [],
+    examples:        l.examples || [],
+    steps:           l.steps || [],
+    properties:      l.properties || [],
+    types:           l.types || [],
+    mindMapBranches: l.mindMapBranches || [],
+    quiz:            l.quiz || [],
+    summary:         l.summary || ''
+  };
+  lc.innerHTML = '<div style="direction:rtl;padding:0">'
+    + '<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">'
+      + '<button class="back-btn" onclick="showDevSummariesPage()">←</button>'
+      + '<div><div style="font-size:1.1rem;font-weight:900">' + aiLesson.lessonTitle + '</div>'
+      + '<div style="font-size:0.75rem;color:var(--text-muted)">📋 ملخص المطور</div></div>'
+    + '</div>'
+    + (renderAILesson(aiLesson) || buildAILessonFallback(aiLesson))
     + '</div>';
 }
 
 function showDevSummariesPage() {
   showSection('dashboard');
-  var dc = document.getElementById('daily-challenge-widget');
-  if (dc) dc.innerHTML = '<div style="background:rgba(255,214,0,0.08);border:1.5px solid rgba(255,214,0,0.25);border-radius:16px;padding:16px;margin-bottom:14px">'
-    + '<div style="font-weight:900;font-size:0.92rem;margin-bottom:12px">📋 ملخصات المطور</div>'
-    + buildStudentDevSummaries()
-    + '</div>';
-  dc && dc.scrollIntoView({behavior:'smooth'});
+  setTimeout(function() {
+    var dc = document.getElementById('daily-challenge-widget');
+    if (dc) {
+      dc.innerHTML = buildStudentDevSummaries();
+      dc.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, 100);
 }
 </script>
 

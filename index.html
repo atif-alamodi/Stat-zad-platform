@@ -6160,7 +6160,7 @@ async function engExplainWord(word, arabic) {
   }
 }
 
-function buildEnglishLab() {
+function buildEnglishLab(subjectId) {
   return `
   <div style="direction:rtl">
 
@@ -6218,7 +6218,8 @@ function buildEnglishLab() {
     </div>
 
     <!-- Panels -->
-    <div id="eng-panel-alphabet">${buildAlphabetPanel()}</div>
+    <div id="eng-panel-uploaded">${buildUploadedLessonsPanel(subjectId || 'english')}</div>
+    <div id="eng-panel-alphabet" style="display:none">${buildAlphabetPanel()}</div>
     <div id="eng-panel-vocab"    style="display:none">${buildVocabPanel()}</div>
     <div id="eng-panel-tense"    style="display:none">${buildTensePanel()}</div>
     <div id="eng-panel-builder"  style="display:none">${buildBuilderPanel()}</div>
@@ -13669,7 +13670,7 @@ function showSubject(subjectId, activeTab) {
       if (_labUps.length>0) {
         var _origLab = '';
         if (subjectId==='communication') _origLab=buildCommLab();
-        else if (subjectId==='english')  _origLab=buildEnglishLab();
+        else if (subjectId==='english')  _origLab=buildEnglishLab(subjectId);
         else if (subjectId==='os')       _origLab=buildOSLab();
         else _origLab=buildEmbeddedLab(subjectId);
         body = buildContentLab(subjectId)+'<div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)"><div style="font-weight:800;font-size:0.85rem;margin-bottom:12px;color:var(--text-muted)">🔬 المختبر التقني</div>'+_origLab+'</div>';
@@ -20431,6 +20432,181 @@ function renderAllSubjects() {
       + '<div class="progress-bar"><div class="progress-fill" style="width:'+prog+'%;background:'+color+'"></div></div>'
       + '</div>';
   }).join('');
+}
+
+function buildUploadedLessonsPanel(subjectId) {
+  var uploads = ZAD_UPLOADS.getAll().filter(function(u){ return u.subjectId === subjectId && u.lesson; });
+  if (!uploads.length) {
+    return '<div style="text-align:center;padding:40px 20px;color:var(--text-muted)">'
+      + '<div style="font-size:2.5rem;margin-bottom:12px">📚</div>'
+      + '<div style="font-weight:700;margin-bottom:6px">لا توجد دروس مرفوعة بعد</div>'
+      + '<div style="font-size:0.82rem">ارفع ملف من تبويب "رفع محتوى" لتفعيل تمارين مخصصة</div>'
+      + '</div>';
+  }
+
+  // Show selector + exercises from selected lesson
+  var optionsHTML = uploads.map(function(u,i){
+    return '<option value="'+i+'">'+(u.lesson&&u.lesson.title || u.title || u.fileName)+'</option>';
+  }).join('');
+
+  var first = uploads[0];
+  var exercises = buildLessonExercises(first);
+
+  return '<div style="direction:rtl">'
+    + '<div style="margin-bottom:14px">'
+      + '<label style="font-size:0.78rem;color:var(--text-muted);display:block;margin-bottom:5px">اختر الدرس:</label>'
+      + '<select id="eng-lab-lesson-sel" onchange="engLabSwitchLesson(this.value)" style="width:100%;padding:9px 12px;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,0.06);color:var(--text);font-family:var(--font);font-size:0.85rem">'
+      + optionsHTML
+      + '</select>'
+    + '</div>'
+    + '<div id="eng-lab-exercises">' + exercises + '</div>'
+  + '</div>';
+}
+
+function buildLessonExercises(bundle) {
+  if (!bundle || !bundle.lesson) return '';
+  var l = bundle.lesson;
+  var content = l.content || {};
+  var keyTerms = content.keyTerms || [];
+  var types = content.types || [];
+  var examples = content.realExamples || [];
+  var quiz = l.quiz || [];
+  var html = '';
+
+  // ── 1. Key Terms Flashcards ─────────────────────────────
+  if (keyTerms.length) {
+    html += '<div style="background:rgba(33,150,243,0.06);border:1.5px solid rgba(33,150,243,0.2);border-radius:14px;padding:14px;margin-bottom:14px">'
+      + '<div style="font-weight:800;font-size:0.85rem;margin-bottom:12px;color:#42A5F5">🔤 Key Terms — بطاقات المصطلحات</div>'
+      + '<div style="display:flex;flex-direction:column;gap:8px">'
+      + keyTerms.map(function(k,i) {
+          var term = k.term || k;
+          var def  = k.def || k.definition || '';
+          return '<div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:10px 14px;cursor:pointer;border:1px solid rgba(255,255,255,0.07)" onclick="this.querySelector(\'.def\').style.display=this.querySelector(\'.def\').style.display===\'none\'?\'block\':\'none\'">'
+            + '<div style="font-weight:700;font-size:0.88rem;direction:ltr;color:#42A5F5">' + term + ' <span style="font-size:0.7rem;color:var(--text-muted)">(اضغط للمعنى)</span></div>'
+            + '<div class="def" style="display:none;font-size:0.82rem;color:var(--text-muted);margin-top:5px;padding-top:5px;border-top:1px solid rgba(255,255,255,0.06)">' + def + '</div>'
+          + '</div>';
+        }).join('')
+      + '</div></div>';
+  }
+
+  // ── 2. Fill-in-the-blank from key terms ────────────────
+  if (keyTerms.length >= 3) {
+    var blanks = keyTerms.slice(0, Math.min(5, keyTerms.length));
+    html += '<div style="background:rgba(0,191,165,0.06);border:1.5px solid rgba(0,191,165,0.2);border-radius:14px;padding:14px;margin-bottom:14px">'
+      + '<div style="font-weight:800;font-size:0.85rem;margin-bottom:12px;color:#00BFA5">✏️ Fill in the Blanks</div>'
+      + '<div id="blanks-container" style="display:flex;flex-direction:column;gap:10px">'
+      + blanks.map(function(k,i) {
+          var term = typeof k==='string' ? k : (k.term||'');
+          var def  = typeof k==='string' ? '' : (k.def||k.definition||'');
+          return '<div style="padding:10px;background:rgba(255,255,255,0.03);border-radius:10px">'
+            + '<div style="font-size:0.82rem;margin-bottom:7px;direction:rtl">معنى: <strong>' + def + '</strong></div>'
+            + '<div style="display:flex;gap:8px;align-items:center;direction:ltr">'
+              + '<input id="blank-'+i+'" type="text" placeholder="Type the English term..." style="flex:1;padding:8px 10px;border-radius:8px;border:1.5px solid rgba(0,191,165,0.3);background:rgba(255,255,255,0.05);color:var(--text);font-family:inherit;font-size:0.85rem;outline:none">'
+              + '<button onclick="checkBlank('+i+',\''+term.replace(/'/g,"\\'")+'\')" style="padding:8px 14px;border-radius:8px;border:none;background:#00BFA5;color:white;cursor:pointer;font-weight:700;font-size:0.8rem">Check</button>'
+            + '</div>'
+            + '<div id="blank-result-'+i+'" style="font-size:0.78rem;margin-top:4px;min-height:16px"></div>'
+          + '</div>';
+        }).join('')
+      + '</div></div>';
+  }
+
+  // ── 3. Quiz from uploaded lesson ───────────────────────
+  if (quiz.length) {
+    var q = quiz[Math.floor(Math.random() * quiz.length)];
+    html += '<div style="background:rgba(156,39,176,0.06);border:1.5px solid rgba(156,39,176,0.2);border-radius:14px;padding:14px;margin-bottom:14px">'
+      + '<div style="font-weight:800;font-size:0.85rem;margin-bottom:12px;color:#9C27B0">❓ Practice Quiz</div>'
+      + '<div id="lab-quiz-q" style="font-size:0.88rem;font-weight:700;margin-bottom:12px;direction:ltr">' + q.q + '</div>'
+      + '<div style="display:flex;flex-direction:column;gap:7px">'
+      + (q.options||[]).map(function(opt,i) {
+          return '<button onclick="labCheckAnswer('+i+','+q.answer+',this,\'lab-quiz-expl\')" '
+            + 'style="padding:10px 14px;border-radius:10px;border:1.5px solid rgba(156,39,176,0.2);background:rgba(156,39,176,0.06);color:var(--text);font-family:var(--font);font-size:0.83rem;cursor:pointer;text-align:left;direction:ltr">'
+            + opt + '</button>';
+        }).join('')
+      + '</div>'
+      + '<div id="lab-quiz-expl" style="margin-top:10px;font-size:0.8rem;min-height:16px"></div>'
+    + '</div>';
+  }
+
+  // ── 4. AI Conversation about the lesson ────────────────
+  html += '<div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:14px">'
+    + '<div style="font-weight:800;font-size:0.85rem;margin-bottom:10px;color:var(--primary)">🤖 Ask AI About This Lesson</div>'
+    + '<div id="eng-lab-chat-hist" style="min-height:80px;max-height:240px;overflow-y:auto;margin-bottom:10px;font-size:0.82rem;color:var(--text-muted);text-align:center;padding:10px">اسأل أي سؤال عن الدرس...</div>'
+    + '<div style="display:flex;gap:8px">'
+      + '<input id="eng-lab-chat-inp" placeholder="E.g. Explain the difference between..." style="flex:1;padding:9px;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text);font-family:var(--font);font-size:0.83rem;outline:none;direction:ltr">'
+      + '<button onclick="engLabAsk()" style="padding:9px 14px;border-radius:10px;border:none;background:var(--primary);color:white;font-weight:800;cursor:pointer;font-size:0.85rem">Ask</button>'
+    + '</div>'
+    + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">'
+    + ['Explain this topic simply', 'Give me 3 examples', 'Quiz me on this', 'What are the key rules?'].map(function(q){
+        return '<button onclick="document.getElementById(\'eng-lab-chat-inp\').value=\''+q+'\'" style="padding:4px 8px;border-radius:7px;border:1px solid var(--border);background:rgba(255,255,255,0.04);color:var(--text-muted);font-size:0.7rem;cursor:pointer">'+q+'</button>';
+      }).join('')
+    + '</div>'
+  + '</div>';
+
+  return html;
+}
+
+function engLabSwitchLesson(idx) {
+  var uploads = ZAD_UPLOADS.getAll().filter(function(u){ return u.subjectId==='english' && u.lesson; });
+  var bundle = uploads[parseInt(idx)];
+  if (!bundle) return;
+  var container = document.getElementById('eng-lab-exercises');
+  if (container) container.innerHTML = buildLessonExercises(bundle);
+}
+
+function checkBlank(idx, answer) {
+  var inp = document.getElementById('blank-'+idx);
+  var res = document.getElementById('blank-result-'+idx);
+  if (!inp || !res) return;
+  var val = inp.value.trim().toLowerCase();
+  var ans = answer.toLowerCase().replace(/\s*\([^)]*\)/g,'').trim();
+  var correct = val === ans || ans.includes(val) || val.includes(ans.split(' ')[0]);
+  res.style.color = correct ? '#28CA41' : '#FF5252';
+  res.textContent = correct ? '✅ Correct! Well done!' : '❌ Try again. Answer: ' + answer;
+}
+
+function labCheckAnswer(selected, correct, btn, explId) {
+  var btns = btn.parentElement.querySelectorAll('button');
+  btns.forEach(function(b,i) {
+    b.disabled = true;
+    b.style.background = i===correct ? 'rgba(40,202,65,0.2)' : 'rgba(255,82,82,0.1)';
+    b.style.borderColor = i===correct ? '#28CA41' : 'rgba(255,82,82,0.3)';
+    b.style.color = i===correct ? '#28CA41' : (i===selected ? '#FF5252' : 'var(--text-muted)');
+  });
+}
+
+async function engLabAsk() {
+  var inp = document.getElementById('eng-lab-chat-inp');
+  var hist = document.getElementById('eng-lab-chat-hist');
+  if (!inp || !hist || !inp.value.trim()) return;
+  var question = inp.value.trim();
+  inp.value = '';
+
+  // Get current lesson context
+  var sel = document.getElementById('eng-lab-lesson-sel');
+  var idx = sel ? parseInt(sel.value) : 0;
+  var uploads = ZAD_UPLOADS.getAll().filter(function(u){ return u.subjectId==='english' && u.lesson; });
+  var bundle = uploads[idx];
+  var context = bundle ? 'Lesson: ' + (bundle.lesson&&bundle.lesson.title||'') + '\nDefinition: ' + ((bundle.lesson&&bundle.lesson.content&&bundle.lesson.content.definition)||'') : 'English grammar lesson';
+
+  hist.innerHTML += '<div style="text-align:right;margin-bottom:8px"><span style="background:rgba(108,99,255,0.15);padding:6px 10px;border-radius:10px;display:inline-block;direction:rtl">'+question+'</span></div>';
+  hist.innerHTML += '<div id="eng-ans-loading" style="color:var(--text-muted);font-size:0.78rem">⏳ Thinking...</div>';
+  hist.scrollTop = hist.scrollHeight;
+
+  try {
+    var resp = await zadFetch({
+      model: 'llama-3.3-70b-versatile', max_tokens: 600,
+      system: 'You are an English teacher for Arabic-speaking students. Answer in simple Arabic with English examples. Keep answers concise and clear.',
+      messages: [{ role:'user', content: 'Context:\n' + context + '\n\nStudent question: ' + question }]
+    });
+    var data = await resp.json();
+    var answer = data.content&&data.content[0]&&data.content[0].text || 'Sorry, could not get an answer.';
+    var loading = document.getElementById('eng-ans-loading');
+    if (loading) loading.outerHTML = '<div style="background:rgba(0,191,165,0.08);border-radius:10px;padding:8px 12px;margin-bottom:8px;font-size:0.82rem;line-height:1.6;direction:rtl">'+answer+'</div>';
+    hist.scrollTop = hist.scrollHeight;
+  } catch(err) {
+    var l = document.getElementById('eng-ans-loading');
+    if (l) l.textContent = '❌ Error: ' + err.message;
+  }
 }
 </script>
 

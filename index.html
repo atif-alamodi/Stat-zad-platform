@@ -19975,39 +19975,212 @@ function doGlobalSearch(query) {
 }
 
 // ── 2. NOTES SYSTEM ───────────────────────────────────────────
-var ZAD_NOTES_KEY = 'zad_notes_v1';
+var ZAD_NOTES_KEY = 'zad_notes_v2';
 
-function getNotes() {
+function _notesKey() {
   var email = APP.student.email || 'guest';
-  var key = ZAD_NOTES_KEY + '_' + email.replace(/[^a-z0-9]/gi,'_');
-  try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch(e) { return []; }
+  return ZAD_NOTES_KEY + '_' + email.replace(/[^a-z0-9]/gi,'_');
 }
 
-function saveNote(lessonId, text) {
-  var email = APP.student.email || 'guest';
-  var key = ZAD_NOTES_KEY + '_' + email.replace(/[^a-z0-9]/gi,'_');
+function getNotes() {
+  try { return JSON.parse(localStorage.getItem(_notesKey()) || '[]'); } catch(e) { return []; }
+}
+
+function saveNotesAll(arr) {
+  try { localStorage.setItem(_notesKey(), JSON.stringify(arr)); } catch(e) {}
+}
+
+// Add or update a note (called from inside a lesson)
+function saveNote(lessonId, text, lessonTitle, subjectId) {
   var notes = getNotes();
-  var existing = notes.findIndex(function(n){ return n.lessonId === lessonId; });
-  if (existing >= 0) notes[existing] = { lessonId:lessonId, text:text, date:Date.now() };
-  else notes.push({ lessonId:lessonId, text:text, date:Date.now() });
-  notes = notes.filter(function(n){ return n.text.trim(); });
-  localStorage.setItem(key, JSON.stringify(notes));
+  var idx = notes.findIndex(function(n){ return n.id === lessonId; });
+  var entry = { id: lessonId || ('free-'+Date.now()), type:'lesson',
+    title: lessonTitle || 'ملاحظة درس', subjectId: subjectId || '',
+    text: text, date: Date.now() };
+  if (idx >= 0) notes[idx] = entry; else notes.push(entry);
+  notes = notes.filter(function(n){ return (n.text||'').trim() || (n.fileData); });
+  saveNotesAll(notes);
+}
+
+// Save a free note from the notes panel
+function saveFreNote(id) {
+  var ta = document.getElementById('note-editor-' + id);
+  var titleEl = document.getElementById('note-title-' + id);
+  if (!ta) return;
+  var text  = ta.value.trim();
+  var title = (titleEl && titleEl.value.trim()) || 'ملاحظة حرة';
+  var notes = getNotes();
+  var idx = notes.findIndex(function(n){ return n.id === id; });
+  if (idx >= 0) { notes[idx].text = text; notes[idx].title = title; notes[idx].date = Date.now(); }
+  else notes.push({ id:id, type:'free', title:title, text:text, date:Date.now() });
+  saveNotesAll(notes);
+  showToast('✅ تم الحفظ', 'success');
+  refreshNotesPanel();
+}
+
+// Delete a note
+function deleteNote(id) {
+  var notes = getNotes().filter(function(n){ return n.id !== id; });
+  saveNotesAll(notes);
+  refreshNotesPanel();
+  showToast('🗑️ تم الحذف', 'success');
+}
+
+function refreshNotesPanel() {
+  var nc = document.getElementById('notes-content');
+  if (nc) nc.innerHTML = buildNotesPanel();
+}
+
+function formatNote(cmd, value) {
+  // Works on the currently active note textarea (focused)
+  var active = document.activeElement;
+  if (!active || active.tagName !== 'TEXTAREA') return;
+  var start = active.selectionStart, end = active.selectionEnd;
+  var sel = active.value.substring(start, end);
+  var replacement = '';
+  if (cmd === 'bold')      replacement = '**' + (sel||'نص') + '**';
+  if (cmd === 'bullet')    replacement = '\n• ' + (sel||'نقطة');
+  if (cmd === 'number')    replacement = '\n1. ' + (sel||'نقطة');
+  if (cmd === 'heading')   replacement = '\n## ' + (sel||'عنوان');
+  if (cmd === 'line')      replacement = '\n---\n';
+  if (cmd === 'emoji')     replacement = value || '✅';
+  active.value = active.value.substring(0, start) + replacement + active.value.substring(end);
+  active.selectionStart = active.selectionEnd = start + replacement.length;
+  active.focus();
+}
+
+// Upload file as a note
+function uploadNoteFile() {
+  var inp = document.getElementById('note-file-upload');
+  if (!inp) return;
+  inp.click();
+}
+
+function handleNoteFileUpload(event) {
+  var file = event.target.files && event.target.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var text = e.target.result;
+    var id = 'file-' + Date.now();
+    var notes = getNotes();
+    notes.push({ id:id, type:'file', title:file.name, text:text.slice(0,5000), date:Date.now(), fileName:file.name });
+    saveNotesAll(notes);
+    showToast('✅ تم رفع "'+file.name+'"', 'success');
+    refreshNotesPanel();
+  };
+  reader.readAsText(file, 'utf-8');
 }
 
 function buildNotesPanel() {
   var notes = getNotes();
-  var notesHTML = notes.length ? notes.map(function(n) {
-    return '<div style="padding:12px;background:rgba(255,214,0,0.06);border:1px solid rgba(255,214,0,0.2);border-radius:12px;margin-bottom:8px">'
-      + '<div style="font-size:0.7rem;color:#E8A020;margin-bottom:4px">' + new Date(n.date).toLocaleDateString('ar') + '</div>'
-      + '<div style="font-size:0.83rem;line-height:1.6">' + (n.text||'').replace(/\n/g,'<br>') + '</div>'
-      + '</div>';
-  }).join('') : '<div style="color:var(--text-muted);text-align:center;padding:20px">لا توجد ملاحظات بعد<br><small>أضف ملاحظات من داخل كل درس</small></div>';
 
-  return '<div style="direction:rtl">'
-    + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">'
-    + '<div style="font-weight:800">📝 ملاحظاتي (' + notes.length + ')</div>'
+  // ── Toolbar ──────────────────────────────────────────
+  var toolbarBtns = [
+    {cmd:'bold',    icon:'B',    title:'خط عريض'},
+    {cmd:'heading', icon:'H',    title:'عنوان'},
+    {cmd:'bullet',  icon:'•',    title:'قائمة نقطية'},
+    {cmd:'number',  icon:'1.',   title:'قائمة مرقمة'},
+    {cmd:'line',    icon:'—',    title:'فاصل'},
+    {cmd:'emoji',   icon:'✅',   title:'✅', val:'✅'},
+    {cmd:'emoji',   icon:'⚠️',  title:'⚠️', val:'⚠️'},
+    {cmd:'emoji',   icon:'📌',  title:'📌', val:'📌'},
+    {cmd:'emoji',   icon:'🔑',  title:'🔑', val:'🔑'},
+  ].map(function(b){
+    return '<button onclick="formatNote(\''+b.cmd+'\','+(b.val?'\''+b.val+'\'':'undefined')+');event.preventDefault()" '
+      + 'title="'+b.title+'" style="padding:4px 8px;border-radius:6px;border:1px solid var(--border);'
+      + 'background:rgba(255,255,255,0.05);color:var(--text);font-size:0.8rem;cursor:pointer;font-weight:700">'+b.icon+'</button>';
+  }).join('');
+
+  var newNoteId = 'new-' + Date.now();
+
+  // ── New note form ────────────────────────────────────
+  var newNoteForm = '<div style="background:rgba(255,214,0,0.05);border:1.5px solid rgba(255,214,0,0.25);border-radius:16px;padding:16px;margin-bottom:18px">'
+    + '<div style="font-weight:800;font-size:0.9rem;margin-bottom:12px;color:#E8A020">✏️ مذكرة جديدة</div>'
+    // Title input
+    + '<input id="note-title-'+newNoteId+'" type="text" placeholder="عنوان الملاحظة..." maxlength="60"'
+      + ' style="width:100%;box-sizing:border-box;padding:8px 12px;border-radius:10px;border:1px solid var(--border);'
+      + 'background:rgba(255,255,255,0.05);color:var(--text);font-family:var(--font);font-size:0.88rem;margin-bottom:8px;direction:rtl;outline:none">'
+    // Formatting toolbar
+    + '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px">'+toolbarBtns+'</div>'
+    // Text area
+    + '<textarea id="note-editor-'+newNoteId+'" rows="5" placeholder="اكتب ملاحظاتك هنا..."'
+      + ' style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:10px;border:1px solid var(--border);'
+      + 'background:rgba(255,255,255,0.05);color:var(--text);font-family:var(--font);font-size:0.88rem;'
+      + 'outline:none;resize:vertical;line-height:1.7;direction:rtl"></textarea>'
+    // Action buttons
+    + '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">'
+      + '<button onclick="saveFreNote(\''+newNoteId+'\');" '
+        + 'style="padding:9px 20px;border-radius:10px;border:none;background:linear-gradient(135deg,#E8A020,#FFD600);'
+        + 'color:#1a1a1a;font-family:var(--font);font-weight:900;cursor:pointer;font-size:0.85rem">💾 حفظ المذكرة</button>'
+      + '<button onclick="uploadNoteFile();" '
+        + 'style="padding:9px 20px;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,0.05);'
+        + 'color:var(--text);font-family:var(--font);font-weight:700;cursor:pointer;font-size:0.85rem">📎 رفع ملف نصي</button>'
     + '</div>'
-    + notesHTML + '</div>';
+    + '<input type="file" id="note-file-upload" accept=".txt,.md" style="display:none" onchange="handleNoteFileUpload(event)">'
+  + '</div>';
+
+  // ── Saved notes list ─────────────────────────────────
+  var savedHTML = '';
+  if (notes.length) {
+    savedHTML = '<div style="font-weight:800;font-size:0.85rem;color:var(--text-muted);margin-bottom:10px">📋 ملاحظاتي المحفوظة ('+notes.length+')</div>';
+    savedHTML += notes.slice().reverse().map(function(n) {
+      var isFile = n.type === 'file';
+      var dateStr = new Date(n.date).toLocaleDateString('ar-SA', {day:'numeric',month:'short',year:'numeric'});
+      var preview = (n.text||'').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
+      return '<div style="background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:14px;margin-bottom:10px;overflow:hidden">'
+        // Header
+        + '<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.05)">'
+          + '<span style="font-size:1.1rem">'+(isFile?'📎':'📝')+'</span>'
+          + '<div style="flex:1;min-width:0">'
+            + '<div style="font-weight:800;font-size:0.85rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(n.title||'ملاحظة')+'</div>'
+            + '<div style="font-size:0.68rem;color:var(--text-muted)">'+(isFile?'📄 '+n.fileName+' · ':'')+'🕐 '+dateStr+'</div>'
+          + '</div>'
+          + '<button onclick="deleteNote(\''+n.id+'\');" '
+            + 'style="padding:4px 8px;border-radius:6px;border:none;background:rgba(255,82,82,0.1);color:#FF5252;cursor:pointer;font-size:0.7rem;font-weight:700;flex-shrink:0">🗑️</button>'
+        + '</div>'
+        // Content (collapsible on tap)
+        + '<div style="padding:12px 14px;font-size:0.83rem;line-height:1.7;max-height:150px;overflow:hidden;cursor:pointer" '
+          + 'onclick="this.style.maxHeight=this.style.maxHeight===\'none\'?\'150px\':\'none\'" title="اضغط لتوسيع">'
+          + preview
+        + '</div>'
+        // Edit button (free notes only)
+        + (!isFile ? '<div style="padding:6px 14px;border-top:1px solid rgba(255,255,255,0.04)">'
+            + '<button onclick="openEditNote(\''+n.id+'\')" style="padding:4px 10px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--text-muted);font-size:0.7rem;cursor:pointer">✏️ تعديل</button>'
+          + '</div>' : '')
+      + '</div>';
+    }).join('');
+  } else {
+    savedHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:0.85rem">'
+      + '<div style="font-size:2rem;margin-bottom:8px">📭</div>'
+      + 'لا توجد ملاحظات محفوظة بعد</div>';
+  }
+
+  return '<div style="direction:rtl">' + newNoteForm + savedHTML + '</div>';
+}
+
+function openEditNote(id) {
+  var notes = getNotes();
+  var n = notes.find(function(x){ return x.id === id; });
+  if (!n) return;
+
+  var ov = document.createElement('div');
+  ov.id = 'note-edit-overlay';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.85);display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto;direction:rtl';
+  ov.innerHTML = '<div style="background:#1C1917;border:1.5px solid rgba(255,214,0,0.3);border-radius:18px;padding:18px;width:100%;max-width:500px;margin-top:20px">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'
+      + '<div style="font-weight:800;color:#E8A020">✏️ تعديل الملاحظة</div>'
+      + '<button onclick="document.getElementById(\'note-edit-overlay\').remove()" style="padding:4px 10px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer">✕</button>'
+    + '</div>'
+    + '<input id="edit-note-title" value="'+(n.title||'')+'" style="width:100%;box-sizing:border-box;padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text);font-family:var(--font);font-size:0.88rem;margin-bottom:8px;direction:rtl;outline:none">'
+    + '<textarea id="edit-note-text" rows="8" style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text);font-family:var(--font);font-size:0.85rem;outline:none;resize:vertical;line-height:1.7;direction:rtl">'+(n.text||'')+'</textarea>'
+    + '<div style="display:flex;gap:8px;margin-top:10px">'
+      + '<button onclick="(function(){ var notes=getNotes(); var idx=notes.findIndex(function(x){return x.id===\''+n.id+'\';}); if(idx>=0){ notes[idx].text=document.getElementById(\'edit-note-text\').value; notes[idx].title=document.getElementById(\'edit-note-title\').value; notes[idx].date=Date.now(); saveNotesAll(notes); } showToast(\'✅ تم الحفظ\',\'success\'); document.getElementById(\'note-edit-overlay\').remove(); refreshNotesPanel(); })()" '
+        + 'style="flex:1;padding:10px;border-radius:10px;border:none;background:linear-gradient(135deg,#E8A020,#FFD600);color:#1a1a1a;font-family:var(--font);font-weight:900;cursor:pointer">💾 حفظ</button>'
+      + '<button onclick="document.getElementById(\'note-edit-overlay\').remove()" style="padding:10px 18px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer">إلغاء</button>'
+    + '</div>'
+  + '</div>';
+  document.body.appendChild(ov);
 }
 
 // ── 3. BOOKMARKS ──────────────────────────────────────────────

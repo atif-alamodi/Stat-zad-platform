@@ -13886,21 +13886,29 @@ function buildLessonsTab(subject, subjectId) {
           + '</div>'
       : '<div class="chapter-pages">' + chLabel + (ch.pages ? ' — 📄 ' + ch.pages : '') + '</div>';
 
+    // Subject icon/color for chapter badge
+    var subjIcon  = (CURRICULUM[subjectId] && CURRICULUM[subjectId].icon)  ? CURRICULUM[subjectId].icon  : (isUpload ? '📂' : '📘');
+    var subjColor = (CURRICULUM[subjectId] && CURRICULUM[subjectId].color) ? CURRICULUM[subjectId].color : (isUpload ? '#6C63FF' : 'var(--primary)');
+
     var _chOpen  = isOpen ? ' open' : '';
     var _chStyle = chBorderStyle;
-    var _chNum   = isUpload ? 'background:linear-gradient(135deg,#6C63FF,#a78bfa)' : 'background:linear-gradient(135deg,var(--primary),var(--secondary))';
     chapHtml += [
       '<div class="chapter-item'+_chOpen+'" id="ch-'+safeChId+'"'+_chStyle+'>',
         '<div class="chapter-header"',
-          ' onclick="toggleChapter(\''+safeChId+'\')"',
-          ' oncontextmenu="event.preventDefault();showDeleteChapterConfirm(\''+subjectId+'\',\''+safeChId+'\',\''+safeChTitle+'\');"',
-          ' ontouchstart="startLongPress(event,\'__ch__'+safeChId+'\',\'\',\''+subjectId+'\',\''+safeChTitle+'\');" ontouchend="clearLongPress()" ontouchmove="clearLongPress()"',
+          ' onclick="toggleChapter(''+safeChId+'')"',
+          ' oncontextmenu="event.preventDefault();showDeleteChapterConfirm(''+subjectId+'',''+safeChId+'',''+safeChTitle+'');"',
+          ' ontouchstart="startLongPress(event,'__ch__'+safeChId+'','',''+subjectId+'',''+safeChTitle+'');" ontouchend="clearLongPress()" ontouchmove="clearLongPress()"',
         '>',
-          '<div class="chapter-num" style="'+_chNum+'">'+(i+1)+'</div>',
+          // Subject icon badge with ordinal number below it
+          '<div class="chapter-num" style="background:linear-gradient(135deg,'+subjColor+','+subjColor+'99);flex-direction:column;gap:0;padding:4px 6px;font-size:0.7rem;width:44px;height:44px">',
+            '<span style="font-size:1.1rem;line-height:1.2">'+subjIcon+'</span>',
+            '<span style="font-size:0.7rem;font-weight:900;line-height:1">'+chSeq+'</span>',
+          '</div>',
           '<div class="chapter-info">',
-            '<div class="chapter-title" style="display:flex;align-items:center;gap:6px;font-size:'+(isUpload?'0.92':'0.88')+'rem">',
-              (ch.icon||'📘')+' '+(ch.title||'')+(isUpload?'':' '+badge),
+            '<div class="chapter-title" style="font-size:'+(isUpload?'0.92':'0.88')+'rem;font-weight:700">',
+              (ch.title||'')+(isUpload?'':' '+badge),
             '</div>',
+            '<div style="font-size:0.68rem;color:var(--text-muted);font-weight:700;margin-top:1px">'+chLabel+'</div>',
             lessCntBadge,
           '</div>',
           '<i class="fas fa-chevron-left chapter-chevron"></i>',
@@ -21087,16 +21095,36 @@ function buildContentLab(subjectId) {
       + '</div>';
   }
 
-  // Build lesson selector + AI chat
-  var optionsHTML = uploads.map(function(u, i) {
-    var title = (u.lesson && u.lesson.title) || u.title || u.fileName || 'درس '+i;
-    return '<option value="'+i+'">'+title+'</option>';
+  // Build grouped options by chapter (chapterTitle = file name)
+  // Group uploads by their chapterTitle (each file = one chapter)
+  var chapGroups = {};
+  var chapOrder  = [];
+  uploads.forEach(function(u, i) {
+    var chKey = u.chapterTitle || u.fileName || 'فصل';
+    if (!chapGroups[chKey]) { chapGroups[chKey] = []; chapOrder.push(chKey); }
+    chapGroups[chKey].push({ u: u, i: i });
+  });
+
+  // Build structured option groups: optgroup per chapter, options per lesson
+  var optionsHTML = chapOrder.map(function(chKey, ci) {
+    var lessons = chapGroups[chKey];
+    var groupLabel = 'الفصل ' + arabicOrdinal(ci+1) + ' — ' + chKey;
+    if (lessons.length === 1) {
+      var title = (lessons[0].u.lesson && lessons[0].u.lesson.title) || lessons[0].u.title || lessons[0].u.fileName || 'درس';
+      return '<option value="'+lessons[0].i+'">'+arabicOrdinal(ci+1)+'. '+title+'</option>';
+    }
+    return '<optgroup label="'+groupLabel+'">'
+      + lessons.map(function(item, li) {
+          var title = (item.u.lesson && item.u.lesson.title) || item.u.title || item.u.fileName || 'درس';
+          return '<option value="'+item.i+'">الدرس '+arabicOrdinal(li+1)+': '+title+'</option>';
+        }).join('')
+      + '</optgroup>';
   }).join('');
 
   return '<div style="direction:rtl;max-width:700px">'
     + '<div style="background:rgba(108,99,255,0.08);border:1.5px solid rgba(108,99,255,0.25);border-radius:16px;padding:16px;margin-bottom:16px">'
-      + '<div style="font-weight:900;font-size:0.95rem;margin-bottom:12px">🧪 مختبر تفاعلي — اسأل عن محتوى دروسك</div>'
-      + '<select id="lab-lesson-select" style="width:100%;padding:9px 12px;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text);font-family:var(--font);font-size:0.85rem;margin-bottom:10px">'
+      + '<div style="font-weight:900;font-size:0.95rem;margin-bottom:12px">🧪 مختبر تفاعلي — اسأل عن أي درس</div>'
+      + '<select id="lab-lesson-select" style="width:100%;padding:9px 12px;border-radius:10px;border:1px solid var(--border);background:rgba(30,30,40,0.95);color:var(--text);font-family:var(--font);font-size:0.85rem;margin-bottom:10px">'
         + optionsHTML
       + '</select>'
     + '</div>'

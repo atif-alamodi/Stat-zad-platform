@@ -7489,8 +7489,7 @@ function detectSubjectFromText(text) {
 }
 
 function buildUploadTab(subjectId) {
-  const subject = CURRICULUM[subjectId];
-  if (!subject) return '';
+  const subject = CURRICULUM[subjectId] || { id: subjectId, title: subjectId, icon: '📚', chapters: [] };
   return `
     ${typeof buildMyUploadsPanel==='function'?buildMyUploadsPanel(subjectId):''}
     
@@ -13910,6 +13909,11 @@ function showSubject(subjectId, activeTab) {
   activeTab = activeTab || 'lessons';
   APP.lastSubjectTab = activeTab;
 
+  // Try to recover from localStorage if not in CURRICULUM (e.g. after page refresh)
+  if (!CURRICULUM[subjectId] && typeof getCustomSubjects === 'function') {
+    var _saved = getCustomSubjects().find(function(s){ return s.id === subjectId; });
+    if (_saved) CURRICULUM[subjectId] = _saved;
+  }
   var subject = CURRICULUM[subjectId] || { id: subjectId, title: subjectId, icon: '📚', chapters: [] };
 
   showSection('subject-detail');
@@ -19318,27 +19322,32 @@ function confirmAddSubject() {
 
   var icon = overlay._selectedIcon || '📚';
   var id   = 'custom_' + Date.now();
+  var color = '#6C63FF';
 
-  // Add to CURRICULUM
-  CURRICULUM[id] = {
-    id: id, title: title, icon: icon, description: title,
-    chapters: [{ id:'ch1', title: title, lessons:[] }]
+  var subjectData = {
+    id: id, title: title, icon: icon,
+    description: title, color: color,
+    chapters: [{ id:'ch1', title: title, pages:'', icon:'📘', lessons:[] }]
   };
 
-  // Save to localStorage
-  var custom = getCustomSubjects();
-  custom.push({ id:id, title:title, icon:icon, description:title,
-    chapters:[{id:'ch1',title:title,lessons:[]}] });
+  // Add to CURRICULUM
+  CURRICULUM[id] = subjectData;
+
+  // Save to localStorage (same key as saveSubjectProfile)
+  var custom = getCustomSubjects().filter(function(s){ return s.id !== id; });
+  custom.push(subjectData);
   saveCustomSubjects(custom);
 
   overlay.remove();
   showToast('✅ تمت إضافة "' + title + '"', 'success');
 
-  // Refresh UI
+  // Refresh UI and navigate
   renderSubjectCards('quick-subjects', 6);
   var grid = document.getElementById('all-subjects-grid');
   if (grid) renderSubjectCards('all-subjects-grid', 99);
+  if (typeof rebuildNavSubjects === 'function') rebuildNavSubjects();
   if (typeof refreshUserCurriculumSection === 'function') refreshUserCurriculumSection();
+  setTimeout(function(){ showSubject(id, 'upload'); }, 300);
 }
 
 // Delete a subject (custom only)
@@ -19404,10 +19413,18 @@ function deleteSubject(subjectId) {
 
 // Restore custom subjects on login
 function restoreCustomSubjects() {
-  // 1. Add custom subjects
+  // 1. Add custom subjects — always overwrite to get latest title/icon/color
   var custom = getCustomSubjects();
   custom.forEach(function(s) {
-    if (!CURRICULUM[s.id]) CURRICULUM[s.id] = s;
+    if (s && s.id && s.title) {
+      // Preserve existing uploaded chapters if any
+      var existing = CURRICULUM[s.id];
+      if (existing && existing.chapters) {
+        var uploadedChs = existing.chapters.filter(function(c){ return c.aiGenerated || (c.id && c.id.startsWith('up-ch-')); });
+        s.chapters = (s.chapters||[]).filter(function(c){ return !c.aiGenerated && !(c.id && c.id.startsWith('up-ch-')); }).concat(uploadedChs);
+      }
+      CURRICULUM[s.id] = s;
+    }
   });
 
   // 2. Remove student-deleted built-in subjects
@@ -20320,6 +20337,15 @@ function saveSubjectProfile(existingId) {
 
   var id = existingId || ('custom_' + Date.now());
 
+  // Preserve any uploaded (AI) chapters from existing entry
+  var existingEntry = CURRICULUM[id];
+  if (existingEntry && existingEntry.chapters) {
+    var uploadedChapters = existingEntry.chapters.filter(function(c){
+      return c.aiGenerated || (c.id && c.id.startsWith('up-ch-'));
+    });
+    chapters = chapters.concat(uploadedChapters);
+  }
+
   var subjectData = { id: id, title: title, description: desc, icon: icon, color: color, chapters: chapters };
 
   // Save to CURRICULUM
@@ -20340,8 +20366,8 @@ function saveSubjectProfile(existingId) {
   var grid = document.getElementById('all-subjects-grid');
   if (grid) renderSubjectCards('all-subjects-grid', 99);
 
-  // Navigate to new subject
-  if (!existingId) setTimeout(function(){ showSubject(id, 'lessons'); }, 300);
+  // Navigate to upload tab so user can immediately add content
+  if (!existingId) setTimeout(function(){ showSubject(id, 'upload'); }, 300);
 }
 
 // ── Dynamic subject nav list ────────────────────────────────────

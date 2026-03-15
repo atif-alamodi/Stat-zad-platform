@@ -17989,6 +17989,7 @@ function renderAIQuizQuestion() {
     + (q.hint ? '<button onclick="document.getElementById(\'quiz-hint-box\').style.display=\'block\';this.style.display=\'none\'" style="margin-top:8px;padding:6px 14px;border-radius:8px;border:1px solid rgba(255,214,0,0.3);background:rgba(255,214,0,0.06);color:#FFD600;font-size:0.78rem;cursor:pointer;font-family:var(--font)">'+(isEng?'💡 Hint':'💡 تلميح')+'</button>' : '')
     + (q.hint ? '<div id="quiz-hint-box" style="display:none;margin-top:8px;padding:10px;border-radius:10px;background:rgba(255,214,0,0.06);border:1px solid rgba(255,214,0,0.2);font-size:0.8rem;color:#FFD600;direction:'+(isEng?'ltr':'rtl')+'">💡 '+q.hint+'</div>' : '')
     + '<div id="ai-quiz-feedback" style="display:none;margin-top:12px;padding:12px;border-radius:12px;font-size:0.83rem;line-height:1.6"></div>'
+    + '<div id="ai-quiz-nav" style="display:none"></div>'
   + '</div>';
 }
 
@@ -18003,6 +18004,7 @@ function selectAIQuizOption(i) {
   state.answers.push(i);
   var isEng = state.subjectId === 'english';
 
+  // Color options
   document.querySelectorAll('[id^="aiqopt-"]').forEach(function(el, idx) {
     el.onclick = null; el.style.cursor = 'default';
     if (idx === q.answer) {
@@ -18016,6 +18018,7 @@ function selectAIQuizOption(i) {
     }
   });
 
+  // Show feedback
   var fb = document.getElementById('ai-quiz-feedback');
   if (fb) {
     fb.style.display = 'block';
@@ -18027,7 +18030,7 @@ function selectAIQuizOption(i) {
       + '</div>';
     if (!correct) h += '<div style="font-size:0.83rem;margin-bottom:6px">'+(isEng?'✔️ Correct answer:':'✔️ الصحيح:')+' <strong style="color:#66BB6A">'+(q.options[q.answer]||'')+'</strong></div>';
     if (q.hint) h += '<div style="font-size:0.8rem;color:#FFD600;margin-bottom:5px">💡 '+q.hint+'</div>';
-    if (q.explanation) h += '<div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:5px;line-height:1.6">'+(isEng?'📝 ':'📝 الشرح: ')+q.explanation+'</div>';
+    if (q.explanation) h += '<div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:5px;line-height:1.6">'+(isEng?'📝 ':'📝 ')+q.explanation+'</div>';
     if (q.lesson||q.page) {
       h += '<div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.07);display:flex;flex-wrap:wrap;gap:10px">';
       if (q.lesson) h += '<span>📖 '+q.lesson+'</span>';
@@ -18037,15 +18040,49 @@ function selectAIQuizOption(i) {
     fb.innerHTML = h;
   }
 
+  // Show hint box
   var hbox = document.getElementById('quiz-hint-box');
   if (hbox) hbox.style.display = 'block';
+  var hbtn = document.querySelector('button[onclick*="quiz-hint-box"]');
+  if (hbtn) hbtn.style.display = 'none';
 
   state.current++;
   window._ZAD_AI_QUIZ_SELECTED = -1;
-  setTimeout(function() {
-    var area = document.getElementById('ai-quiz-q-area');
-    if (area) area.innerHTML = renderAIQuizQuestion();
-  }, state.current >= state.questions.length ? 1200 : 2000);
+
+  // Show navigation buttons (Next / Previous) instead of auto-advance
+  var navArea = document.getElementById('ai-quiz-nav');
+  if (navArea) {
+    var isLast = state.current >= state.questions.length;
+    var hasPrev = state.current > 1;
+    navArea.innerHTML =
+      '<div style="display:flex;gap:8px;margin-top:10px">'
+      + (hasPrev ? '<button onclick="quizGoBack()" style="flex:1;padding:10px;border-radius:12px;border:1px solid var(--border);background:rgba(255,255,255,0.05);cursor:pointer;font-family:var(--font);font-weight:700;font-size:0.85rem;color:var(--text-muted)">'+(isEng?'← Previous':'← السابق')+'</button>' : '<div style="flex:1"></div>')
+      + '<button onclick="quizGoNext()" style="flex:2;padding:10px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--primary),#a78bfa);color:white;cursor:pointer;font-family:var(--font);font-weight:800;font-size:0.88rem">'
+        + (isLast ? (isEng?'🏁 See Results':'🏁 عرض النتيجة') : (isEng?'Next Question →':'السؤال التالي →'))
+      + '</button>'
+    + '</div>';
+    navArea.style.display = 'block';
+  }
+}
+
+function quizGoNext() {
+  var area = document.getElementById('ai-quiz-q-area');
+  if (area) area.innerHTML = renderAIQuizQuestion();
+}
+
+function quizGoBack() {
+  var state = window._ZAD_AI_QUIZ_STATE;
+  if (!state || state.current <= 1) return;
+  // Go back one question
+  state.current -= 2; // -2 because selectAIQuizOption already incremented by 1
+  if (state.answers.length > 0) {
+    var removedAns = state.answers.pop();
+    var wasCorrect = removedAns === state.questions[state.current].answer;
+    if (wasCorrect) state.score = Math.max(0, state.score - 1);
+  }
+  window._ZAD_AI_QUIZ_SELECTED = -1;
+  var area = document.getElementById('ai-quiz-q-area');
+  if (area) area.innerHTML = renderAIQuizQuestion();
 }
 
 

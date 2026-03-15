@@ -13268,6 +13268,207 @@ function showSection(name) {
   }
 }
 
+function buildLessonsTab(subject, subjectId) {
+  var merged = getSubjectWithUploads(subjectId);
+  if (!merged || !merged.chapters || !merged.chapters.length) {
+    return '<div style="text-align:center;padding:40px;color:var(--text-muted)">'
+      + '<div style="font-size:2rem;margin-bottom:10px">📂</div>'
+      + '<div>لا توجد دروس — ارفع محتوى من تبويب "رفع محتوى"</div>'
+      + '</div>';
+  }
+
+  var chapHtml = '';
+  merged.chapters.forEach(function(ch, i) {
+    var isUpload  = ch.id && ch.id.startsWith('up-ch-');
+    var safeChId  = (ch.id||'').replace(/['"\\]/g,'');
+    var safeChTitle = (ch.title||'').replace(/['"\\]/g,'');
+    var lessCnt   = (ch.lessons||[]).length;
+
+    var badge = '';
+    if (isUpload) {
+      badge = '<span style="font-size:0.7rem;padding:2px 8px;background:rgba(108,99,255,0.15);color:var(--primary);border-radius:10px;border:1px solid rgba(108,99,255,0.3)">✨ مرفوع</span>';
+    } else {
+      var done = 0;
+      (ch.lessons||[]).forEach(function(l){
+        var d = typeof getLessonCompletion==='function' ? getLessonCompletion(subjectId,l.id) : null;
+        if (d && d.status==='completed') done++;
+      });
+      if (done===lessCnt && lessCnt>0) badge = '<span style="font-size:0.72rem;background:rgba(40,202,65,0.15);color:#28CA41;padding:2px 8px;border-radius:20px">✅ مكتمل</span>';
+      else if (done>0) badge = '<span style="font-size:0.72rem;background:rgba(255,214,0,0.12);color:#FFD600;padding:2px 8px;border-radius:20px">'+done+'/'+lessCnt+'</span>';
+    }
+
+    var lessonsHtml = '';
+    (ch.lessons||[]).forEach(function(l) {
+      var safeLId    = (l.id||'').replace(/['"\\]/g,'');
+      var safeLTitle = (l.title||'').replace(/['"\\]/g,'');
+      var safeUpRef  = (l.sourceUploadId||'').replace(/['"\\]/g,'');
+      var comp = !isUpload && typeof getLessonCompletion==='function' ? getLessonCompletion(subjectId, l.id) : null;
+      var badge2 = '';
+      if (comp) {
+        if      (comp.status==='completed') badge2='<span style="font-size:0.72rem;background:rgba(40,202,65,0.12);color:#28CA41;padding:2px 8px;border-radius:20px;white-space:nowrap">✅</span>';
+        else if (comp.status==='partial')   badge2='<span style="font-size:0.72rem;background:rgba(255,214,0,0.1);color:#FFD600;padding:2px 8px;border-radius:20px;white-space:nowrap">'+Math.round(comp.pct||0)+'%</span>';
+      }
+      var icon = isUpload ? '📄' : (typeof getLessonTypeIcon==='function' ? getLessonTypeIcon(l.type) : '💡');
+      lessonsHtml += '<div class="lesson-item"'
+        + (isUpload ? ' style="border-right:3px solid var(--primary)"' : '')
+        + ' onclick="openLesson(\''+subjectId+'\',\''+safeLId+'\')"'
+        + ' oncontextmenu="event.preventDefault();showDeleteLessonConfirm(\''+subjectId+'\',\''+safeLId+'\',\''+safeLTitle+'\',\''+safeUpRef+'\')"'
+        + ' ontouchstart="startLongPress(event,\''+safeLId+'\',\''+safeUpRef+'\',\''+subjectId+'\',\''+safeLTitle+'\')" ontouchend="clearLongPress()" ontouchmove="clearLongPress()">'
+        + '<span class="lesson-icon">'+icon+'</span>'
+        + '<span class="lesson-name" style="flex:1">'+(l.title||'درس')+'</span>'
+        + badge2
+        + (!isUpload && typeof getLessonTypeLabel==='function' ? '<span class="lesson-type type-'+(l.type||'concept')+'">'+getLessonTypeLabel(l.type)+'</span>' : '')
+        + '</div>';
+    });
+
+    var isOpen = i===0 || isUpload;
+    chapHtml += '<div class="chapter-item'+(isOpen?' open':'')+'" id="ch-'+safeChId+'">'
+      + '<div class="chapter-header"'
+      + ' onclick="toggleChapter(\''+safeChId+'\')"'
+      + ' oncontextmenu="event.preventDefault();showDeleteChapterConfirm(\''+subjectId+'\',\''+safeChId+'\',\''+safeChTitle+'\')"'
+      + ' ontouchstart="startLongPress(event,\'__ch__'+safeChId+'\',\'\',\''+subjectId+'\',\''+safeChTitle+'\');" ontouchend="clearLongPress()" ontouchmove="clearLongPress()">'
+      + '<div class="chapter-num">'+(i+1)+'</div>'
+      + '<div class="chapter-info">'
+        + '<div class="chapter-title" style="display:flex;align-items:center;gap:6px">'+(ch.icon||'📘')+' '+(ch.title||'')+' '+badge+'</div>'
+        + '<div class="chapter-pages">📄 '+(ch.pages||'')+'</div>'
+      + '</div>'
+      + '<i class="fas fa-chevron-left chapter-chevron"></i>'
+      + '</div>'
+      + '<div class="lesson-list">'+lessonsHtml+'</div>'
+      + '</div>';
+  });
+
+  return '<div class="chapter-list">'+chapHtml+'</div>';
+}
+
+function openLesson(subjectId, lessonId) {
+  if (typeof trackUserActivity === 'function') trackUserActivity('درس: '+lessonId);
+  if (typeof trackLessonOpened === 'function' && subjectId && lessonId) trackLessonOpened(subjectId, lessonId);
+
+  // Push to history
+  try { history.pushState({ zad:'lesson', subjectId:subjectId, lessonId:lessonId }, '', '#lesson-'+lessonId); } catch(ex) {}
+
+  // 1. Check ZAD_UPLOADS first
+  var uploads = ZAD_UPLOADS.getAll();
+  var bundle  = uploads.find(function(u) {
+    return u.lessonId===lessonId || ('ai-'+u.id)===lessonId || u.id===lessonId;
+  });
+
+  if (bundle) {
+    var ul = bundle.lesson || {};
+    var aiLesson = {
+      lessonTitle:     ul.title || bundle.title || bundle.fileName || 'درس مرفوع',
+      definition:      (ul.content && ul.content.definition) || ul.definition || '',
+      whyLearn:        (ul.content && ul.content.whyLearn)   || ul.whyLearn   || [],
+      keyTerms:        (ul.content && ul.content.keyTerms)   || ul.keyTerms   || [],
+      examples:        (ul.content && ul.content.realExamples) || ul.examples || [],
+      steps:           (ul.content && ul.content.steps)       || ul.steps     || [],
+      properties:      (ul.content && ul.content.properties)  || ul.properties|| [],
+      types:           (ul.content && ul.content.types)       || ul.types     || [],
+      mindMapBranches: (ul.content && ul.content.mindMap && ul.content.mindMap.branches) || ul.mindMapBranches || [],
+      quiz:            ul.quiz    || [],
+      summary:         ul.summary || ''
+    };
+    window._ZAD_AI_LESSON = { lesson: aiLesson, subjectId: subjectId };
+    window._ZAD_AI_QUIZ   = aiLesson.quiz;
+    showSection('lesson');
+    var lc = document.getElementById('lesson-content');
+    if (lc) {
+      lc.innerHTML = '<div style="direction:rtl;padding:0">'
+        + '<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">'
+          + '<button class="back-btn" onclick="showSubject(\''+subjectId+'\',\'lessons\')">←</button>'
+          + '<div><div style="font-size:1.1rem;font-weight:900">'+aiLesson.lessonTitle+'</div>'
+          + '<div style="font-size:0.75rem;color:var(--text-muted)">✨ '+(bundle.fileName||'')+'</div></div>'
+        + '</div>'
+        + (renderAILesson(aiLesson)||buildAILessonFallback(aiLesson))
+        + '</div>';
+    }
+    return;
+  }
+
+  // 2. Standard CURRICULUM lesson
+  var merged = getSubjectWithUploads(subjectId);
+  var subject = merged || CURRICULUM[subjectId];
+  if (!subject) return;
+
+  var allLessons = [];
+  (merged ? merged.chapters : (subject.chapters||[])).forEach(function(ch) {
+    (ch.lessons||[]).forEach(function(l) { allLessons.push({lesson:l, chapter:ch}); });
+  });
+
+  var currentIdx = allLessons.findIndex(function(e) { return e.lesson.id === lessonId; });
+  if (currentIdx === -1) return;
+
+  var lesson  = allLessons[currentIdx].lesson;
+  var chapter = allLessons[currentIdx].chapter;
+  var prev    = currentIdx > 0 ? allLessons[currentIdx-1] : null;
+  var next    = currentIdx < allLessons.length-1 ? allLessons[currentIdx+1] : null;
+  var lessonNum = currentIdx + 1;
+  var totalLessons = allLessons.length;
+
+  APP.currentLesson = lesson;
+  if (APP.student && APP.student.email) {
+    try { saveLocation({ type:'lesson', subjectId:subjectId, lessonId:lessonId }); } catch(e) {}
+  }
+
+  APP.progress.lessons++;
+  try { saveProgress(); updateStats(); } catch(e) {}
+  if (typeof addActivity==='function') addActivity((subject.icon||'📚')+' '+(lesson.title||''));
+
+  showSection('lesson');
+  var container = document.getElementById('lesson-content');
+  if (!container) return;
+
+  var cnt = lesson.content || {};
+  var progressPct = Math.round((lessonNum / totalLessons) * 100);
+
+  container.innerHTML = `
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap">
+      <button class="back-btn" onclick="showSubject('${subjectId}','lessons')" title="العودة">←</button>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:2px">${subject.icon||'📚'} ${subject.title||subjectId} › ${chapter.title||''}</div>
+        <div style="font-size:1rem;font-weight:900">${lesson.title||''}</div>
+      </div>
+      <span class="lesson-type type-${lesson.type||'concept'}" style="flex-shrink:0">${typeof getLessonTypeLabel==='function'?getLessonTypeLabel(lesson.type):''}</span>
+    </div>
+
+    <!-- Progress bar -->
+    <div style="background:rgba(255,255,255,0.05);border-radius:999px;height:4px;margin-bottom:20px;overflow:hidden">
+      <div style="height:4px;background:linear-gradient(90deg,var(--primary),var(--secondary));width:${progressPct}%;border-radius:999px;transition:width 0.5s"></div>
+    </div>
+
+    <!-- Definition -->
+    ${cnt.definition ? `<div style="background:rgba(108,99,255,0.08);border:1.5px solid rgba(108,99,255,0.25);border-radius:16px;padding:16px;margin-bottom:16px;direction:rtl">
+      <div style="font-weight:800;font-size:0.85rem;margin-bottom:8px;color:var(--primary)">📖 التعريف</div>
+      <div style="font-size:0.88rem;line-height:1.8">${cnt.definition}</div>
+    </div>` : ''}
+
+    <!-- Key Terms -->
+    ${cnt.keyTerms && cnt.keyTerms.length ? `<div style="background:rgba(0,191,165,0.06);border:1px solid rgba(0,191,165,0.2);border-radius:14px;padding:14px;margin-bottom:14px;direction:rtl">
+      <div style="font-weight:800;font-size:0.82rem;margin-bottom:10px;color:#00BFA5">🔑 المصطلحات الأساسية</div>
+      ${cnt.keyTerms.map(k=>`<div style="padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.05);font-size:0.83rem"><strong style="color:#00BFA5">${k.term||''}</strong><span style="color:var(--text-muted)"> — ${k.def||''}</span></div>`).join('')}
+    </div>` : ''}
+
+    <!-- Real Examples -->
+    ${cnt.realExamples && cnt.realExamples.length ? `<div style="background:rgba(255,112,67,0.06);border:1px solid rgba(255,112,67,0.2);border-radius:14px;padding:14px;margin-bottom:14px;direction:rtl">
+      <div style="font-weight:800;font-size:0.82rem;margin-bottom:10px;color:#FF7043">📌 أمثلة تطبيقية</div>
+      ${cnt.realExamples.map(ex=>`<div style="padding:8px;background:rgba(255,255,255,0.03);border-radius:10px;margin-bottom:6px"><div style="font-weight:700;font-size:0.82rem">${ex.icon||'💡'} ${ex.title||''}</div><div style="font-size:0.78rem;color:var(--text-muted);margin-top:4px">${ex.desc||''}</div></div>`).join('')}
+    </div>` : ''}
+
+    <!-- Steps/Properties -->
+    ${cnt.steps && cnt.steps.length ? `<div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:14px;margin-bottom:14px;direction:rtl">
+      <div style="font-weight:800;font-size:0.82rem;margin-bottom:8px">📋 النقاط الرئيسية</div>
+      ${cnt.steps.map((s,i)=>`<div style="padding:5px 0;font-size:0.83rem"><span style="color:var(--primary);font-weight:700">${i+1}. </span>${s}</div>`).join('')}
+    </div>` : ''}
+
+    <!-- Nav buttons -->
+    <div style="display:flex;gap:8px;margin-top:20px">
+      ${prev ? `<button onclick="openLesson('${subjectId}','${prev.lesson.id}')" style="flex:1;padding:11px;border-radius:12px;border:1px solid var(--border);background:rgba(255,255,255,0.04);cursor:pointer;font-family:var(--font);font-weight:700;font-size:0.82rem">→ ${prev.lesson.title||''}</button>` : '<div style="flex:1"></div>'}
+      ${next ? `<button onclick="openLesson('${subjectId}','${next.lesson.id}')" style="flex:1;padding:11px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--primary),var(--secondary));color:white;cursor:pointer;font-family:var(--font);font-weight:700;font-size:0.82rem">${next.lesson.title||''} ←</button>` : ''}
+    </div>
+  `;
+}
+
 function showSubject(subjectId, activeTab) {
   if (!subjectId) return;
   APP.currentSubject = subjectId;

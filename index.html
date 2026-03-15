@@ -10729,7 +10729,32 @@ VIOLATION: Writing Arabic in quiz.q or quiz.options is a critical error.`
         if (parsed) allResults.push(parsed);
       }
 
-      if (!allResults.length) throw new Error('لم يُنتج الذكاء الاصطناعي أي محتوى');
+      if (!allResults.length) {
+        // Fallback: try one more time with simplified prompt
+        upd('🔄', 'إعادة المحاولة بطريقة مختلفة...', 85);
+        try {
+          const fbResp = await zadFetch({
+            model: 'llama-3.1-8b-instant',
+            max_tokens: 3000,
+            system: isEng
+              ? 'Educational JSON generator. Reply with valid JSON only.'
+              : 'مساعد تعليمي. أجب بـ JSON صالح فقط.',
+            messages: [{ role: 'user', content:
+              (isEng
+                ? 'Create an educational lesson about: ' + fileName + '\n\nText:\n' + clean.slice(0, 4000)
+                : 'أنشئ درساً تعليمياً عن: ' + fileName + '\n\nنص:\n' + clean.slice(0, 4000))
+              + '\n\nReturn JSON:\n' + jsonTemplate
+            }]
+          });
+          const fbData = await fbResp.json();
+          const fbText = (fbData.content && fbData.content[0] && fbData.content[0].text) || '';
+          const fbParsed = repairAndParseJSON(fbText.trim());
+          if (fbParsed) allResults.push(fbParsed);
+        } catch(fbErr) {
+          console.error('Fallback also failed:', fbErr);
+        }
+        if (!allResults.length) throw new Error('لم يُنتج الذكاء الاصطناعي أي محتوى — تأكد من اتصالك بالإنترنت وحجم الملف');
+      }
 
       const main = allResults[0];
       const lesson = {
@@ -10782,6 +10807,7 @@ VIOLATION: Writing Arabic in quiz.q or quiz.options is a critical error.`
     }
 
   } catch(err) {
+    console.error('analyzeAndGenerate error:', err);
     if (err.message === 'NO_API_KEY' || err.message === 'INVALID_API_KEY' || err.message === 'BACKEND_NOT_CONFIGURED') return;
     var em = String(err.message || err);
     if (document.getElementById('ai-gen-steps'))

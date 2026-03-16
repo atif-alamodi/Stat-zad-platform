@@ -2252,167 +2252,491 @@ function getPyErrorHints(err, code) {
 }
 
 function elabInitXl() {
-  _exlData={}; _exlStyles={}; _exlRows=10; _exlCols=7; _exlSel={r:1,c:1};
-  elabLoadXlTmpl('grades');
+  _exlData={}; _exlStyles={}; _exlRows=12; _exlCols=8; _exlSel={r:1,c:1};
+  elabLoadXlTmpl('blank');
   elabBuildFnRef();
+  _xlInitialized = true;
 }
 
 function elabLoadXlTmpl(name) {
   const sel = document.getElementById('elab-xl-tmpl');
   if (!name && sel) name = sel.value;
-  if (!name) name = 'grades';
-  const t = ELAB_XL_TMPLS[name] || ELAB_XL_TMPLS.grades;
-  _exlRows = t.rows||10; _exlCols = t.cols||7;
+  if (!name) name = 'blank';
+  const t = ELAB_XL_TMPLS[name] || {};
+  _exlRows = t.rows||12; _exlCols = t.cols||8;
   _exlData = Object.assign({}, t.data||{});
   _exlStyles = {};
-  for(let c=1;c<=_exlCols;c++) _exlStyles[`1_${c}`]={bold:true,bg:'#1f1f35',color:'#E8A020'};
+  // Header row styling
+  for(let c=1;c<=_exlCols;c++) {
+    if (_exlData[`1_${c}`]) _exlStyles[`1_${c}`]={bold:true,bg:'#1f1f35',color:'#E8A020'};
+  }
   if (sel) sel.value='';
-  elabXlRender(); elabXlComputeAll();
+  elabXlRender();
+  elabXlComputeAll();
 }
 
+// ── Core rendering ────────────────────────────────────────────
 function elabXlRender() {
   const wrap = document.getElementById('elab-xl-grid');
   if (!wrap) return;
-  let h = '<table style="border-collapse:collapse;min-width:100%;font-family:Fira Code,monospace;font-size:0.8rem">';
-  h += '<thead><tr><th style="width:38px;background:#1a1a2a;border:1px solid #333;padding:5px;color:#555;position:sticky;top:0;left:0;z-index:3"></th>';
-  for(let c=1;c<=_exlCols;c++) h+=`<th style="background:#1a1a2a;border:1px solid #333;padding:5px 12px;color:#888;min-width:100px;position:sticky;top:0;z-index:2;font-weight:600">${ELAB_XL_COLS[c-1]}</th>`;
-  h += '</tr></thead><tbody>';
-  for(let r=1;r<=_exlRows;r++) {
-    h += `<tr><td style="background:#1a1a2a;border:1px solid #333;padding:3px 7px;color:#555;text-align:center;position:sticky;left:0;z-index:1;font-weight:600">${r}</td>`;
-    for(let c=1;c<=_exlCols;c++) {
-      const key=`${r}_${c}`, st=_exlStyles[key]||{}, raw=_exlData[key];
-      const disp = raw!==undefined&&raw!==null&&String(raw).startsWith('=') ? (elabXlCompute(raw)??'') : (raw??'');
-      const isA = _exlSel.r===r&&_exlSel.c===c;
-      const isHdr = r===1;
-      const bgColor = st.bg ? st.bg : isA ? 'rgba(108,99,255,0.15)' : isHdr ? '#1f1f35' : '#1e1e2e';
-      let cs=`border:1px solid #333;padding:0;min-width:100px;background:${bgColor};${isA?'outline:2px solid #6C63FF;outline-offset:-2px':''}`;
-      let is=`width:100%;background:transparent;border:none;outline:none;padding:5px 9px;color:${st.color||'#e0e0e0'};font-weight:${st.bold?700:400};font-family:inherit;font-size:inherit;text-align:${st.align||'left'};direction:auto`;
-      h+=`<td style="${cs}" onclick="elabXlSel(${r},${c})"><input data-key="${key}" value="${String(disp).replace(/"/g,'&quot;').replace(/</g,'&lt;')}" style="${is}" onchange="elabXlChange(event,'${key}')" onfocus="elabXlFocus(${r},${c})" onkeydown="elabXlNav(event,${r},${c})"/></td>`;
-    }
-    h += '</tr>';
+
+  let h = '<div style="overflow-x:auto;overflow-y:auto;max-height:480px;direction:ltr">';
+  h += '<table style="border-collapse:collapse;min-width:100%;font-family:Fira Code,monospace;font-size:0.82rem">';
+
+  // Column headers A B C ...
+  h += '<thead><tr><th style="width:36px;min-width:36px;background:#0d1117;border:1px solid #30363d;padding:5px;color:#484f58;position:sticky;top:0;left:0;z-index:4"></th>';
+  for(let c=1;c<=_exlCols;c++) {
+    h += `<th style="background:#161b22;border:1px solid #30363d;padding:5px 14px;color:#8b949e;min-width:110px;position:sticky;top:0;z-index:2;font-weight:600;text-align:center;letter-spacing:1px">${ELAB_XL_COLS[c-1]}</th>`;
   }
-  h += '</tbody></table>';
+  h += '<th style="background:#0d1117;border:1px solid #30363d;padding:5px;width:30px;position:sticky;top:0;z-index:2"></th>';
+  h += '</tr></thead><tbody>';
+
+  for(let r=1;r<=_exlRows;r++) {
+    const isOdd = r % 2 === 0;
+    h += `<tr><td style="background:#161b22;border:1px solid #30363d;padding:3px 8px;color:#484f58;text-align:center;position:sticky;left:0;z-index:1;font-weight:600;min-width:36px">${r}</td>`;
+    for(let c=1;c<=_exlCols;c++) {
+      const key = `${r}_${c}`;
+      const st  = _exlStyles[key] || {};
+      const raw = _exlData[key];
+      const isFormula = typeof raw === 'string' && raw.startsWith('=');
+      const displayVal = isFormula ? (elabXlCompute(raw) ?? '') : (raw ?? '');
+      const isActive = _exlSel.r===r && _exlSel.c===c;
+      const isHdr = r===1 && _exlData[key];
+
+      const bgColor = st.bg ? st.bg : isActive ? 'rgba(88,166,255,0.15)' : isHdr ? '#161b22' : (isOdd ? '#0d1117' : '#161b22');
+      const outlineStyle = isActive ? 'outline:2px solid #58a6ff;outline-offset:-2px;' : '';
+      const cellStyle = `border:1px solid ${isActive?'#58a6ff':'#30363d'};padding:0;min-width:110px;background:${bgColor};${outlineStyle}`;
+      const inputStyle = `width:100%;min-width:110px;background:transparent;border:none;outline:none;padding:5px 9px;color:${isFormula?'#79c0ff':(st.color||'#e6edf3')};font-weight:${(st.bold||isHdr)?700:400};font-family:inherit;font-size:inherit;text-align:${st.align||(typeof displayVal==='number'?'right':'left')};box-sizing:border-box;`;
+      const safeDisplay = String(displayVal).replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      h += `<td style="${cellStyle}" onclick="elabXlSel(${r},${c})">`;
+      h += `<input data-key="${key}" value="${safeDisplay}" style="${inputStyle}"`;
+      h += ` onchange="elabXlChange(event,'${key}')"`;
+      h += ` onfocus="elabXlFocus(${r},${c})"`;
+      h += ` onkeydown="elabXlNav(event,${r},${c})"`;
+      h += ` title="${isFormula ? raw : ''}"`;
+      h += `></td>`;
+    }
+    h += '<td style="background:#0d1117;border:1px solid #30363d;width:30px"></td></tr>';
+  }
+  h += '</tbody></table></div>';
   wrap.innerHTML = h;
   elabXlUpdateStats();
 }
 
-function elabXlSel(r,c){_exlSel={r,c};}
-function elabXlFocus(r,c){
+// ── Selection & navigation ─────────────────────────────────────
+function elabXlSel(r,c) { _exlSel={r,c}; }
+
+function elabXlFocus(r,c) {
   _exlSel={r,c};
-  const ref=document.getElementById('elab-xl-ref'), fb=document.getElementById('elab-xl-fbar');
-  if(ref) ref.textContent=`${ELAB_XL_COLS[c-1]}${r}`;
-  const v=_exlData[`${r}_${c}`];
-  if(fb) fb.value=(v!==undefined&&v!==null)?String(v):'';
+  const ref = document.getElementById('elab-xl-ref');
+  const fb  = document.getElementById('elab-xl-fbar');
+  if (ref) ref.textContent = `${ELAB_XL_COLS[c-1]}${r}`;
+  // Show RAW formula in formula bar, not computed value
+  const raw = _exlData[`${r}_${c}`];
+  if (fb) fb.value = (raw !== undefined && raw !== null) ? String(raw) : '';
 }
-function elabXlNav(e,r,c){
-  const moves={ArrowRight:[0,1],ArrowLeft:[0,-1],ArrowDown:[1,0],ArrowUp:[-1,0],Enter:[1,0],Tab:[0,1]};
-  if(!moves[e.key]) return;
+
+function elabXlNav(e,r,c) {
+  const moves = {ArrowRight:[0,1],ArrowLeft:[0,-1],ArrowDown:[1,0],ArrowUp:[-1,0],Enter:[1,0],Tab:[0,1]};
+  if (!moves[e.key]) return;
   e.preventDefault();
-  const [dr,dc]=moves[e.key];
-  const nr=Math.max(1,Math.min(_exlRows,r+dr)), nc=Math.max(1,Math.min(_exlCols,c+dc));
-  document.querySelector(`input[data-key="${nr}_${nc}"]`)?.focus();
-}
-function elabXlChange(e,key){
-  const v=e.target.value;
-  _exlData[key]=(!isNaN(v)&&v!=='')?Number(v):v;
-  elabXlComputeAll(); elabXlUpdateStats();
-}
-function elabXlFbarInput(){
-  const fb=document.getElementById('elab-xl-fbar'); if(!fb) return;
-  const key=`${_exlSel.r}_${_exlSel.c}`, v=fb.value;
-  _exlData[key]=(!isNaN(v)||v.startsWith('='))?v:v;
-  const inp=document.querySelector(`input[data-key="${key}"]`);
-  if(inp) inp.value=v.startsWith('=')?String(elabXlCompute(v)??''):v;
-}
-function elabXlFbarCommit(){elabXlComputeAll();elabXlUpdateStats();}
-
-function elabXlGetNum(key){
-  const v=_exlData[key];
-  if(v===undefined||v===null||v==='') return null;
-  if(typeof v==='number') return v;
-  if(typeof v==='string'&&v.startsWith('=')){const r=elabXlCompute(v);return typeof r==='number'?r:null;}
-  const n=parseFloat(v); return isNaN(n)?null:n;
+  const [dr,dc] = moves[e.key];
+  const nr = Math.max(1,Math.min(_exlRows,r+dr));
+  const nc = Math.max(1,Math.min(_exlCols,c+dc));
+  const inp = document.querySelector(`input[data-key="${nr}_${nc}"]`);
+  if (inp) inp.focus();
 }
 
-function elabXlParseRange(range){
-  const m=range.trim().match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/i);
-  if(!m) return [];
-  const c1=ELAB_XL_COLS.indexOf(m[1].toUpperCase())+1, r1=parseInt(m[2]);
-  const c2=ELAB_XL_COLS.indexOf(m[3].toUpperCase())+1, r2=parseInt(m[4]);
+function elabXlChange(e, key) {
+  const v = e.target.value.trim();
+  // Store raw formula or auto-detect number
+  if (v.startsWith('=')) {
+    _exlData[key] = v;
+  } else if (v !== '' && !isNaN(v)) {
+    _exlData[key] = Number(v);
+  } else if (v === '') {
+    delete _exlData[key];
+  } else {
+    _exlData[key] = v;
+  }
+  elabXlComputeAll();
+  elabXlUpdateStats();
+  // Show formula hint
+  _elabXlShowFormulaHint(key, v);
+}
+
+function elabXlFbarInput() {
+  const fb  = document.getElementById('elab-xl-fbar');
+  if (!fb) return;
+  const key = `${_exlSel.r}_${_exlSel.c}`;
+  const v   = fb.value.trim();
+  if (v.startsWith('=')) {
+    _exlData[key] = v;
+  } else if (v !== '' && !isNaN(v)) {
+    _exlData[key] = Number(v);
+  } else if (v === '') {
+    delete _exlData[key];
+  } else {
+    _exlData[key] = v;
+  }
+  // Update cell display
+  const inp = document.querySelector(`input[data-key="${key}"]`);
+  if (inp) {
+    inp.value = v.startsWith('=') ? String(elabXlCompute(v) ?? '') : v;
+    inp.style.color = v.startsWith('=') ? '#79c0ff' : '#e6edf3';
+  }
+  elabXlComputeAll();
+  elabXlUpdateStats();
+}
+function elabXlFbarCommit() { elabXlComputeAll(); elabXlUpdateStats(); }
+
+// ── Helpers ────────────────────────────────────────────────────
+function elabXlGetNum(key) {
+  const v = _exlData[key];
+  if (v === undefined || v === null || v === '') return null;
+  if (typeof v === 'number') return v;
+  if (typeof v === 'string' && v.startsWith('=')) {
+    const r = elabXlCompute(v);
+    return typeof r === 'number' ? r : null;
+  }
+  const n = parseFloat(v);
+  return isNaN(n) ? null : n;
+}
+
+function elabXlParseRange(range) {
+  const m = range.trim().toUpperCase().match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/);
+  if (!m) return [];
+  const c1=ELAB_XL_COLS.indexOf(m[1])+1, r1=parseInt(m[2]);
+  const c2=ELAB_XL_COLS.indexOf(m[3])+1, r2=parseInt(m[4]);
   const vals=[];
-  for(let r=r1;r<=r2;r++) for(let c=c1;c<=c2;c++){const v=elabXlGetNum(`${r}_${c}`);if(v!==null)vals.push(v);}
+  for(let r=Math.min(r1,r2);r<=Math.max(r1,r2);r++)
+    for(let c=Math.min(c1,c2);c<=Math.max(c1,c2);c++) {
+      const v=elabXlGetNum(`${r}_${c}`);
+      if(v!==null) vals.push(v);
+    }
   return vals;
 }
 
-function elabXlCompute(formula){
-  if(!formula||!formula.startsWith('=')) return formula;
-  const expr=formula.slice(1).trim().toUpperCase();
-  try {
-    const FNS={
-      SUM:r=>r.reduce((a,b)=>a+b,0),
-      AVERAGE:r=>r.reduce((a,b)=>a+b,0)/r.length,
-      MAX:r=>Math.max(...r), MIN:r=>Math.min(...r), COUNT:r=>r.length,
-      STDEV:r=>{const m=r.reduce((a,b)=>a+b,0)/r.length;return Math.sqrt(r.reduce((s,x)=>s+(x-m)**2,0)/(r.length-1));},
-      VAR:r=>{const m=r.reduce((a,b)=>a+b,0)/r.length;return r.reduce((s,x)=>s+(x-m)**2,0)/(r.length-1);},
-      MEDIAN:r=>{const s=[...r].sort((a,b)=>a-b),mid=Math.floor(s.length/2);return s.length%2?s[mid]:(s[mid-1]+s[mid])/2;},
-      ROUND:r=>Math.round(r[0]*10**r[1])/10**r[1],
-    };
-    const fm=expr.match(/^(\w+)\((.+)\)$/);
-    if(fm&&FNS[fm[1]]){
-      const rangeM=fm[2].match(/([A-Z]+\d+:[A-Z]+\d+)/i);
-      if(rangeM){const vals=elabXlParseRange(rangeM[1]);return vals.length?Math.round(FNS[fm[1]](vals)*100)/100:0;}
-      const parts=fm[2].split(',').map(a=>{const cr=a.trim().match(/^([A-Z]+)(\d+)$/i);if(cr){const c=ELAB_XL_COLS.indexOf(cr[1].toUpperCase())+1;return elabXlGetNum(`${parseInt(cr[2])}_${c}`)||0;}return parseFloat(a)||0;});
-      return Math.round(FNS[fm[1]](parts)*100)/100;
-    }
-    if(expr.startsWith('IF(')){
-      const inner=expr.slice(3,-1);
-      const m2=inner.match(/^([A-Z]+)(\d+)\s*([><=!]+)\s*([^,]+),(.+),(.+)$/i);
-      if(!m2) return '#IF!';
-      const c=ELAB_XL_COLS.indexOf(m2[1].toUpperCase())+1, cellV=elabXlGetNum(`${parseInt(m2[2])}_${c}`)||0;
-      const cmp=parseFloat(m2[4]), ops={'>':v=>v>cmp,'<':v=>v<cmp,'>=':v=>v>=cmp,'<=':v=>v<=cmp,'=':v=>v===cmp,'<>':v=>v!==cmp};
-      return (ops[m2[3]]||(() =>false))(cellV) ? m2[5].trim().replace(/['"]/g,'') : m2[6].trim().replace(/['"]/g,'');
-    }
-
-    const withV=expr.replace(/([A-Z]+)(\d+)/gi,(_,col,row)=>{const c=ELAB_XL_COLS.indexOf(col.toUpperCase())+1;return elabXlGetNum(`${row}_${c}`)||0;});
-    const res=Function(`"use strict";return(${withV})`)();
-    return typeof res==='number'?Math.round(res*100)/100:res;
-  } catch(e){return '#ERR!';}
+function elabXlParseCellRef(ref) {
+  const m = ref.trim().toUpperCase().match(/^([A-Z]+)(\d+)$/);
+  if (!m) return null;
+  const c = ELAB_XL_COLS.indexOf(m[1]) + 1;
+  const r = parseInt(m[2]);
+  return (c > 0 && r > 0) ? {r, c} : null;
 }
 
-function elabXlComputeAll(){
-  Object.keys(_exlData).forEach(key=>{
-    const v=_exlData[key];
-    if(typeof v==='string'&&v.startsWith('=')){
-      const inp=document.querySelector(`input[data-key="${key}"]`);
-      if(inp) inp.value=String(elabXlCompute(v)??'');
+// ── FORMULA ENGINE ─────────────────────────────────────────────
+// Supports: ALL standard Excel-like formulas
+// Ranges: A1:B5  |  Cell refs: A1  |  Functions: SUM,AVERAGE,IF...
+// Arithmetic: +,-,*,/,^  |  Comparisons  |  Nested functions
+function elabXlCompute(formula) {
+  if (!formula || !String(formula).startsWith('=')) return formula;
+  const raw = String(formula).slice(1).trim();
+
+  try {
+    return _xlEval(raw);
+  } catch(e) {
+    return '#ERR!';
+  }
+}
+
+function _xlEval(expr) {
+  const up = expr.toUpperCase().trim();
+
+  // ── IF(condition, true, false) ──
+  if (up.startsWith('IF(')) {
+    return _xlIF(expr.slice(3, -1));
+  }
+
+  // ── IFS(cond1,val1,cond2,val2,...) ──
+  if (up.startsWith('IFS(')) {
+    return _xlIFS(expr.slice(4, -1));
+  }
+
+  // ── Named functions with range or args ──
+  const fnMatch = up.match(/^([A-Z_]+)\(([\s\S]*)\)$/);
+  if (fnMatch) {
+    const fn   = fnMatch[1];
+    const args = fnMatch[2];
+    const result = _xlFn(fn, args, expr);
+    if (result !== undefined) return result;
+  }
+
+  // ── Arithmetic / cell references ──
+  return _xlArith(expr);
+}
+
+// All supported functions
+function _xlFn(fn, argsStr, raw) {
+  const getRange = (s) => elabXlParseRange(s);
+  const getNum   = (s) => {
+    const ref = elabXlParseCellRef(s.trim());
+    if (ref) return elabXlGetNum(`${ref.r}_${ref.c}`) ?? 0;
+    const n = parseFloat(s);
+    return isNaN(n) ? 0 : n;
+  };
+
+  // Check if it's a range argument
+  const rangeMatch = argsStr.trim().match(/^([A-Z]+\d+:[A-Z]+\d+)(?:,(.*))?$/i);
+  const vals = rangeMatch ? getRange(rangeMatch[1]) : [];
+
+  const FUNCS = {
+    // ── Math ──
+    SUM:     () => vals.reduce((a,b)=>a+b, 0),
+    AVERAGE: () => vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : 0,
+    COUNT:   () => vals.length,
+    COUNTA:  () => {
+      const m = argsStr.trim().match(/^([A-Z]+\d+:[A-Z]+\d+)/i);
+      if (!m) return 0;
+      const rng = argsStr.trim().toUpperCase().match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/);
+      if (!rng) return 0;
+      let cnt=0;
+      for(let r=parseInt(rng[2]);r<=parseInt(rng[4]);r++)
+        for(let c=ELAB_XL_COLS.indexOf(rng[1])+1;c<=ELAB_XL_COLS.indexOf(rng[3])+1;c++) {
+          if (_exlData[`${r}_${c}`] !== undefined && _exlData[`${r}_${c}`] !== '') cnt++;
+        }
+      return cnt;
+    },
+    MAX:     () => vals.length ? Math.max(...vals) : 0,
+    MIN:     () => vals.length ? Math.min(...vals) : 0,
+    PRODUCT: () => vals.reduce((a,b)=>a*b, 1),
+
+    // ── Statistics ──
+    STDEV:   () => { if(vals.length<2) return 0; const m=vals.reduce((a,b)=>a+b)/vals.length; return Math.sqrt(vals.reduce((s,x)=>s+(x-m)**2,0)/(vals.length-1)); },
+    STDEVP:  () => { if(!vals.length) return 0; const m=vals.reduce((a,b)=>a+b)/vals.length; return Math.sqrt(vals.reduce((s,x)=>s+(x-m)**2,0)/vals.length); },
+    VAR:     () => { if(vals.length<2) return 0; const m=vals.reduce((a,b)=>a+b)/vals.length; return vals.reduce((s,x)=>s+(x-m)**2,0)/(vals.length-1); },
+    VARP:    () => { if(!vals.length) return 0; const m=vals.reduce((a,b)=>a+b)/vals.length; return vals.reduce((s,x)=>s+(x-m)**2,0)/vals.length; },
+    MEDIAN:  () => { if(!vals.length) return 0; const s=[...vals].sort((a,b)=>a-b),mid=Math.floor(s.length/2); return s.length%2?s[mid]:(s[mid-1]+s[mid])/2; },
+    MODE:    () => { if(!vals.length) return 0; const cnt={}; vals.forEach(v=>cnt[v]=(cnt[v]||0)+1); return +Object.entries(cnt).sort((a,b)=>b[1]-a[1])[0][0]; },
+    LARGE:   () => { const parts=argsStr.split(','); const v2=getRange(parts[0].trim()); const k=parseInt(parts[1])||1; return [...v2].sort((a,b)=>b-a)[k-1]??0; },
+    SMALL:   () => { const parts=argsStr.split(','); const v2=getRange(parts[0].trim()); const k=parseInt(parts[1])||1; return [...v2].sort((a,b)=>a-b)[k-1]??0; },
+    RANK:    () => { const parts=argsStr.split(','); const num=getNum(parts[0]); const v2=getRange(parts[1]?.trim()||''); const desc=parseInt(parts[2]||'1')!==0; const s=[...v2].sort((a,b)=>desc?b-a:a-b); return s.indexOf(num)+1; },
+    PERCENTILE: () => { const parts=argsStr.split(','); const v2=getRange(parts[0].trim()); const p=parseFloat(parts[1]||'0.5'); const s=[...v2].sort((a,b)=>a-b); const k=(s.length-1)*p; const f=Math.floor(k),c2=Math.ceil(k); return f===c2?s[k]:s[f]*(c2-k)+s[c2]*(k-f); },
+    QUARTILE: () => { const parts=argsStr.split(','); const v2=getRange(parts[0].trim()); const q=parseInt(parts[1]||'1'); const ps=[0,0.25,0.5,0.75,1]; const p=ps[q]||0.25; const s=[...v2].sort((a,b)=>a-b); const k=(s.length-1)*p; const f=Math.floor(k),c2=Math.ceil(k); return f===c2?s[k]:s[f]*(c2-k)+s[c2]*(k-f); },
+    CORREL:  () => { const parts=argsStr.split(','); const x=getRange(parts[0].trim()); const y=getRange(parts[1]?.trim()||''); if(!x.length||x.length!==y.length) return 0; const xm=x.reduce((a,b)=>a+b)/x.length,ym=y.reduce((a,b)=>a+b)/y.length; const num2=x.reduce((s,_,i)=>s+(x[i]-xm)*(y[i]-ym),0); const d=Math.sqrt(x.reduce((s,v)=>s+(v-xm)**2,0)*y.reduce((s,v)=>s+(v-ym)**2,0)); return d?num2/d:0; },
+
+    // ── Math functions ──
+    ROUND:   () => { const p=argsStr.split(','); const v=_xlArith(p[0].trim()); const d=parseInt(p[1]||'0'); return Math.round(v*10**d)/10**d; },
+    ROUNDUP: () => { const p=argsStr.split(','); const v=_xlArith(p[0].trim()); const d=parseInt(p[1]||'0'); return Math.ceil(v*10**d)/10**d; },
+    ROUNDDOWN:()=>{ const p=argsStr.split(','); const v=_xlArith(p[0].trim()); const d=parseInt(p[1]||'0'); return Math.floor(v*10**d)/10**d; },
+    ABS:     () => Math.abs(_xlArith(argsStr.trim())),
+    SQRT:    () => Math.sqrt(Math.abs(_xlArith(argsStr.trim()))),
+    POWER:   () => { const p=argsStr.split(','); return Math.pow(_xlArith(p[0].trim()), _xlArith(p[1]?.trim()||'2')); },
+    MOD:     () => { const p=argsStr.split(','); return _xlArith(p[0].trim()) % _xlArith(p[1]?.trim()||'1'); },
+    INT:     () => Math.floor(_xlArith(argsStr.trim())),
+    CEILING: () => { const p=argsStr.split(','); const v=_xlArith(p[0].trim()); const s=_xlArith(p[1]?.trim()||'1'); return Math.ceil(v/s)*s; },
+    FLOOR:   () => { const p=argsStr.split(','); const v=_xlArith(p[0].trim()); const s=_xlArith(p[1]?.trim()||'1'); return Math.floor(v/s)*s; },
+    LOG:     () => { const p=argsStr.split(','); const v=_xlArith(p[0].trim()); const b=_xlArith(p[1]?.trim()||String(Math.E)); return Math.log(v)/Math.log(b); },
+    LOG10:   () => Math.log10(Math.abs(_xlArith(argsStr.trim()))),
+    LN:      () => Math.log(Math.abs(_xlArith(argsStr.trim()))),
+    EXP:     () => Math.exp(_xlArith(argsStr.trim())),
+    PI:      () => Math.PI,
+    SIN:     () => Math.sin(_xlArith(argsStr.trim())),
+    COS:     () => Math.cos(_xlArith(argsStr.trim())),
+    TAN:     () => Math.tan(_xlArith(argsStr.trim())),
+    DEGREES: () => _xlArith(argsStr.trim()) * 180 / Math.PI,
+    RADIANS: () => _xlArith(argsStr.trim()) * Math.PI / 180,
+    FACT:    () => { let n=Math.round(_xlArith(argsStr.trim())),f=1; while(n>1)f*=n--; return f; },
+    COMBIN:  () => { const p=argsStr.split(','); const n=Math.round(_xlArith(p[0].trim())); const k=Math.round(_xlArith(p[1]?.trim()||'0')); let r=1,kk=k; while(kk>0){r=r*n/kk;n--;kk--;} return Math.round(r); },
+
+    // ── Text ──
+    LEN:     () => String(_exlData[`${(elabXlParseCellRef(argsStr.trim())||{}).r||0}_${(elabXlParseCellRef(argsStr.trim())||{}).c||0}`]||argsStr.replace(/"/g,'')).length,
+    CONCATENATE: () => argsStr.split(',').map(a=>{const ref=elabXlParseCellRef(a.trim());return ref?String(_exlData[`${ref.r}_${ref.c}`]||''):a.trim().replace(/"/g,'');}).join(''),
+    LEFT:    () => { const p=argsStr.split(','); const ref=elabXlParseCellRef(p[0].trim()); const txt=ref?String(_exlData[`${ref.r}_${ref.c}`]||''):p[0].trim().replace(/"/g,''); return txt.slice(0,parseInt(p[1]||'1')); },
+    RIGHT:   () => { const p=argsStr.split(','); const ref=elabXlParseCellRef(p[0].trim()); const txt=ref?String(_exlData[`${ref.r}_${ref.c}`]||''):p[0].trim().replace(/"/g,''); return txt.slice(-parseInt(p[1]||'1')); },
+    UPPER:   () => { const ref=elabXlParseCellRef(argsStr.trim()); return String(ref?(_exlData[`${ref.r}_${ref.c}`]||''):argsStr.replace(/"/g,'')).toUpperCase(); },
+    LOWER:   () => { const ref=elabXlParseCellRef(argsStr.trim()); return String(ref?(_exlData[`${ref.r}_${ref.c}`]||''):argsStr.replace(/"/g,'')).toLowerCase(); },
+
+    // ── Logical ──
+    AND:     () => argsStr.split(',').every(a=>!!_xlArith(a.trim())),
+    OR:      () => argsStr.split(',').some(a=>!!_xlArith(a.trim())),
+    NOT:     () => !_xlArith(argsStr.trim()),
+    TRUE:    () => true,
+    FALSE:   () => false,
+
+    // ── Lookup ──
+    VLOOKUP: () => {
+      const parts=argsStr.split(',');
+      const lookupVal=_xlArith(parts[0].trim());
+      const rng=parts[1]?.trim();
+      const colIdx=parseInt(parts[2]||'1');
+      if(!rng) return '#N/A';
+      const m2=rng.toUpperCase().match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/);
+      if(!m2) return '#N/A';
+      const c1=ELAB_XL_COLS.indexOf(m2[1])+1,r1=parseInt(m2[2]),r2=parseInt(m2[4]);
+      for(let r=r1;r<=r2;r++) {
+        const v=elabXlGetNum(`${r}_${c1}`) ?? _exlData[`${r}_${c1}`];
+        if(String(v)===String(lookupVal)) return _exlData[`${r}_${c1+colIdx-1}`]??'#N/A';
+      }
+      return '#N/A';
+    },
+
+    // ── Conditional ──
+    SUMIF:   () => { const parts=argsStr.split(','); const crit=parts[1]?.trim().replace(/"/g,''); const v2=getRange(parts[0].trim()); const sv=getRange(parts[2]?.trim()||parts[0].trim()); return v2.reduce((s,v,i)=>s+(String(v)===crit?sv[i]||v:0),0); },
+    COUNTIF: () => { const parts=argsStr.split(','); const crit=parts[1]?.trim().replace(/"/g,''); const v2=getRange(parts[0].trim()); const m2=crit.match(/^([><=!]+)(.+)$/); if(m2){const ops={'>':(a,b)=>a>b,'<':(a,b)=>a<b,'>=':(a,b)=>a>=b,'<=':(a,b)=>a<=b,'=':(a,b)=>a==b,'<>':(a,b)=>a!=b}[m2[1]]; return v2.filter(v=>ops&&ops(v,parseFloat(m2[2]))).length;} return v2.filter(v=>String(v)===crit).length; },
+    AVERAGEIF:()=>{ const parts=argsStr.split(','); const crit=parts[1]?.trim().replace(/"/g,''); const v2=getRange(parts[0].trim()); const matches=v2.filter(v=>String(v)===crit); return matches.length?matches.reduce((a,b)=>a+b)/matches.length:0; },
+    IFERROR: () => { const parts=argsStr.split(','); try{const r=_xlArith(parts[0].trim()); return(String(r).startsWith('#')?parts[1]?.trim().replace(/"/g,''):r);}catch{return parts[1]?.trim().replace(/"/g,'')||'';} },
+
+    // ── Financial ──
+    PMT:     () => { const p=argsStr.split(','); const rate=_xlArith(p[0].trim()); const nper=_xlArith(p[1]?.trim()||'0'); const pv=_xlArith(p[2]?.trim()||'0'); if(!rate) return -pv/nper; return -(pv*rate*(1+rate)**nper)/((1+rate)**nper-1); },
+    FV:      () => { const p=argsStr.split(','); const rate=_xlArith(p[0].trim()); const nper=_xlArith(p[1]?.trim()||'0'); const pmt=_xlArith(p[2]?.trim()||'0'); const pv=_xlArith(p[3]?.trim()||'0'); return -(pv*(1+rate)**nper + pmt*((1+rate)**nper-1)/rate); },
+    PV:      () => { const p=argsStr.split(','); const rate=_xlArith(p[0].trim()); const nper=_xlArith(p[1]?.trim()||'0'); const pmt=_xlArith(p[2]?.trim()||'0'); if(!rate) return -pmt*nper; return -pmt*((1-(1+rate)**-nper)/rate); },
+  };
+
+  const handler = FUNCS[fn];
+  if (handler) {
+    const result = handler();
+    if (typeof result === 'number' && isFinite(result)) {
+      return Math.round(result * 10000) / 10000;
     }
+    return result;
+  }
+  return undefined; // unknown function — fall through to arithmetic
+}
+
+function _xlIF(inner) {
+  // IF(condition, value_if_true, value_if_false)
+  // Split carefully respecting nested parens
+  const parts = _xlSplitArgs(inner);
+  if (parts.length < 2) return '#IF!';
+  const condResult = _xlCondition(parts[0].trim());
+  return condResult ? _xlEval(parts[1].trim()) : _xlEval(parts[2]?.trim() || '0');
+}
+
+function _xlIFS(inner) {
+  const parts = _xlSplitArgs(inner);
+  for (let i = 0; i+1 < parts.length; i += 2) {
+    if (_xlCondition(parts[i].trim())) return _xlEval(parts[i+1].trim());
+  }
+  return '#IFS!';
+}
+
+function _xlCondition(expr) {
+  // Check if it's a comparison: A1>5, B2="text", etc.
+  const compMatch = expr.match(/^(.+?)\s*([><=!]{1,2})\s*(.+)$/);
+  if (compMatch) {
+    const left  = _xlArith(compMatch[1].trim());
+    const right = _xlArith(compMatch[3].trim().replace(/^"(.*)"$/, '$1'));
+    const ops   = {'>':()=>left>right,'<':()=>left<right,'>=':()=>left>=right,'<=':()=>left<=right,'=':()=>left==right,'<>':()=>left!=right,'!=':()=>left!=right};
+    return (ops[compMatch[2]] || (() => false))();
+  }
+  return !!_xlArith(expr);
+}
+
+function _xlArith(expr) {
+  if (!expr) return 0;
+  const s = expr.toString().trim();
+
+  // String literal
+  if (/^".*"$/.test(s)) return s.slice(1,-1);
+
+  // Bare number
+  if (!isNaN(s) && s !== '') return parseFloat(s);
+
+  // Cell reference
+  const cellRef = elabXlParseCellRef(s);
+  if (cellRef) return elabXlGetNum(`${cellRef.r}_${cellRef.c}`) ?? 0;
+
+  // Replace all cell references in expression with values
+  const withVals = s.replace(/([A-Z]+)(\d+)/gi, (_, col, row) => {
+    const c = ELAB_XL_COLS.indexOf(col.toUpperCase()) + 1;
+    return elabXlGetNum(`${parseInt(row)}_${c}`) ?? 0;
   });
+
+  // Safe eval for arithmetic
+  try {
+    const safe = withVals.replace(/\^/g,'**'); // ^ to **
+    const res = Function('"use strict"; return (' + safe + ')')();
+    return typeof res === 'number' ? res : (res ? 1 : 0);
+  } catch(e) {
+    return '#ERR!';
+  }
+}
+
+// Split function args respecting nested parentheses
+function _xlSplitArgs(str) {
+  const parts = []; let cur = '', depth = 0;
+  for (const ch of str) {
+    if (ch === '(' ) depth++;
+    else if (ch === ')') depth--;
+    if (ch === ',' && depth === 0) { parts.push(cur); cur = ''; }
+    else cur += ch;
+  }
+  if (cur) parts.push(cur);
+  return parts;
+}
+
+function elabXlComputeAll() {
+  // Two passes for dependencies
+  for (let pass = 0; pass < 2; pass++) {
+    Object.keys(_exlData).forEach(key => {
+      const v = _exlData[key];
+      if (typeof v === 'string' && v.startsWith('=')) {
+        const computed = elabXlCompute(v);
+        const inp = document.querySelector(`input[data-key="${key}"]`);
+        if (inp) {
+          inp.value = String(computed ?? '');
+          inp.style.color = '#79c0ff'; // blue = formula cell
+          inp.title = v; // show formula on hover
+        }
+      }
+    });
+  }
   elabXlUpdateStats();
 }
 
-function elabXlUpdateStats(){
-  const panel=document.getElementById('elab-xl-stats'); if(!panel) return;
-  const nums=[];
-  for(let r=2;r<=_exlRows;r++) for(let c=1;c<=_exlCols;c++){const v=elabXlGetNum(`${r}_${c}`);if(v!==null&&v>0)nums.push(v);}
-  if(nums.length<2){panel.innerHTML='';return;}
-  const mean=nums.reduce((a,b)=>a+b,0)/nums.length;
-  const sorted=[...nums].sort((a,b)=>a-b),mid=Math.floor(sorted.length/2);
-  const median=sorted.length%2?sorted[mid]:(sorted[mid-1]+sorted[mid])/2;
-  const stdev=Math.sqrt(nums.reduce((s,x)=>s+(x-mean)**2,0)/(nums.length-1));
-  const STATS=[
-    {l:'∑ المجموع',v:Math.round(nums.reduce((a,b)=>a+b,0)),i:'➕',c:'#6C63FF'},
-    {l:'x̄ المتوسط',v:mean.toFixed(2),i:'📊',c:'#00BFA5'},
-    {l:'↕ الوسيط',v:median.toFixed(2),i:'↕️',c:'#FFD600'},
-    {l:'σ الانحراف',v:stdev.toFixed(2),i:'📐',c:'#FF7043'},
-    {l:'⬆ الأعلى',v:Math.max(...nums),i:'🔺',c:'#28CA41'},
-    {l:'⬇ الأدنى',v:Math.min(...nums),i:'🔻',c:'#FF5252'},
+function elabXlUpdateStats() {
+  const panel = document.getElementById('elab-xl-stats');
+  if (!panel) return;
+  const nums = [];
+  for(let r=2;r<=_exlRows;r++)
+    for(let c=1;c<=_exlCols;c++) {
+      const v = elabXlGetNum(`${r}_${c}`);
+      if (v !== null && isFinite(v)) nums.push(v);
+    }
+  if (nums.length < 2) { panel.innerHTML=''; return; }
+  const mean   = nums.reduce((a,b)=>a+b,0)/nums.length;
+  const sorted = [...nums].sort((a,b)=>a-b);
+  const mid    = Math.floor(sorted.length/2);
+  const median = sorted.length%2 ? sorted[mid] : (sorted[mid-1]+sorted[mid])/2;
+  const stdev  = Math.sqrt(nums.reduce((s,x)=>s+(x-mean)**2,0)/(nums.length-1));
+  const total  = nums.reduce((a,b)=>a+b,0);
+  const STATS  = [
+    {l:'العدد n',    v:nums.length,        i:'#',   c:'#a78bfa'},
+    {l:'∑ المجموع', v:Math.round(total*100)/100, i:'➕',c:'#6C63FF'},
+    {l:'x̄ المتوسط', v:mean.toFixed(3),     i:'📊',  c:'#00BFA5'},
+    {l:'الوسيط',    v:median.toFixed(3),   i:'↕️',  c:'#FFD600'},
+    {l:'σ الانحراف',v:stdev.toFixed(3),    i:'📐',  c:'#FF7043'},
+    {l:'الأعلى',    v:Math.max(...nums),   i:'🔺',  c:'#28CA41'},
+    {l:'الأدنى',    v:Math.min(...nums),   i:'🔻',  c:'#FF5252'},
+    {l:'المدى',     v:Math.max(...nums)-Math.min(...nums), i:'↔️', c:'#26C6DA'},
   ];
-  panel.innerHTML=STATS.map(s=>`<div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:10px;text-align:center"><div style="font-size:1.1rem">${s.i}</div><div style="font-size:1rem;font-weight:700;color:${s.c}">${s.v}</div><div style="font-size:0.68rem;color:var(--text-muted);margin-top:2px">${s.l}</div></div>`).join('');
+  panel.innerHTML = '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px">'
+    + STATS.map(s=>`<div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:8px;text-align:center">
+        <div style="font-size:0.9rem">${s.i}</div>
+        <div style="font-size:0.9rem;font-weight:700;color:${s.c}">${s.v}</div>
+        <div style="font-size:0.62rem;color:var(--text-muted);margin-top:2px">${s.l}</div>
+      </div>`).join('')
+    + '</div>';
+}
+
+// Formula hint while typing
+function _elabXlShowFormulaHint(key, formula) {
+  const fb = document.getElementById('elab-xl-feedback');
+  if (!fb || !formula.startsWith('=')) { if(fb) fb.innerHTML=''; return; }
+  const computed = elabXlCompute(formula);
+  if (String(computed).startsWith('#')) {
+    fb.innerHTML = `<span style="color:#FF5252">⚠️ ${computed} — تحقق من الصيغة</span>`;
+  } else {
+    fb.innerHTML = `<span style="color:#00BFA5">✓ النتيجة = <strong>${computed}</strong></span>`;
+  }
 }
 
 function elabXlAddRow(){_exlRows++;elabXlRender();elabXlComputeAll();}
 function elabXlAddCol(){if(_exlCols<ELAB_XL_COLS.length){_exlCols++;elabXlRender();elabXlComputeAll();}}
-function elabXlClear(){_exlData={};_exlStyles={};elabXlRender();const s=document.getElementById('elab-xl-stats');if(s)s.innerHTML='';const cw=document.getElementById('elab-xl-chart-wrap');if(cw)cw.style.display='none';}
+function elabXlClear(){_exlData={};_exlStyles={};elabXlRender();const s=document.getElementById('elab-xl-stats');if(s)s.innerHTML='';const cw=document.getElementById('elab-xl-chart-wrap');if(cw)cw.style.display='none';const fb=document.getElementById('elab-xl-feedback');if(fb)fb.innerHTML='';}
+
+
 
 function elabXlValidate(){
   const fb = document.getElementById('elab-xl-feedback');
@@ -2574,10 +2898,17 @@ function elabBuildFnRef(){
   el.innerHTML=FNS.map(([f,l])=>`<span onclick="elabXlPasteFn('${f.replace(/'/g,"\\'")}')" title="${l}" style="background:rgba(232,160,32,0.1);border:1px solid rgba(232,160,32,0.22);border-radius:6px;padding:2px 7px;font-size:0.71rem;color:#E8A020;cursor:pointer;font-family:Fira Code,monospace" onmouseenter="this.style.background='rgba(232,160,32,0.2)'" onmouseleave="this.style.background='rgba(232,160,32,0.1)'">${f}</span>`).join('');
 }
 
-function elabXlPasteFn(fn){
+function elabXlPasteFn(fn, label){
   const key=`${_exlSel.r}_${_exlSel.c}`;
+  _exlData[key]=fn;
   const inp=document.querySelector(`input[data-key="${key}"]`);
-  if(inp){inp.value=fn;inp.focus();_exlData[key]=fn;const fb=document.getElementById('elab-xl-fbar');if(fb)fb.value=fn;elabXlComputeAll();}
+  if(inp){ inp.focus(); }
+  const fb=document.getElementById('elab-xl-fbar');
+  if(fb) fb.value=fn;
+  elabXlComputeAll();
+  _elabXlShowFormulaHint(key, fn);
+  const feedback=document.getElementById('elab-xl-feedback');
+  if(feedback && label) feedback.innerHTML=`<span style="color:#a78bfa">📌 تم إدراج: <code style="color:#E8A020">${fn}</code> — ${label}</span>`;
 }
 
 if (typeof Chart === 'undefined') {
@@ -17479,7 +17810,7 @@ function buildStatsLabFull(subjectId, uploads) {
         + '<span id="elab-xl-ref" style="font-weight:700;color:#5cb888;font-family:monospace;font-size:0.82rem;min-width:30px">A1</span>'
         + '<span style="color:var(--border)">|</span>'
         + '<span style="font-size:0.78rem;color:var(--text-muted)">fx</span>'
-        + '<input id="elab-xl-fbar" style="flex:1;background:transparent;border:none;outline:none;color:var(--text);font-family:monospace;font-size:0.82rem;direction:ltr" onchange="elabXlFbarCommit()" placeholder="أدخل قيمة أو صيغة...">'
+        + '<input id="elab-xl-fbar" style="flex:1;background:transparent;border:none;outline:none;color:var(--text);font-family:monospace;font-size:0.82rem;direction:ltr" onchange="elabXlFbarCommit()" placeholder="قيمة أو =SUM(A1:A10) أو =IF(A1>5,'نعم','لا') ...">'
       + '</div>'
       + '<div id="elab-xl-grid" style="overflow-x:auto;border-radius:10px;border:1px solid var(--border)"></div>'
       + '<div id="elab-xl-stats" style="margin-top:10px"></div>'
@@ -24739,7 +25070,7 @@ function buildEmbeddedLab(subjectId) {
         <span id="elab-xl-ref" style="font-weight:700;color:#5cb888;font-family:monospace;font-size:0.82rem;min-width:30px">A1</span>
         <span style="color:var(--border)">|</span>
         <span style="font-size:0.78rem;color:var(--text-muted)">fx</span>
-        <input id="elab-xl-fbar" style="flex:1;background:transparent;border:none;outline:none;color:var(--text);font-family:monospace;font-size:0.82rem;direction:ltr" onchange="elabXlFbarCommit()" placeholder="أدخل قيمة أو صيغة...">
+        <input id="elab-xl-fbar" style="flex:1;background:transparent;border:none;outline:none;color:var(--text);font-family:monospace;font-size:0.82rem;direction:ltr" onchange="elabXlFbarCommit()" placeholder="قيمة أو =SUM(A1:A10) أو =IF(A1>5,'نعم','لا') ...">
       </div>
       <!-- Grid -->
       <div id="elab-xl-grid" style="overflow-x:auto;border-radius:10px;border:1px solid var(--border)"></div>

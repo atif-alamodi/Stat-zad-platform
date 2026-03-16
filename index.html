@@ -2429,261 +2429,381 @@ function elabXlParseCellRef(ref) {
 // Supports: ALL standard Excel-like formulas
 // Ranges: A1:B5  |  Cell refs: A1  |  Functions: SUM,AVERAGE,IF...
 // Arithmetic: +,-,*,/,^  |  Comparisons  |  Nested functions
+// ═══════════════════════════════════════════════════════════════
+// Excel Engine v2 — Full nested formula support + charts
+// ═══════════════════════════════════════════════════════════════
+
+// ── Core entry point ──────────────────────────────────────────
 function elabXlCompute(formula) {
   if (!formula || !String(formula).startsWith('=')) return formula;
-  const raw = String(formula).slice(1).trim();
-
   try {
-    return _xlEval(raw);
+    return _xlEval(String(formula).slice(1).trim());
   } catch(e) {
     return '#ERR!';
   }
 }
 
+// ── Main evaluator: handles any expression ───────────────────
 function _xlEval(expr) {
-  const up = expr.toUpperCase().trim();
+  if (!expr) return 0;
+  expr = expr.trim();
 
-  // ── IF(condition, true, false) ──
-  if (up.startsWith('IF(')) {
-    return _xlIF(expr.slice(3, -1));
-  }
+  // 1. String literal
+  if (/^"[^"]*"$/.test(expr)) return expr.slice(1,-1);
 
-  // ── IFS(cond1,val1,cond2,val2,...) ──
-  if (up.startsWith('IFS(')) {
-    return _xlIFS(expr.slice(4, -1));
-  }
+  // 2. Number
+  if (!isNaN(expr) && expr !== '') return parseFloat(expr);
 
-  // ── Named functions with range or args ──
-  const fnMatch = up.match(/^([A-Z_]+)\(([\s\S]*)\)$/);
-  if (fnMatch) {
-    const fn   = fnMatch[1];
-    const args = fnMatch[2];
-    const result = _xlFn(fn, args, expr);
+  // 3. Boolean literals
+  if (expr.toUpperCase() === 'TRUE')  return true;
+  if (expr.toUpperCase() === 'FALSE') return false;
+
+  // 4. Cell reference
+  const cellRef = elabXlParseCellRef(expr);
+  if (cellRef) return elabXlGetNum(`${cellRef.r}_${cellRef.c}`) ?? 0;
+
+  // 5. Function call  fn(args...)
+  const fn = _xlExtractFn(expr);
+  if (fn) {
+    const result = _xlCallFn(fn.name, fn.argsStr);
     if (result !== undefined) return result;
   }
 
-  // ── Arithmetic / cell references ──
+  // 6. Arithmetic expression (may contain nested functions)
   return _xlArith(expr);
 }
 
-// All supported functions
-function _xlFn(fn, argsStr, raw) {
-  const getRange = (s) => elabXlParseRange(s);
-  const getNum   = (s) => {
-    const ref = elabXlParseCellRef(s.trim());
-    if (ref) return elabXlGetNum(`${ref.r}_${ref.c}`) ?? 0;
-    const n = parseFloat(s);
-    return isNaN(n) ? 0 : n;
-  };
-
-  // Check if it's a range argument
-  const rangeMatch = argsStr.trim().match(/^([A-Z]+\d+:[A-Z]+\d+)(?:,(.*))?$/i);
-  const vals = rangeMatch ? getRange(rangeMatch[1]) : [];
-
-  const FUNCS = {
-    // ── Math ──
-    SUM:     () => vals.reduce((a,b)=>a+b, 0),
-    AVERAGE: () => vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : 0,
-    COUNT:   () => vals.length,
-    COUNTA:  () => {
-      const m = argsStr.trim().match(/^([A-Z]+\d+:[A-Z]+\d+)/i);
-      if (!m) return 0;
-      const rng = argsStr.trim().toUpperCase().match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/);
-      if (!rng) return 0;
-      let cnt=0;
-      for(let r=parseInt(rng[2]);r<=parseInt(rng[4]);r++)
-        for(let c=ELAB_XL_COLS.indexOf(rng[1])+1;c<=ELAB_XL_COLS.indexOf(rng[3])+1;c++) {
-          if (_exlData[`${r}_${c}`] !== undefined && _exlData[`${r}_${c}`] !== '') cnt++;
-        }
-      return cnt;
-    },
-    MAX:     () => vals.length ? Math.max(...vals) : 0,
-    MIN:     () => vals.length ? Math.min(...vals) : 0,
-    PRODUCT: () => vals.reduce((a,b)=>a*b, 1),
-
-    // ── Statistics ──
-    STDEV:   () => { if(vals.length<2) return 0; const m=vals.reduce((a,b)=>a+b)/vals.length; return Math.sqrt(vals.reduce((s,x)=>s+(x-m)**2,0)/(vals.length-1)); },
-    STDEVP:  () => { if(!vals.length) return 0; const m=vals.reduce((a,b)=>a+b)/vals.length; return Math.sqrt(vals.reduce((s,x)=>s+(x-m)**2,0)/vals.length); },
-    VAR:     () => { if(vals.length<2) return 0; const m=vals.reduce((a,b)=>a+b)/vals.length; return vals.reduce((s,x)=>s+(x-m)**2,0)/(vals.length-1); },
-    VARP:    () => { if(!vals.length) return 0; const m=vals.reduce((a,b)=>a+b)/vals.length; return vals.reduce((s,x)=>s+(x-m)**2,0)/vals.length; },
-    MEDIAN:  () => { if(!vals.length) return 0; const s=[...vals].sort((a,b)=>a-b),mid=Math.floor(s.length/2); return s.length%2?s[mid]:(s[mid-1]+s[mid])/2; },
-    MODE:    () => { if(!vals.length) return 0; const cnt={}; vals.forEach(v=>cnt[v]=(cnt[v]||0)+1); return +Object.entries(cnt).sort((a,b)=>b[1]-a[1])[0][0]; },
-    LARGE:   () => { const parts=argsStr.split(','); const v2=getRange(parts[0].trim()); const k=parseInt(parts[1])||1; return [...v2].sort((a,b)=>b-a)[k-1]??0; },
-    SMALL:   () => { const parts=argsStr.split(','); const v2=getRange(parts[0].trim()); const k=parseInt(parts[1])||1; return [...v2].sort((a,b)=>a-b)[k-1]??0; },
-    RANK:    () => { const parts=argsStr.split(','); const num=getNum(parts[0]); const v2=getRange(parts[1]?.trim()||''); const desc=parseInt(parts[2]||'1')!==0; const s=[...v2].sort((a,b)=>desc?b-a:a-b); return s.indexOf(num)+1; },
-    PERCENTILE: () => { const parts=argsStr.split(','); const v2=getRange(parts[0].trim()); const p=parseFloat(parts[1]||'0.5'); const s=[...v2].sort((a,b)=>a-b); const k=(s.length-1)*p; const f=Math.floor(k),c2=Math.ceil(k); return f===c2?s[k]:s[f]*(c2-k)+s[c2]*(k-f); },
-    QUARTILE: () => { const parts=argsStr.split(','); const v2=getRange(parts[0].trim()); const q=parseInt(parts[1]||'1'); const ps=[0,0.25,0.5,0.75,1]; const p=ps[q]||0.25; const s=[...v2].sort((a,b)=>a-b); const k=(s.length-1)*p; const f=Math.floor(k),c2=Math.ceil(k); return f===c2?s[k]:s[f]*(c2-k)+s[c2]*(k-f); },
-    CORREL:  () => { const parts=argsStr.split(','); const x=getRange(parts[0].trim()); const y=getRange(parts[1]?.trim()||''); if(!x.length||x.length!==y.length) return 0; const xm=x.reduce((a,b)=>a+b)/x.length,ym=y.reduce((a,b)=>a+b)/y.length; const num2=x.reduce((s,_,i)=>s+(x[i]-xm)*(y[i]-ym),0); const d=Math.sqrt(x.reduce((s,v)=>s+(v-xm)**2,0)*y.reduce((s,v)=>s+(v-ym)**2,0)); return d?num2/d:0; },
-
-    // ── Math functions ──
-    ROUND:   () => { const p=argsStr.split(','); const v=_xlArith(p[0].trim()); const d=parseInt(p[1]||'0'); return Math.round(v*10**d)/10**d; },
-    ROUNDUP: () => { const p=argsStr.split(','); const v=_xlArith(p[0].trim()); const d=parseInt(p[1]||'0'); return Math.ceil(v*10**d)/10**d; },
-    ROUNDDOWN:()=>{ const p=argsStr.split(','); const v=_xlArith(p[0].trim()); const d=parseInt(p[1]||'0'); return Math.floor(v*10**d)/10**d; },
-    ABS:     () => Math.abs(_xlArith(argsStr.trim())),
-    SQRT:    () => Math.sqrt(Math.abs(_xlArith(argsStr.trim()))),
-    POWER:   () => { const p=argsStr.split(','); return Math.pow(_xlArith(p[0].trim()), _xlArith(p[1]?.trim()||'2')); },
-    MOD:     () => { const p=argsStr.split(','); return _xlArith(p[0].trim()) % _xlArith(p[1]?.trim()||'1'); },
-    INT:     () => Math.floor(_xlArith(argsStr.trim())),
-    CEILING: () => { const p=argsStr.split(','); const v=_xlArith(p[0].trim()); const s=_xlArith(p[1]?.trim()||'1'); return Math.ceil(v/s)*s; },
-    FLOOR:   () => { const p=argsStr.split(','); const v=_xlArith(p[0].trim()); const s=_xlArith(p[1]?.trim()||'1'); return Math.floor(v/s)*s; },
-    LOG:     () => { const p=argsStr.split(','); const v=_xlArith(p[0].trim()); const b=_xlArith(p[1]?.trim()||String(Math.E)); return Math.log(v)/Math.log(b); },
-    LOG10:   () => Math.log10(Math.abs(_xlArith(argsStr.trim()))),
-    LN:      () => Math.log(Math.abs(_xlArith(argsStr.trim()))),
-    EXP:     () => Math.exp(_xlArith(argsStr.trim())),
-    PI:      () => Math.PI,
-    SIN:     () => Math.sin(_xlArith(argsStr.trim())),
-    COS:     () => Math.cos(_xlArith(argsStr.trim())),
-    TAN:     () => Math.tan(_xlArith(argsStr.trim())),
-    DEGREES: () => _xlArith(argsStr.trim()) * 180 / Math.PI,
-    RADIANS: () => _xlArith(argsStr.trim()) * Math.PI / 180,
-    FACT:    () => { let n=Math.round(_xlArith(argsStr.trim())),f=1; while(n>1)f*=n--; return f; },
-    COMBIN:  () => { const p=argsStr.split(','); const n=Math.round(_xlArith(p[0].trim())); const k=Math.round(_xlArith(p[1]?.trim()||'0')); let r=1,kk=k; while(kk>0){r=r*n/kk;n--;kk--;} return Math.round(r); },
-
-    // ── Text ──
-    LEN:     () => String(_exlData[`${(elabXlParseCellRef(argsStr.trim())||{}).r||0}_${(elabXlParseCellRef(argsStr.trim())||{}).c||0}`]||argsStr.replace(/"/g,'')).length,
-    CONCATENATE: () => argsStr.split(',').map(a=>{const ref=elabXlParseCellRef(a.trim());return ref?String(_exlData[`${ref.r}_${ref.c}`]||''):a.trim().replace(/"/g,'');}).join(''),
-    LEFT:    () => { const p=argsStr.split(','); const ref=elabXlParseCellRef(p[0].trim()); const txt=ref?String(_exlData[`${ref.r}_${ref.c}`]||''):p[0].trim().replace(/"/g,''); return txt.slice(0,parseInt(p[1]||'1')); },
-    RIGHT:   () => { const p=argsStr.split(','); const ref=elabXlParseCellRef(p[0].trim()); const txt=ref?String(_exlData[`${ref.r}_${ref.c}`]||''):p[0].trim().replace(/"/g,''); return txt.slice(-parseInt(p[1]||'1')); },
-    UPPER:   () => { const ref=elabXlParseCellRef(argsStr.trim()); return String(ref?(_exlData[`${ref.r}_${ref.c}`]||''):argsStr.replace(/"/g,'')).toUpperCase(); },
-    LOWER:   () => { const ref=elabXlParseCellRef(argsStr.trim()); return String(ref?(_exlData[`${ref.r}_${ref.c}`]||''):argsStr.replace(/"/g,'')).toLowerCase(); },
-
-    // ── Logical ──
-    AND:     () => argsStr.split(',').every(a=>!!_xlArith(a.trim())),
-    OR:      () => argsStr.split(',').some(a=>!!_xlArith(a.trim())),
-    NOT:     () => !_xlArith(argsStr.trim()),
-    TRUE:    () => true,
-    FALSE:   () => false,
-
-    // ── Lookup ──
-    VLOOKUP: () => {
-      const parts=argsStr.split(',');
-      const lookupVal=_xlArith(parts[0].trim());
-      const rng=parts[1]?.trim();
-      const colIdx=parseInt(parts[2]||'1');
-      if(!rng) return '#N/A';
-      const m2=rng.toUpperCase().match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/);
-      if(!m2) return '#N/A';
-      const c1=ELAB_XL_COLS.indexOf(m2[1])+1,r1=parseInt(m2[2]),r2=parseInt(m2[4]);
-      for(let r=r1;r<=r2;r++) {
-        const v=elabXlGetNum(`${r}_${c1}`) ?? _exlData[`${r}_${c1}`];
-        if(String(v)===String(lookupVal)) return _exlData[`${r}_${c1+colIdx-1}`]??'#N/A';
-      }
-      return '#N/A';
-    },
-
-    // ── Conditional ──
-    SUMIF:   () => { const parts=argsStr.split(','); const crit=parts[1]?.trim().replace(/"/g,''); const v2=getRange(parts[0].trim()); const sv=getRange(parts[2]?.trim()||parts[0].trim()); return v2.reduce((s,v,i)=>s+(String(v)===crit?sv[i]||v:0),0); },
-    COUNTIF: () => { const parts=argsStr.split(','); const crit=parts[1]?.trim().replace(/"/g,''); const v2=getRange(parts[0].trim()); const m2=crit.match(/^([><=!]+)(.+)$/); if(m2){const ops={'>':(a,b)=>a>b,'<':(a,b)=>a<b,'>=':(a,b)=>a>=b,'<=':(a,b)=>a<=b,'=':(a,b)=>a==b,'<>':(a,b)=>a!=b}[m2[1]]; return v2.filter(v=>ops&&ops(v,parseFloat(m2[2]))).length;} return v2.filter(v=>String(v)===crit).length; },
-    AVERAGEIF:()=>{ const parts=argsStr.split(','); const crit=parts[1]?.trim().replace(/"/g,''); const v2=getRange(parts[0].trim()); const matches=v2.filter(v=>String(v)===crit); return matches.length?matches.reduce((a,b)=>a+b)/matches.length:0; },
-    IFERROR: () => { const parts=argsStr.split(','); try{const r=_xlArith(parts[0].trim()); return(String(r).startsWith('#')?parts[1]?.trim().replace(/"/g,''):r);}catch{return parts[1]?.trim().replace(/"/g,'')||'';} },
-
-    // ── Financial ──
-    PMT:     () => { const p=argsStr.split(','); const rate=_xlArith(p[0].trim()); const nper=_xlArith(p[1]?.trim()||'0'); const pv=_xlArith(p[2]?.trim()||'0'); if(!rate) return -pv/nper; return -(pv*rate*(1+rate)**nper)/((1+rate)**nper-1); },
-    FV:      () => { const p=argsStr.split(','); const rate=_xlArith(p[0].trim()); const nper=_xlArith(p[1]?.trim()||'0'); const pmt=_xlArith(p[2]?.trim()||'0'); const pv=_xlArith(p[3]?.trim()||'0'); return -(pv*(1+rate)**nper + pmt*((1+rate)**nper-1)/rate); },
-    PV:      () => { const p=argsStr.split(','); const rate=_xlArith(p[0].trim()); const nper=_xlArith(p[1]?.trim()||'0'); const pmt=_xlArith(p[2]?.trim()||'0'); if(!rate) return -pmt*nper; return -pmt*((1-(1+rate)**-nper)/rate); },
-  };
-
-  const handler = FUNCS[fn];
-  if (handler) {
-    const result = handler();
-    if (typeof result === 'number' && isFinite(result)) {
-      return Math.round(result * 10000) / 10000;
-    }
-    return result;
+// ── Extract fn name + args from expr like SUM(A1:A5) ─────────
+function _xlExtractFn(expr) {
+  // Must start with letters, followed by (, and end with matching )
+  const m = expr.match(/^([A-Z_][A-Z0-9_]*)\(([\s\S]*)\)$/i);
+  if (!m) return null;
+  // Verify the closing ) is truly the end (not part of outer expr)
+  // Count parens in argsStr
+  let depth = 0;
+  for (const ch of m[2]) {
+    if (ch === '(') depth++;
+    else if (ch === ')') depth--;
+    if (depth < 0) return null; // unbalanced — this ) belongs to outer
   }
-  return undefined; // unknown function — fall through to arithmetic
+  return { name: m[1].toUpperCase(), argsStr: m[2] };
 }
 
-function _xlIF(inner) {
-  // IF(condition, value_if_true, value_if_false)
-  // Split carefully respecting nested parens
-  const parts = _xlSplitArgs(inner);
-  if (parts.length < 2) return '#IF!';
-  const condResult = _xlCondition(parts[0].trim());
-  return condResult ? _xlEval(parts[1].trim()) : _xlEval(parts[2]?.trim() || '0');
-}
-
-function _xlIFS(inner) {
-  const parts = _xlSplitArgs(inner);
-  for (let i = 0; i+1 < parts.length; i += 2) {
-    if (_xlCondition(parts[i].trim())) return _xlEval(parts[i+1].trim());
-  }
-  return '#IFS!';
-}
-
-function _xlCondition(expr) {
-  // Check if it's a comparison: A1>5, B2="text", etc.
-  const compMatch = expr.match(/^(.+?)\s*([><=!]{1,2})\s*(.+)$/);
-  if (compMatch) {
-    const left  = _xlArith(compMatch[1].trim());
-    const right = _xlArith(compMatch[3].trim().replace(/^"(.*)"$/, '$1'));
-    const ops   = {'>':()=>left>right,'<':()=>left<right,'>=':()=>left>=right,'<=':()=>left<=right,'=':()=>left==right,'<>':()=>left!=right,'!=':()=>left!=right};
-    return (ops[compMatch[2]] || (() => false))();
-  }
-  return !!_xlArith(expr);
-}
-
+// ── Arithmetic: replaces fn calls AND cell refs, then evals ──
 function _xlArith(expr) {
   if (!expr) return 0;
-  const s = expr.toString().trim();
+  let s = expr.toString().trim();
 
-  // String literal
-  if (/^".*"$/.test(s)) return s.slice(1,-1);
-
-  // Bare number
+  // String literal passthrough
+  if (/^"[^"]*"$/.test(s)) return s.slice(1,-1);
   if (!isNaN(s) && s !== '') return parseFloat(s);
 
-  // Cell reference
-  const cellRef = elabXlParseCellRef(s);
-  if (cellRef) return elabXlGetNum(`${cellRef.r}_${cellRef.c}`) ?? 0;
+  // Step 1: Replace function calls with their computed values
+  // Use iterative approach to handle nested fns from innermost out
+  let prev;
+  let iterations = 0;
+  do {
+    prev = s;
+    // Find innermost fn call: letters followed by ( no-nested-parens )
+    s = s.replace(/([A-Z_][A-Z0-9_]*)\(([^()]*)\)/gi, (match, fnName, argsStr) => {
+      const result = _xlCallFn(fnName.toUpperCase(), argsStr);
+      if (result === undefined) return match; // unknown fn — keep as is
+      const n = typeof result === 'number' ? result : (result ? 1 : 0);
+      return isNaN(n) ? '0' : String(n);
+    });
+    iterations++;
+  } while (s !== prev && iterations < 20);
 
-  // Replace all cell references in expression with values
-  const withVals = s.replace(/([A-Z]+)(\d+)/gi, (_, col, row) => {
+  // Step 2: Replace all remaining cell references with their values
+  s = s.replace(/([A-Z]+)(\d+)/gi, (_, col, row) => {
     const c = ELAB_XL_COLS.indexOf(col.toUpperCase()) + 1;
-    return elabXlGetNum(`${parseInt(row)}_${c}`) ?? 0;
+    if (c <= 0) return '0';
+    return String(elabXlGetNum(`${parseInt(row)}_${c}`) ?? 0);
   });
 
-  // Safe eval for arithmetic
+  // Step 3: Safe arithmetic eval
   try {
-    const safe = withVals.replace(/\^/g,'**'); // ^ to **
+    const safe = s
+      .replace(/\^/g, '**')          // ^ to power
+      .replace(/<>/g, '!==')         // <> to JS !=
+      .replace(/(?<![=!<>])=(?!=)/g, '=='); // single = to == (for comparisons)
     const res = Function('"use strict"; return (' + safe + ')')();
-    return typeof res === 'number' ? res : (res ? 1 : 0);
+    if (typeof res === 'number') return isFinite(res) ? res : '#DIV/0!';
+    if (typeof res === 'boolean') return res;
+    return String(res);
   } catch(e) {
     return '#ERR!';
   }
 }
 
-// Split function args respecting nested parentheses
-function _xlSplitArgs(str) {
-  const parts = []; let cur = '', depth = 0;
-  for (const ch of str) {
-    if (ch === '(' ) depth++;
-    else if (ch === ')') depth--;
-    if (ch === ',' && depth === 0) { parts.push(cur); cur = ''; }
-    else cur += ch;
+// ── Call any function by name with raw args string ────────────
+function _xlCallFn(fnName, argsStr) {
+  const args = _xlSplitArgs(argsStr);
+
+  // Helper: evaluate one arg (could be range, formula, or value)
+  const evalArg  = (i) => _xlEval(args[i]?.trim() || '0');
+  const numArg   = (i) => { const v = evalArg(i); return typeof v==='number'?v:parseFloat(v)||0; };
+  const strArg   = (i) => { const v = evalArg(i); return String(v).replace(/^"|"$/g,''); };
+  const rangeArg = (i) => elabXlParseRange(args[i]?.trim() || '');
+  const allNums  = (i) => {
+    const r = elabXlParseRange(args[i]?.trim() || '');
+    if (r.length) return r;
+    return [numArg(i)];
+  };
+
+  const FUNCS = {
+    // ── Core math ──────────────────────────────────────────────
+    SUM:      () => allNums(0).reduce((a,b)=>a+b, 0),
+    AVERAGE:  () => { const v=allNums(0); return v.length ? v.reduce((a,b)=>a+b)/v.length : 0; },
+    COUNT:    () => rangeArg(0).length,
+    COUNTA:   () => { const rng=args[0]?.trim().toUpperCase().match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/); if(!rng)return 0; let cnt=0; for(let r=+rng[2];r<=+rng[4];r++) for(let c=ELAB_XL_COLS.indexOf(rng[1])+1;c<=ELAB_XL_COLS.indexOf(rng[3])+1;c++) if(_exlData[`${r}_${c}`]!==undefined&&_exlData[`${r}_${c}`]!=='')cnt++; return cnt; },
+    MAX:      () => { const v=allNums(0); return v.length ? Math.max(...v) : 0; },
+    MIN:      () => { const v=allNums(0); return v.length ? Math.min(...v) : 0; },
+    PRODUCT:  () => allNums(0).reduce((a,b)=>a*b, 1),
+    SUMPRODUCT:()=>{ const x=rangeArg(0); const y=rangeArg(1); return x.reduce((s,v,i)=>s+v*(y[i]||0),0); },
+
+    // ── Statistics ─────────────────────────────────────────────
+    STDEV:    () => { const v=allNums(0); if(v.length<2)return 0; const m=v.reduce((a,b)=>a+b)/v.length; return Math.sqrt(v.reduce((s,x)=>s+(x-m)**2,0)/(v.length-1)); },
+    STDEVP:   () => { const v=allNums(0); if(!v.length)return 0; const m=v.reduce((a,b)=>a+b)/v.length; return Math.sqrt(v.reduce((s,x)=>s+(x-m)**2,0)/v.length); },
+    VAR:      () => { const v=allNums(0); if(v.length<2)return 0; const m=v.reduce((a,b)=>a+b)/v.length; return v.reduce((s,x)=>s+(x-m)**2,0)/(v.length-1); },
+    VARP:     () => { const v=allNums(0); if(!v.length)return 0; const m=v.reduce((a,b)=>a+b)/v.length; return v.reduce((s,x)=>s+(x-m)**2,0)/v.length; },
+    MEDIAN:   () => { const v=[...allNums(0)].sort((a,b)=>a-b); if(!v.length)return 0; const m=Math.floor(v.length/2); return v.length%2?v[m]:(v[m-1]+v[m])/2; },
+    MODE:     () => { const v=allNums(0); if(!v.length)return 0; const c={}; v.forEach(x=>c[x]=(c[x]||0)+1); return +Object.entries(c).sort((a,b)=>b[1]-a[1])[0][0]; },
+    LARGE:    () => { const v=[...allNums(0)].sort((a,b)=>b-a); return v[numArg(1)-1]??0; },
+    SMALL:    () => { const v=[...allNums(0)].sort((a,b)=>a-b); return v[numArg(1)-1]??0; },
+    RANK:     () => { const num=numArg(0); const v=[...allNums(1)].sort((a,b)=>b-a); return v.indexOf(num)+1; },
+    PERCENTILE:()=>{ const v=[...allNums(0)].sort((a,b)=>a-b); const p=numArg(1); const k=(v.length-1)*p; const f=Math.floor(k),c=Math.ceil(k); return f===c?v[k]:v[f]*(c-k)+v[c]*(k-f); },
+    QUARTILE: () => { const v=[...allNums(0)].sort((a,b)=>a-b); const q=numArg(1); const ps=[0,0.25,0.5,0.75,1]; const p=ps[q]||0; const k=(v.length-1)*p; const f=Math.floor(k),c=Math.ceil(k); return f===c?v[k]:v[f]*(c-k)+v[c]*(k-f); },
+    CORREL:   () => { const x=rangeArg(0),y=rangeArg(1); if(!x.length||x.length!==y.length)return 0; const xm=x.reduce((a,b)=>a+b)/x.length,ym=y.reduce((a,b)=>a+b)/y.length; const n=x.reduce((s,_,i)=>s+(x[i]-xm)*(y[i]-ym),0); const d=Math.sqrt(x.reduce((s,v)=>s+(v-xm)**2,0)*y.reduce((s,v)=>s+(v-ym)**2,0)); return d?n/d:0; },
+    COVAR:    () => { const x=rangeArg(0),y=rangeArg(1); if(!x.length)return 0; const xm=x.reduce((a,b)=>a+b)/x.length,ym=y.reduce((a,b)=>a+b)/y.length; return x.reduce((s,_,i)=>s+(x[i]-xm)*(y[i]-ym),0)/x.length; },
+    SKEW:     () => { const v=allNums(0); const n=v.length; if(n<3)return 0; const m=v.reduce((a,b)=>a+b)/n; const s=Math.sqrt(v.reduce((x,y)=>x+(y-m)**2,0)/(n-1)); return v.reduce((x,y)=>x+((y-m)/s)**3,0)*n/((n-1)*(n-2)); },
+    KURT:     () => { const v=allNums(0); const n=v.length; if(n<4)return 0; const m=v.reduce((a,b)=>a+b)/n; const s=Math.sqrt(v.reduce((x,y)=>x+(y-m)**2,0)/(n-1)); const k=v.reduce((x,y)=>x+((y-m)/s)**4,0); return (n*(n+1))/((n-1)*(n-2)*(n-3))*k - 3*(n-1)**2/((n-2)*(n-3)); },
+    INTERCEPT:()=>{ const y=rangeArg(0),x=rangeArg(1); const n=x.length; if(!n)return 0; const xm=x.reduce((a,b)=>a+b)/n,ym=y.reduce((a,b)=>a+b)/n; const b=x.reduce((s,_,i)=>s+(x[i]-xm)*(y[i]-ym),0)/x.reduce((s,v)=>s+(v-xm)**2,0); return ym-b*xm; },
+    SLOPE:    () => { const y=rangeArg(0),x=rangeArg(1); const n=x.length; if(!n)return 0; const xm=x.reduce((a,b)=>a+b)/n,ym=y.reduce((a,b)=>a+b)/n; return x.reduce((s,_,i)=>s+(x[i]-xm)*(y[i]-ym),0)/x.reduce((s,v)=>s+(v-xm)**2,0); },
+    RSQ:      () => { const r=FUNCS.CORREL(); return r*r; },
+    FORECAST: () => { const x=numArg(0),y=rangeArg(1),xr=rangeArg(2); const n=xr.length; if(!n)return 0; const xm=xr.reduce((a,b)=>a+b)/n,ym=y.reduce((a,b)=>a+b)/n; const b=xr.reduce((s,_,i)=>s+(xr[i]-xm)*(y[i]-ym),0)/xr.reduce((s,v)=>s+(v-xm)**2,0); return ym+b*(x-xm); },
+    GEOMEAN:  () => { const v=allNums(0); return Math.exp(v.reduce((s,x)=>s+Math.log(x),0)/v.length); },
+    HARMEAN:  () => { const v=allNums(0); return v.length/v.reduce((s,x)=>s+1/x,0); },
+    TRIMMEAN: () => { const v=[...allNums(0)].sort((a,b)=>a-b); const p=numArg(1); const trim=Math.floor(v.length*p/2); const t=v.slice(trim,v.length-trim); return t.reduce((a,b)=>a+b)/t.length; },
+    NORM_DIST:() => { const x=numArg(0),m=numArg(1),s=numArg(2); const z=(x-m)/s; return 0.5*(1+Math.erf?Math.erf(z/Math.sqrt(2)):0.5); },
+    NORM_S_DIST:()=>{ const z=numArg(0); return 0.5*(1+(Math.erf?Math.erf(z/Math.sqrt(2)):0)); },
+
+    // ── Math ───────────────────────────────────────────────────
+    ABS:      () => Math.abs(numArg(0)),
+    SQRT:     () => Math.sqrt(Math.abs(numArg(0))),
+    POWER:    () => Math.pow(numArg(0), numArg(1)),
+    MOD:      () => numArg(0) % numArg(1),
+    INT:      () => Math.floor(numArg(0)),
+    SIGN:     () => Math.sign(numArg(0)),
+    ROUND:    () => Math.round(numArg(0)*10**numArg(1))/10**numArg(1),
+    ROUNDUP:  () => Math.ceil( numArg(0)*10**numArg(1))/10**numArg(1),
+    ROUNDDOWN:() => Math.floor(numArg(0)*10**numArg(1))/10**numArg(1),
+    CEILING:  () => Math.ceil( numArg(0)/numArg(1))*numArg(1),
+    FLOOR:    () => Math.floor(numArg(0)/numArg(1))*numArg(1),
+    LOG:      () => Math.log(Math.abs(numArg(0)))/Math.log(args[1]?numArg(1):Math.E),
+    LOG10:    () => Math.log10(Math.abs(numArg(0))),
+    LN:       () => Math.log(Math.abs(numArg(0))),
+    EXP:      () => Math.exp(numArg(0)),
+    PI:       () => Math.PI,
+    E:        () => Math.E,
+    SIN:      () => Math.sin(numArg(0)),
+    COS:      () => Math.cos(numArg(0)),
+    TAN:      () => Math.tan(numArg(0)),
+    ASIN:     () => Math.asin(numArg(0)),
+    ACOS:     () => Math.acos(numArg(0)),
+    ATAN:     () => Math.atan(numArg(0)),
+    ATAN2:    () => Math.atan2(numArg(0), numArg(1)),
+    DEGREES:  () => numArg(0)*180/Math.PI,
+    RADIANS:  () => numArg(0)*Math.PI/180,
+    FACT:     () => { let n=Math.round(numArg(0)),f=1; for(let i=2;i<=n;i++)f*=i; return f; },
+    COMBIN:   () => { let n=Math.round(numArg(0)),k=Math.round(numArg(1)),r=1; for(let i=0;i<k;i++)r=r*(n-i)/(i+1); return Math.round(r); },
+    PERMUT:   () => { let n=Math.round(numArg(0)),k=Math.round(numArg(1)),r=1; for(let i=0;i<k;i++)r*=(n-i); return r; },
+    RAND:     () => Math.random(),
+    RANDBETWEEN:()=> Math.floor(Math.random()*(numArg(1)-numArg(0)+1))+numArg(0),
+    GCD:      () => { const gcd=(a,b)=>b?gcd(b,a%b):a; return args.map(a=>Math.round(numArg(args.indexOf(a)))).reduce(gcd); },
+    LCM:      () => { const gcd=(a,b)=>b?gcd(b,a%b):a; const lcm=(a,b)=>a*b/gcd(a,b); return args.map(a=>Math.round(numArg(args.indexOf(a)))).reduce(lcm); },
+    EVEN:     () => Math.ceil(numArg(0)/2)*2,
+    ODD:      () => { const n=Math.ceil(numArg(0)); return n%2===0?n+1:n; },
+    SUMXMY2:  () => { const x=rangeArg(0),y=rangeArg(1); return x.reduce((s,_,i)=>s+(x[i]-y[i])**2,0); },
+    SUMX2MY2: () => { const x=rangeArg(0),y=rangeArg(1); return x.reduce((s,_,i)=>s+x[i]**2-y[i]**2,0); },
+    SUMX2PY2: () => { const x=rangeArg(0),y=rangeArg(1); return x.reduce((s,_,i)=>s+x[i]**2+y[i]**2,0); },
+
+    // ── Logical ────────────────────────────────────────────────
+    IF:       () => { const cond=_xlCondition(args[0]?.trim()||''); return cond?_xlEval(args[1]?.trim()||''):_xlEval(args[2]?.trim()||'0'); },
+    IFS:      () => { for(let i=0;i+1<args.length;i+=2){if(_xlCondition(args[i]?.trim()||''))return _xlEval(args[i+1]?.trim()||'');} return '#IFS!'; },
+    AND:      () => args.every(a=>_xlCondition(a.trim())),
+    OR:       () => args.some(a=>_xlCondition(a.trim())),
+    NOT:      () => !_xlCondition(args[0]?.trim()||''),
+    XOR:      () => args.filter(a=>_xlCondition(a.trim())).length%2===1,
+    TRUE:     () => true,
+    FALSE:    () => false,
+    IFERROR:  () => { try{const r=_xlEval(args[0]?.trim()||'');return String(r).startsWith('#')?strArg(1):r;}catch{return strArg(1);} },
+    IFNA:     () => { try{const r=_xlEval(args[0]?.trim()||'');return r==='#N/A'?strArg(1):r;}catch{return strArg(1);} },
+    SWITCH:   () => { const val=String(_xlEval(args[0]?.trim()||'')); for(let i=1;i+1<args.length;i+=2){if(String(_xlEval(args[i].trim()))===val)return _xlEval(args[i+1].trim());} return args.length%2===0?strArg(args.length-1):'#N/A'; },
+
+    // ── Conditional aggregates ─────────────────────────────────
+    SUMIF:    () => { const range=rangeArg(0); const crit=_parseCrit(args[1]?.trim()||''); const sr=rangeArg(2)||range; return range.reduce((s,v,i)=>s+(crit(v)?sr[i]||0:0),0); },
+    SUMIFS:   () => { const sr=rangeArg(0); const r1=rangeArg(1); const c1=_parseCrit(args[2]?.trim()||''); const r2=args[4]?rangeArg(3):null; const c2=args[4]?_parseCrit(args[4]?.trim()||''):null; return sr.reduce((s,v,i)=>s+(c1(r1[i])&&(!r2||c2(r2[i]))?v:0),0); },
+    COUNTIF:  () => { const range=rangeArg(0); const crit=_parseCrit(args[1]?.trim()||''); return range.filter(v=>crit(v)).length; },
+    COUNTIFS: () => { const r1=rangeArg(0); const c1=_parseCrit(args[1]?.trim()||''); const r2=args[2]?rangeArg(2):null; const c2=args[3]?_parseCrit(args[3]?.trim()||''):null; return r1.filter((v,i)=>c1(v)&&(!r2||c2(r2[i]))).length; },
+    AVERAGEIF:() => { const range=rangeArg(0); const crit=_parseCrit(args[1]?.trim()||''); const ar=rangeArg(2)||range; const match=range.map((v,i)=>crit(v)?ar[i]:null).filter(x=>x!==null); return match.length?match.reduce((a,b)=>a+b)/match.length:0; },
+    MAXIFS:   () => { const r1=rangeArg(0),r2=rangeArg(1),crit=_parseCrit(args[2]?.trim()||''); const match=r2.map((v,i)=>crit(v)?r1[i]:null).filter(x=>x!==null); return match.length?Math.max(...match):0; },
+    MINIFS:   () => { const r1=rangeArg(0),r2=rangeArg(1),crit=_parseCrit(args[2]?.trim()||''); const match=r2.map((v,i)=>crit(v)?r1[i]:null).filter(x=>x!==null); return match.length?Math.min(...match):0; },
+
+    // ── Text ───────────────────────────────────────────────────
+    LEN:      () => String(args[0]?_xlEval(args[0].trim()):'').length,
+    TEXT:     () => { const v=numArg(0); const f=strArg(1); if(f.includes('%'))return(v*100).toFixed(f.split('.')[1]?.replace('%','')||0)+'%'; if(f.includes('.'))return v.toFixed(f.split('.')[1]?.length||0); return String(v); },
+    CONCATENATE:()=>args.map(a=>String(_xlEval(a.trim())).replace(/^"|"$/g,'')).join(''),
+    CONCAT:   ()=>args.map(a=>String(_xlEval(a.trim())).replace(/^"|"$/g,'')).join(''),
+    TEXTJOIN: ()=>{ const sep=strArg(0); const vals=args.slice(2).map(a=>{const rv=elabXlParseRange(a.trim());return rv.length?rv.map(String):[String(_xlEval(a.trim()))];}).flat().filter(v=>v!==''); return vals.join(sep); },
+    LEFT:     ()=>{ const t=String(_xlEval(args[0]?.trim()||'')).replace(/^"|"$/g,''); return t.slice(0,numArg(1)||1); },
+    RIGHT:    ()=>{ const t=String(_xlEval(args[0]?.trim()||'')).replace(/^"|"$/g,''); return t.slice(-numArg(1)||1); },
+    MID:      ()=>{ const t=String(_xlEval(args[0]?.trim()||'')).replace(/^"|"$/g,''); return t.substr(numArg(1)-1,numArg(2)); },
+    UPPER:    ()=>String(_xlEval(args[0]?.trim()||'')).replace(/^"|"$/g,'').toUpperCase(),
+    LOWER:    ()=>String(_xlEval(args[0]?.trim()||'')).replace(/^"|"$/g,'').toLowerCase(),
+    PROPER:   ()=>String(_xlEval(args[0]?.trim()||'')).replace(/^"|"$/g,'').replace(/\b\w/g,c=>c.toUpperCase()),
+    TRIM:     ()=>String(_xlEval(args[0]?.trim()||'')).replace(/^"|"$/g,'').trim(),
+    REPT:     ()=>String(_xlEval(args[0]?.trim()||'')).replace(/^"|"$/g,'').repeat(numArg(1)),
+    SUBSTITUTE:()=>{ const t=String(_xlEval(args[0]?.trim()||'')).replace(/^"|"$/g,''); const from=strArg(1); const to=strArg(2); return t.split(from).join(to); },
+    REPLACE:  ()=>{ const t=String(_xlEval(args[0]?.trim()||'')).replace(/^"|"$/g,''); const s=numArg(1)-1; const n=numArg(2); const r=strArg(3); return t.slice(0,s)+r+t.slice(s+n); },
+    FIND:     ()=>{ const s=strArg(0),t=String(_xlEval(args[1]?.trim()||'')).replace(/^"|"$/g,''); const idx=t.indexOf(s); return idx>=0?idx+1:'#VALUE!'; },
+    SEARCH:   ()=>{ const s=strArg(0).toLowerCase(),t=String(_xlEval(args[1]?.trim()||'')).replace(/^"|"$/g,'').toLowerCase(); const idx=t.indexOf(s); return idx>=0?idx+1:'#VALUE!'; },
+    EXACT:    ()=>String(_xlEval(args[0]?.trim()||'')).replace(/^"|"$/g,'')=== String(_xlEval(args[1]?.trim()||'')).replace(/^"|"$/g,''),
+    VALUE:    ()=>parseFloat(String(_xlEval(args[0]?.trim()||'')).replace(/[,٬]/g,'')),
+    DOLLAR:   ()=>'$'+numArg(0).toFixed(numArg(1)||2),
+    FIXED:    ()=>numArg(0).toFixed(numArg(1)||2),
+    CHAR:     ()=>String.fromCharCode(numArg(0)),
+    CODE:     ()=>strArg(0).charCodeAt(0),
+
+    // ── Lookup ─────────────────────────────────────────────────
+    VLOOKUP:  ()=>{ const val=_xlEval(args[0]?.trim()||''); const rng=args[1]?.trim().toUpperCase().match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/); if(!rng)return '#N/A'; const c1=ELAB_XL_COLS.indexOf(rng[1])+1,r1=+rng[2],r2=+rng[4],ci=numArg(2)-1; for(let r=r1;r<=r2;r++){const cv=elabXlGetNum(`${r}_${c1}`)??_exlData[`${r}_${c1}`]; if(String(cv)===String(val))return elabXlGetNum(`${r}_${c1+ci}`)??_exlData[`${r}_${c1+ci}`]??'#N/A';} return '#N/A'; },
+    HLOOKUP:  ()=>{ const val=_xlEval(args[0]?.trim()||''); const rng=args[1]?.trim().toUpperCase().match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/); if(!rng)return '#N/A'; const c1=ELAB_XL_COLS.indexOf(rng[1])+1,r1=+rng[2],c2=ELAB_XL_COLS.indexOf(rng[3])+1,ri=numArg(2)-1; for(let c=c1;c<=c2;c++){const cv=elabXlGetNum(`${r1}_${c}`)??_exlData[`${r1}_${c}`]; if(String(cv)===String(val))return elabXlGetNum(`${r1+ri}_${c}`)??_exlData[`${r1+ri}_${c}`]??'#N/A';} return '#N/A'; },
+    INDEX:    ()=>{ const rng=args[0]?.trim().toUpperCase().match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/); if(!rng)return '#REF!'; const c1=ELAB_XL_COLS.indexOf(rng[1])+1,r1=+rng[2],ri=numArg(1)-1,ci=numArg(2)-1; return elabXlGetNum(`${r1+ri}_${c1+ci}`)??_exlData[`${r1+ri}_${c1+ci}`]??0; },
+    MATCH:    ()=>{ const val=_xlEval(args[0]?.trim()||''); const v=rangeArg(1); const idx=v.findIndex(x=>String(x)===String(val)); return idx>=0?idx+1:'#N/A'; },
+    OFFSET:   ()=>{ const ref=elabXlParseCellRef(args[0]?.trim()||''); if(!ref)return 0; return elabXlGetNum(`${ref.r+numArg(1)}_${ref.c+numArg(2)}`)??0; },
+    CHOOSE:   ()=>{ const i=numArg(0); return i>=1&&i<args.length?_xlEval(args[i].trim()):'#VALUE!'; },
+    ROW:      ()=>{ const ref=elabXlParseCellRef(args[0]?.trim()||''); return ref?ref.r:_exlSel.r; },
+    COLUMN:   ()=>{ const ref=elabXlParseCellRef(args[0]?.trim()||''); return ref?ref.c:_exlSel.c; },
+    ROWS:     ()=>{ const m=args[0]?.trim().toUpperCase().match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/); return m?+m[4]-+m[2]+1:1; },
+    COLUMNS:  ()=>{ const m=args[0]?.trim().toUpperCase().match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/); return m?ELAB_XL_COLS.indexOf(m[3])-ELAB_XL_COLS.indexOf(m[1])+1:1; },
+    ISNUMBER: ()=>typeof _xlEval(args[0]?.trim()||'') === 'number',
+    ISTEXT:   ()=>typeof _xlEval(args[0]?.trim()||'') === 'string',
+    ISBLANK:  ()=>{ const ref=elabXlParseCellRef(args[0]?.trim()||''); return ref?(!_exlData[`${ref.r}_${ref.c}`]):true; },
+    ISERROR:  ()=>{ try{const r=_xlEval(args[0]?.trim()||'');return String(r).startsWith('#');}catch{return true;} },
+    NA:       ()=>'#N/A',
+    N:        ()=>{ const v=_xlEval(args[0]?.trim()||''); return typeof v==='number'?v:0; },
+    T:        ()=>{ const v=_xlEval(args[0]?.trim()||''); return typeof v==='string'?v:''; },
+
+    // ── Financial ──────────────────────────────────────────────
+    PMT:      ()=>{ const rate=numArg(0),nper=numArg(1),pv=numArg(2),fv=numArg(3)||0; if(!rate)return -(pv+fv)/nper; return -(pv*(1+rate)**nper+fv)*rate/((1+rate)**nper-1); },
+    FV:       ()=>{ const rate=numArg(0),nper=numArg(1),pmt=numArg(2),pv=numArg(3)||0; if(!rate)return -(pv+pmt*nper); return -(pv*(1+rate)**nper+pmt*((1+rate)**nper-1)/rate); },
+    PV:       ()=>{ const rate=numArg(0),nper=numArg(1),pmt=numArg(2),fv=numArg(3)||0; if(!rate)return -(fv+pmt*nper); return -(pmt*((1-(1+rate)**-nper)/rate)+fv*(1+rate)**-nper); },
+    NPER:     ()=>{ const rate=numArg(0),pmt=numArg(1),pv=numArg(2),fv=numArg(3)||0; if(!rate)return -(pv+fv)/pmt; return Math.log((pmt/rate-fv)/(pmt/rate+pv))/Math.log(1+rate); },
+    RATE:     ()=>0.05, // simplified
+    NPV:      ()=>{ const rate=numArg(0); return args.slice(1).map((a,i)=>numArg(i+1)/(1+rate)**(i+1)).reduce((a,b)=>a+b,0); },
+    IRR:      ()=>0.1, // simplified
+    IPMT:     ()=>{ const rate=numArg(0),per=numArg(1),nper=numArg(2),pv=numArg(3); return -(pv*(1+rate)**(per-1)*rate+(pv*((1+rate)**per-1)*rate/((1+rate)**nper-1))*(per-1));},
+    PPMT:     ()=>{ const pmt=FUNCS.PMT(); const ipmt=FUNCS.IPMT(); return pmt-ipmt; },
+    DB:       ()=>{ const cost=numArg(0),salvage=numArg(1),life=numArg(2),period=numArg(3); const rate=1-Math.pow(salvage/cost,1/life); return cost*(1-rate)**(period-1)*rate; },
+    SLN:      ()=>(numArg(0)-numArg(1))/numArg(2),
+    DDB:      ()=>{ const cost=numArg(0),salvage=numArg(1),life=numArg(2),period=numArg(3),factor=numArg(4)||2; return Math.min((cost-salvage)*factor/life,(cost-salvage)*(1-factor/life)**(period-1)*factor/life); },
+  };
+
+  const h = FUNCS[fnName];
+  if (!h) return undefined;
+  const result = h();
+  if (typeof result === 'number' && !isFinite(result)) return '#DIV/0!';
+  if (typeof result === 'number') return Math.round(result*1e8)/1e8;
+  return result;
+}
+
+// ── Condition evaluator (for IF, COUNTIF, etc.) ──────────────
+function _xlCondition(expr) {
+  expr = expr.trim();
+  const compMatch = expr.match(/^(.+?)\s*([><=!]{1,2})\s*(.+)$/);
+  if (compMatch) {
+    const left  = _xlEval(compMatch[1].trim());
+    const rightRaw = compMatch[3].trim();
+    const right = /^".*"$/.test(rightRaw) ? rightRaw.slice(1,-1) : _xlEval(rightRaw);
+    const ops = {
+      '>': ()=>+left >  +right, '<':  ()=>+left <  +right,
+      '>=':()=>+left >= +right, '<=': ()=>+left <= +right,
+      '=': ()=>String(left)===String(right),
+      '<>':()=>String(left)!==String(right),
+      '!=':()=>String(left)!==String(right),
+    };
+    return (ops[compMatch[2]] || (() => false))();
   }
-  if (cur) parts.push(cur);
+  const v = _xlEval(expr);
+  return !!v && v !== '' && v !== 0 && v !== false;
+}
+
+// ── Criterion parser for COUNTIF/SUMIF etc. ──────────────────
+function _parseCrit(crit) {
+  crit = crit.replace(/^"|"$/g, '');
+  const m = crit.match(/^([><=!]{1,2})(.+)$/);
+  if (m) {
+    const ops = {
+      '>': (a,b)=>+a>+b, '<': (a,b)=>+a<+b,
+      '>=': (a,b)=>+a>=+b, '<=': (a,b)=>+a<=+b,
+      '=': (a,b)=>String(a)===String(b),
+      '<>': (a,b)=>String(a)!==String(b),
+      '!=': (a,b)=>String(a)!==String(b),
+    };
+    const op = ops[m[1]]; const val = m[2];
+    return (v) => op ? op(v, isNaN(val)?val:+val) : false;
+  }
+  return (v) => String(v) === crit;
+}
+
+// ── Split args respecting nested parens and strings ───────────
+function _xlSplitArgs(str) {
+  const parts = []; let cur = '', depth = 0, inStr = false;
+  for (let i = 0; i < str.length; i++) {
+    const ch = str[i];
+    if (ch === '"' && str[i-1] !== '\\') inStr = !inStr;
+    if (!inStr) {
+      if (ch === '(') depth++;
+      else if (ch === ')') depth--;
+      if (ch === ',' && depth === 0) { parts.push(cur); cur = ''; continue; }
+    }
+    cur += ch;
+  }
+  if (cur.trim()) parts.push(cur);
   return parts;
 }
 
+// ── IF shorthand via _xlIF (for backwards compat) ─────────────
+function _xlIF(inner) {
+  const parts = _xlSplitArgs(inner);
+  if (parts.length < 2) return '#IF!';
+  return _xlCondition(parts[0].trim()) ? _xlEval(parts[1].trim()) : _xlEval(parts[2]?.trim()||'0');
+}
+function _xlIFS(inner) {
+  const parts = _xlSplitArgs(inner);
+  for (let i=0;i+1<parts.length;i+=2) if(_xlCondition(parts[i].trim())) return _xlEval(parts[i+1].trim());
+  return '#IFS!';
+}
+
+// ── Compute all formula cells (3 passes for dependencies) ─────
 function elabXlComputeAll() {
-  // Two passes for dependencies
-  for (let pass = 0; pass < 2; pass++) {
+  for (let pass = 0; pass < 3; pass++) {
     Object.keys(_exlData).forEach(key => {
       const v = _exlData[key];
       if (typeof v === 'string' && v.startsWith('=')) {
         const computed = elabXlCompute(v);
         const inp = document.querySelector(`input[data-key="${key}"]`);
         if (inp) {
-          inp.value = String(computed ?? '');
-          inp.style.color = '#79c0ff'; // blue = formula cell
-          inp.title = v; // show formula on hover
+          inp.value = (computed===null||computed===undefined) ? '' : String(computed);
+          inp.style.color = '#79c0ff';
+          inp.title = v;
         }
       }
     });
   }
   elabXlUpdateStats();
 }
+
 
 function elabXlUpdateStats() {
   const panel = document.getElementById('elab-xl-stats');
@@ -2709,7 +2829,7 @@ function elabXlUpdateStats() {
     {l:'σ الانحراف',v:stdev.toFixed(3),    i:'📐',  c:'#FF7043'},
     {l:'الأعلى',    v:Math.max(...nums),   i:'🔺',  c:'#28CA41'},
     {l:'الأدنى',    v:Math.min(...nums),   i:'🔻',  c:'#FF5252'},
-    {l:'المدى',     v:Math.max(...nums)-Math.min(...nums), i:'↔️', c:'#26C6DA'},
+    {l:'المدى',     v:(Math.max(...nums)-Math.min(...nums)).toFixed(3), i:'↔️', c:'#26C6DA'},
   ];
   panel.innerHTML = '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px">'
     + STATS.map(s=>`<div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:8px;text-align:center">
@@ -2720,17 +2840,229 @@ function elabXlUpdateStats() {
     + '</div>';
 }
 
-// Formula hint while typing
-function _elabXlShowFormulaHint(key, formula) {
-  const fb = document.getElementById('elab-xl-feedback');
-  if (!fb || !formula.startsWith('=')) { if(fb) fb.innerHTML=''; return; }
-  const computed = elabXlCompute(formula);
-  if (String(computed).startsWith('#')) {
-    fb.innerHTML = `<span style="color:#FF5252">⚠️ ${computed} — تحقق من الصيغة</span>`;
-  } else {
-    fb.innerHTML = `<span style="color:#00BFA5">✓ النتيجة = <strong>${computed}</strong></span>`;
-  }
+// ═══════════════════════════════════════════════════════════════
+// Excel Chart Builder — full range selection + 7 chart types
+// ═══════════════════════════════════════════════════════════════
+
+function elabXlChart() {
+  // Build chart control panel
+  const cw = document.getElementById('elab-xl-chart-wrap');
+  const cv = document.getElementById('elab-xl-chart');
+  if (!cw || !cv) return;
+
+  // Show chart builder UI
+  cw.style.display = 'block';
+  cw.style.background = 'rgba(13,17,23,0.97)';
+  cw.style.border = '1.5px solid rgba(108,99,255,0.3)';
+  cw.style.borderRadius = '14px';
+  cw.style.padding = '14px';
+
+  cw.innerHTML = `
+    <div style="direction:rtl;color:#e6edf3">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+        <div style="font-weight:800;font-size:0.9rem;color:#6C63FF">📊 منشئ الرسوم البيانية</div>
+        <button onclick="elabXlChartClose()" style="background:rgba(255,82,82,0.1);border:1px solid rgba(255,82,82,0.3);color:#FF5252;border-radius:8px;padding:4px 10px;cursor:pointer;font-size:0.8rem">✕ إغلاق</button>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+        <div>
+          <label style="font-size:0.72rem;color:#8b949e;display:block;margin-bottom:4px">نوع الرسم:</label>
+          <select id="xl-chart-type" style="width:100%;padding:7px;border-radius:8px;border:1px solid #30363d;background:#161b22;color:#e6edf3;font-family:inherit;font-size:0.82rem">
+            <option value="bar">📊 مدرج شريطي (Bar)</option>
+            <option value="line">📈 خطي (Line)</option>
+            <option value="pie">🥧 دائري (Pie)</option>
+            <option value="scatter">🔵 تشتت (Scatter)</option>
+            <option value="area">📐 مساحي (Area)</option>
+            <option value="histogram">📉 تكراري (Histogram)</option>
+            <option value="doughnut">🍩 حلقي (Doughnut)</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:0.72rem;color:#8b949e;display:block;margin-bottom:4px">عنوان الرسم:</label>
+          <input id="xl-chart-title" value="الرسم البياني" style="width:100%;box-sizing:border-box;padding:7px;border-radius:8px;border:1px solid #30363d;background:#161b22;color:#e6edf3;font-family:inherit;font-size:0.82rem;outline:none">
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+        <div>
+          <label style="font-size:0.72rem;color:#8b949e;display:block;margin-bottom:4px">نطاق التسميات (العمود X):</label>
+          <input id="xl-chart-labels" placeholder="مثال: A2:A10 أو اتركه فارغاً" style="width:100%;box-sizing:border-box;padding:7px;border-radius:8px;border:1px solid #30363d;background:#161b22;color:#e6edf3;font-family:monospace;font-size:0.82rem;outline:none;direction:ltr">
+        </div>
+        <div>
+          <label style="font-size:0.72rem;color:#8b949e;display:block;margin-bottom:4px">نطاق البيانات (القيم Y):</label>
+          <input id="xl-chart-data" placeholder="مثال: B2:B10 أو B2:D10" style="width:100%;box-sizing:border-box;padding:7px;border-radius:8px;border:1px solid #30363d;background:#161b22;color:#e6edf3;font-family:monospace;font-size:0.82rem;outline:none;direction:ltr">
+        </div>
+      </div>
+
+      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+        <button onclick="elabXlChartAutoDetect()" style="padding:7px 14px;border-radius:8px;border:1px solid rgba(0,191,165,0.4);background:rgba(0,191,165,0.1);color:#00BFA5;font-family:inherit;font-size:0.8rem;cursor:pointer;font-weight:700">🔍 اكتشاف تلقائي</button>
+        <button onclick="elabXlChartDraw()" style="padding:7px 20px;border-radius:8px;border:none;background:linear-gradient(135deg,#6C63FF,#a78bfa);color:white;font-family:inherit;font-size:0.85rem;cursor:pointer;font-weight:800">▶ ارسم</button>
+      </div>
+
+      <div id="xl-chart-canvas-wrap" style="background:white;border-radius:10px;padding:10px;display:none;margin-top:8px">
+        <canvas id="elab-xl-chart-canvas" style="max-height:380px;width:100%"></canvas>
+      </div>
+      <div id="xl-chart-info" style="font-size:0.72rem;color:#8b949e;margin-top:6px;min-height:16px"></div>
+    </div>
+  `;
+
+  // Auto-detect on open
+  elabXlChartAutoDetect();
 }
+
+function elabXlChartClose() {
+  const cw = document.getElementById('elab-xl-chart-wrap');
+  if (cw) { cw.style.display = 'none'; cw.innerHTML = '<canvas id="elab-xl-chart" style="max-width:100%;max-height:300px"></canvas>'; }
+  if (window._exlChartInst) { try{window._exlChartInst.destroy();}catch(e){} window._exlChartInst=null; }
+}
+
+function elabXlChartAutoDetect() {
+  // Find first text column = labels, first numeric column = data
+  let lblCol=-1, dataStartCol=-1, dataEndCol=-1, dataStartRow=2, dataEndRow=_exlRows;
+
+  // Scan row 2 to detect columns
+  for(let c=1;c<=_exlCols;c++){
+    const v=_exlData[`2_${c}`];
+    if(v!==undefined&&v!==null&&v!=='') {
+      if(typeof v==='string'&&!v.startsWith('=')&&isNaN(v)&&lblCol<0) lblCol=c;
+      if(elabXlGetNum(`2_${c}`)!==null&&dataStartCol<0) dataStartCol=c;
+    }
+  }
+  if(dataStartCol<0) dataStartCol=1;
+  // Find last non-empty row
+  for(let r=_exlRows;r>=2;r--){
+    let hasData=false;
+    for(let c=1;c<=_exlCols;c++){if(_exlData[`${r}_${c}`]!==undefined&&_exlData[`${r}_${c}`]!==''){hasData=true;break;}}
+    if(hasData){dataEndRow=r;break;}
+  }
+  // Find last data column
+  for(let c=_exlCols;c>=1;c--){
+    if(elabXlGetNum(`2_${c}`)!==null){dataEndCol=c;break;}
+  }
+  if(dataEndCol<0) dataEndCol=dataStartCol;
+
+  const lblInp  = document.getElementById('xl-chart-labels');
+  const dataInp = document.getElementById('xl-chart-data');
+  if (lblInp && lblCol>0) lblInp.value = `${ELAB_XL_COLS[lblCol-1]}2:${ELAB_XL_COLS[lblCol-1]}${dataEndRow}`;
+  if (dataInp && dataStartCol>0) {
+    const startCol = ELAB_XL_COLS[dataStartCol-1];
+    const endCol   = ELAB_XL_COLS[dataEndCol-1];
+    dataInp.value = `${startCol}2:${endCol}${dataEndRow}`;
+  }
+
+  const info = document.getElementById('xl-chart-info');
+  if (info) info.textContent = lblCol>0
+    ? `✓ تسميات في عمود ${ELAB_XL_COLS[lblCol-1]}، بيانات في أعمدة ${ELAB_XL_COLS[dataStartCol-1]}-${ELAB_XL_COLS[Math.max(0,dataEndCol)-1]} (${dataEndRow-1} صف)`
+    : `ℹ️ لم تُوجد تسميات — سيُستخدم رقم الصف`;
+}
+
+function elabXlChartDraw() {
+  const type    = document.getElementById('xl-chart-type')?.value || 'bar';
+  const title   = document.getElementById('xl-chart-title')?.value || 'الرسم البياني';
+  const lblRng  = document.getElementById('xl-chart-labels')?.value.trim();
+  const dataRng = document.getElementById('xl-chart-data')?.value.trim();
+
+  if (!dataRng) { alert('أدخل نطاق البيانات أولاً'); return; }
+
+  const wrap = document.getElementById('xl-chart-canvas-wrap');
+  if (wrap) wrap.style.display = 'block';
+
+  // Parse data range — may be multi-column (B2:D10 = 3 datasets)
+  const m = dataRng.toUpperCase().match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/);
+  if (!m) { const info=document.getElementById('xl-chart-info'); if(info)info.textContent='❌ نطاق غير صحيح — مثال: B2:D10'; return; }
+
+  const c1=ELAB_XL_COLS.indexOf(m[1])+1, r1=+m[2];
+  const c2=ELAB_XL_COLS.indexOf(m[3])+1, r2=+m[4];
+
+  // Labels
+  let labels = [];
+  if (lblRng) {
+    const lm=lblRng.toUpperCase().match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/);
+    if(lm) {
+      const lc=ELAB_XL_COLS.indexOf(lm[1])+1, lr1=+lm[2], lr2=+lm[4];
+      for(let r=lr1;r<=lr2;r++) labels.push(String(_exlData[`${r}_${lc}`]||`r${r}`));
+    }
+  }
+  if (!labels.length) for(let r=r1;r<=r2;r++) labels.push(`صف ${r}`);
+
+  // Build datasets (one per column in data range)
+  const PALETTE = ['#6C63FF','#00BFA5','#FF7043','#FFD600','#FF5252','#28CA41','#3776AB','#E91E63','#FF9800','#9C27B0'];
+  const datasets = [];
+
+  for(let c=c1;c<=c2;c++) {
+    const data = [];
+    for(let r=r1;r<=r2;r++) {
+      const v = elabXlGetNum(`${r}_${c}`);
+      data.push(v !== null ? v : 0);
+    }
+    // Dataset label from row 1 header
+    const dsLabel = String(_exlData[`1_${c}`] || ELAB_XL_COLS[c-1]);
+    const color   = PALETTE[(c-c1) % PALETTE.length];
+    datasets.push({ label:dsLabel, data, backgroundColor: type==='pie'||type==='doughnut'
+      ? data.map((_,i)=>PALETTE[i%PALETTE.length])
+      : color+'cc',
+      borderColor: color, borderWidth:2, borderRadius:type==='bar'?6:0,
+      fill: type==='area', tension:0.4,
+      pointRadius: type==='scatter'?6:3
+    });
+  }
+
+  // Handle histogram specially
+  let chartType = type;
+  let finalDatasets = datasets;
+  let finalLabels   = labels;
+
+  if (type === 'histogram') {
+    chartType = 'bar';
+    const allVals = datasets[0]?.data || [];
+    const bins = Math.max(5, Math.ceil(Math.sqrt(allVals.length)));
+    const mn=Math.min(...allVals), mx=Math.max(...allVals), bw=(mx-mn)/bins;
+    const freqs = Array(bins).fill(0);
+    allVals.forEach(v=>{ const i=Math.min(bins-1,Math.floor((v-mn)/bw)); freqs[i]++; });
+    finalLabels   = freqs.map((_,i)=>`${(mn+i*bw).toFixed(1)}–${(mn+(i+1)*bw).toFixed(1)}`);
+    finalDatasets = [{label:'التكرار',data:freqs,backgroundColor:'#6C63FF99',borderColor:'#6C63FF',borderWidth:2,borderRadius:4,barPercentage:0.98,categoryPercentage:1}];
+  }
+
+  if (type === 'scatter') {
+    chartType = 'scatter';
+    finalDatasets = datasets.map(ds=>({...ds, data: ds.data.map((v,i)=>({x:i+1,y:v})) }));
+    finalLabels = undefined;
+  }
+  if (type === 'area') { chartType = 'line'; }
+
+  // Destroy previous chart
+  const ctx = document.getElementById('elab-xl-chart-canvas');
+  if (!ctx) return;
+  if (window._exlChartInst) { try{window._exlChartInst.destroy();}catch(e){} }
+
+  window._exlChartInst = new Chart(ctx, {
+    type: chartType,
+    data: { labels: finalLabels, datasets: finalDatasets },
+    options: {
+      responsive: true,
+      animation: { duration: 600 },
+      plugins: {
+        title: { display:true, text:title, color:'#333', font:{size:14,weight:'bold'} },
+        legend: { display: datasets.length>1 || type==='pie'||type==='doughnut',
+                  labels:{color:'#555',font:{size:11}} },
+        tooltip: { callbacks: {
+          label: (ctx) => ` ${ctx.dataset.label}: ${typeof ctx.raw==='object'?ctx.raw.y:ctx.raw}`
+        }}
+      },
+      scales: (type==='pie'||type==='doughnut') ? {} : {
+        x: { grid:{color:'rgba(0,0,0,0.08)'}, ticks:{color:'#555',font:{size:11}},
+             title:{display:!!lblRng,text:'القيم',color:'#777'} },
+        y: { grid:{color:'rgba(0,0,0,0.08)'}, ticks:{color:'#555',font:{size:11}},
+             title:{display:true,text:'البيانات',color:'#777'},
+             beginAtZero: type!=='line'&&type!=='scatter' }
+      }
+    }
+  });
+
+  const info = document.getElementById('xl-chart-info');
+  if (info) info.textContent = `✓ رُسم ${datasets.length} مجموعة بيانات × ${r2-r1+1} قيمة`;
+}
+
 
 function elabXlAddRow(){_exlRows++;elabXlRender();elabXlComputeAll();}
 function elabXlAddCol(){if(_exlCols<ELAB_XL_COLS.length){_exlCols++;elabXlRender();elabXlComputeAll();}}

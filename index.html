@@ -3115,7 +3115,7 @@ function buildOSProcessPanel() {
 
   const stateSVG = `
     <svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg"
-      style="width:100%;min-width:460px;display:block">
+      style="width:100%;max-width:100%;display:block">
       <defs>
         <radialGradient id="pgBg" cx="50%" cy="50%" r="70%">
           <stop offset="0%" stop-color="#34d399" stop-opacity="0.04"/>
@@ -9598,6 +9598,10 @@ const ZAD_UPLOADS = (() => {
             .filter(u => u._owner === eKey)
             .sort((a,b) => new Date(b.savedAt||0) - new Date(a.savedAt||0));
           _cacheOwner = eKey; // Remember which user this cache belongs to
+          // Write IDs index to LS for getCount() fallback
+          try {
+            localStorage.setItem('zad_upl_ids_'+eKey, JSON.stringify(_cache.map(u=>u.id)));
+          } catch(e2) {}
           res(_cache);
         };
         req.onerror = () => { _cache = _cache || []; res(_cache); };
@@ -9612,18 +9616,45 @@ const ZAD_UPLOADS = (() => {
         _cacheOwner = null;
       }
       if (_cache) return _cache;
-      // Fallback: try localStorage migration
+
+      // Fallback 1: try full LS backup key
       try {
         const lsKey = 'zad_uploads_' + _emailKey();
         const ls = JSON.parse(localStorage.getItem(lsKey) || '[]');
         if (ls.length) {
           _cache = ls;
+          _cacheOwner = _emailKey();
           // Migrate to IDB in background
           setTimeout(() => { ls.forEach(u => this._idbPut(u)); }, 500);
           return ls;
         }
       } catch(e) {}
+
+      // Fallback 2: trigger async reload from IDB if not loaded yet
+      // (happens on mobile first render before IDB is ready)
+      if (!this._pendingInit) {
+        this._pendingInit = true;
+        this.init().then(() => {
+          this._pendingInit = false;
+          // Notify the app to re-render lesson counts
+          if (typeof refreshUserCurriculumSection === 'function') {
+            setTimeout(refreshUserCurriculumSection, 100);
+          }
+        }).catch(() => { this._pendingInit = false; });
+      }
+
       return [];
+    },
+
+    // Reliable count — checks cache + localStorage backup
+    getCount() {
+      const all = this.getAll();
+      if (all.length) return all.length;
+      // Quick count from LS index
+      try {
+        const ids = JSON.parse(localStorage.getItem('zad_upl_ids_' + _emailKey()) || '[]');
+        return ids.length;
+      } catch(e) { return 0; }
     },
 
     async _idbPut(bundle) {
@@ -9650,10 +9681,20 @@ const ZAD_UPLOADS = (() => {
       _cache.unshift(bundle);
       // Persist to IDB
       await this._idbPut(bundle);
-      // Also keep small localStorage copy (ids only) for quick check
+      // Keep IDs index for quick count
       try {
-        const ids = _cache.map(u=>u.id); // no limit
+        const ids = _cache.map(u=>u.id);
         localStorage.setItem('zad_upl_ids_'+_emailKey(), JSON.stringify(ids));
+      } catch(e) {}
+      // Also write compressed full backup to LS for cross-device stability
+      // We store only the essential fields, not the full lesson content
+      try {
+        const compact = _cache.map(u=>({
+          id:u.id, subjectId:u.subjectId, lessonId:u.lessonId,
+          fileName:u.fileName, title:u.title, savedAt:u.savedAt,
+          chapterTitle:u.chapterTitle, _owner:u._owner
+        }));
+        localStorage.setItem('zad_uploads_idx_'+_emailKey(), JSON.stringify(compact));
       } catch(e) {}
     },
 
@@ -9807,7 +9848,7 @@ function buildMyUploadsPanel(subjectId) {
 
   return `<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">
     <div style="font-size:0.82rem;font-weight:700;color:var(--text-muted);margin-bottom:4px">
-      📂 ملفاتي المرفوعة — ${uploads.length} ملف (خاصة بك فقط)
+      📂 ملفاتي المرفوعة — ${uploads.length || ZAD_UPLOADS.getCount()} ملف (خاصة بك فقط)
     </div>
     ${uploads.map(u => `
       <div style="background:rgba(255,255,255,0.04);border:1px solid var(--border);
@@ -14124,7 +14165,7 @@ async function loginStudent() {
   setActiveEmail(email);
   updateStreak();
   enterApp();
-  if(typeof restoreUserUploads==='function') restoreUserUploads();
+  // Note: restoreUserAILessons() inside enterApp() already handles uploads
   showToast(`مرحباً بعودتك يا ${APP.student.name}! 🌟`, 'success');
 }
 
@@ -14428,11 +14469,22 @@ function buildLessonsTab(subject, subjectId) {
     var chBorderStyle = isUpload
       ? ' style="border-color:rgba(108,99,255,0.35);background:rgba(108,99,255,0.04)"'
       : '';
+    // Use actual IDB count for uploaded chapters; lessCnt from in-memory for built-in
+    var displayLessCnt = lessCnt;
+    if (isUpload && lessCnt === 0) {
+      // IDB might not be loaded yet — check LS index
+      try {
+        var _idsKey = 'zad_upl_ids_' + ((APP.student && APP.student.email)||'').replace(/[^a-z0-9]/gi,'_');
+        var _ids = JSON.parse(localStorage.getItem(_idsKey)||'[]');
+        var _baseId = (ch.id||'').replace('up-ch-','');
+        displayLessCnt = _ids.filter(function(id){ return id.replace(/_[0-9]+$/,'')===_baseId; }).length;
+      } catch(e) {}
+    }
     var lessCntBadge = isUpload
       ? '<div style="display:flex;align-items:center;gap:6px;margin-top:4px">'
           + '<span style="font-size:0.65rem;padding:2px 8px;background:rgba(108,99,255,0.18);'
           + 'color:var(--primary);border-radius:10px;border:1px solid rgba(108,99,255,0.3);font-weight:700">✨ مرفوع</span>'
-          + '<span style="font-size:0.68rem;color:var(--text-muted)">' + lessCnt + ' درس</span>'
+          + '<span style="font-size:0.68rem;color:var(--text-muted)">' + (displayLessCnt||lessCnt) + ' درس</span>'
           + '</div>'
       : '<div class="chapter-pages">' + chLabel + (ch.pages ? ' — 📄 ' + ch.pages : '') + '</div>';
 
@@ -14593,6 +14645,23 @@ function buildLessonContentHTML(lesson, subject, chapter, subjectId, prev, next,
         + '<div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:2px">'+(subject?subject.icon:'📚')+' '+(subject?subject.title:subjectId)+' › '+(chapter?chapter.title:'')+' › درس '+lessonNum+'/'+totalLessons+'</div>'
         + '<div style="font-size:1rem;font-weight:900">'+(lesson.title||'')+'</div>'
       + '</div>'
+      + (function(){
+          try {
+            var email=(APP.student&&APP.student.email)||'guest';
+            var bmsKey='zad_bookmarks_v1_'+email.replace(/[^a-z0-9]/gi,'_');
+            var bms=JSON.parse(localStorage.getItem(bmsKey)||'[]');
+            var bmId=subjectId+'__'+lesson.id;
+            var isBm=bms.some(function(b){return b.id===bmId;});
+            var safeTitle=(lesson.title||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+            var safeLid=(lesson.id||'').replace(/'/g,"\\'");
+            return '<button id="lesson-bm-btn" onclick="(function(){'
+              +'var a=toggleBookmark(\''+subjectId+'\',\''+safeLid+'\',\''+safeTitle+'\');'
+              +'var b=document.getElementById(\'lesson-bm-btn\');'
+              +'if(b){b.innerHTML=a?\'🔖 محفوظ\':\'☆ إشارة\';b.style.background=a?\'rgba(108,99,255,0.2)\':\'transparent\';b.style.color=a?\'var(--primary)\':\'var(--text-muted)\';}' 
+              +'})()" style="padding:7px 12px;border-radius:10px;border:1px solid var(--border);background:'+(isBm?'rgba(108,99,255,0.2)':'transparent')+';color:'+(isBm?'var(--primary)':'var(--text-muted)')+';font-family:var(--font);font-size:0.8rem;font-weight:700;cursor:pointer;flex-shrink:0">'
+              +(isBm?'🔖 محفوظ':'☆ إشارة')+'</button>';
+          } catch(e){return '';}
+        })()
     + '</div>'
     // ── Progress bar ─────────────────────────────────────────
     + '<div style="background:rgba(255,255,255,0.06);border-radius:99px;height:5px;margin-bottom:18px">'
@@ -14769,6 +14838,8 @@ function buildLessonContentHTML(lesson, subject, chapter, subjectId, prev, next,
 }
 
 function showSubject(subjectId, activeTab) {
+  // Track for re-render after IDB loads
+  if (APP) { APP._currentSubjectId = subjectId; APP._currentTab = activeTab; }
   if (!subjectId) return;
   APP.currentSubject = subjectId;
   activeTab = activeTab || 'lessons';
@@ -22334,8 +22405,16 @@ async function restoreUserAILessons() {
     _injectLessonToCurriculum(bundle.lesson, bundle.subjectId);
   });
 
-  if (uploads.length > 0 && typeof refreshUserCurriculumSection === 'function') {
-    refreshUserCurriculumSection();
+  if (uploads.length > 0) {
+    if (typeof refreshUserCurriculumSection === 'function') {
+      refreshUserCurriculumSection();
+    }
+    // Force re-render of any open subject to show correct lesson counts
+    if (typeof showSubject === 'function' && APP && APP._currentSubjectId) {
+      setTimeout(function() {
+        try { showSubject(APP._currentSubjectId, APP._currentTab || 'lessons'); } catch(e) {}
+      }, 300);
+    }
   }
 }
 

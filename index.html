@@ -9700,6 +9700,8 @@ const ZAD_UPLOADS = (() => {
 
     delete(uploadId, subjectId) {
       if (_cache) _cache = _cache.filter(u => u.id !== uploadId);
+      // Sync deletion to cloud
+      if (typeof ZAD_SYNC !== 'undefined') ZAD_SYNC.deleteUpload(uploadId);
       // IDB delete
       _openDB().then(db => {
         const tx = db.transaction(STORE, 'readwrite');
@@ -9818,6 +9820,8 @@ async function saveAILessonForUser(lesson, subjectId, uploadId, originalFileName
     lesson: newLesson,
   };
   await ZAD_UPLOADS.save(bundle);
+  // Sync to cloud for cross-device access
+  if (typeof ZAD_SYNC !== 'undefined') ZAD_SYNC.pushUploads([bundle]);
 
   showToast('✅ تم حفظ "' + (lesson.lessonTitle||'الدرس') + '" بنجاح', 'success');
 
@@ -13443,8 +13447,10 @@ table { display: block; overflow-x: auto; max-width: 100%; }
     
     <div class="student-mini-card">
       <div class="student-avatar-mini" id="sidebar-avatar">👨‍🎓</div>
+      <div id="sync-status-dot" title="حالة المزامنة" style="position:absolute;top:8px;right:8px;width:8px;height:8px;border-radius:50%;background:#555;transition:background 0.3s"></div>
       <div>
         <div class="student-name-mini" id="sidebar-name">الطالب</div>
+        <div id="sync-label" style="font-size:0.6rem;color:#555;margin-top:1px">●  محلي</div>
       <div id="sidebar-email" style="font-size:0.65rem;color:var(--text-muted);margin-top:2px;direction:ltr;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px;"></div>
         <span class="student-level-mini" id="sidebar-level">مستوى مبتدئ</span>
       </div>
@@ -13967,6 +13973,194 @@ function setActiveEmail(email) {
 // ── Cloud sync helpers (Cloudflare KV via Worker) ──────────────
 const ZAD_WORKER_BASE = 'https://zad-proxy.atif-alamodi.workers.dev';
 
+// ══════════════════════════════════════════════════════
+// ZAD CLOUD SYNC — هذا يجعل كل شيء متزامن عبر الأجهزة
+// ══════════════════════════════════════════════════════
+const ZAD_SYNC = {
+  _base: 'https://zad-proxy.atif-alamodi.workers.dev',
+  _timers: {},
+
+  email() {
+    return (APP.student && APP.student.email) || null;
+  },
+
+  // ── Generic data save (notes, bookmarks, progress, etc) ──
+  async push(key, value) {
+    const email = this.email();
+    if (!email) return;
+    try {
+      await fetch(this._base + '/data/save', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({email, key, value})
+      });
+    } catch(e) {}
+  },
+
+  // ── Generic data load ──
+  async pull(key) {
+    const email = this.email();
+    if (!email) return null;
+    try {
+      const r = await fetch(this._base + '/data/load?email=' + encodeURIComponent(email) + '&key=' + key);
+      if (!r.ok) return null;
+      const d = await r.json();
+      return d.found ? d.value : null;
+    } catch(e) { return null; }
+  },
+
+  // ── Debounced push (avoid too many requests) ──
+  schedule(key, value, delayMs) {
+    clearTimeout(this._timers[key]);
+    this._timers[key] = setTimeout(() => this.push(key, value), delayMs || 2000);
+  },
+
+  // ── Upload files sync ──
+  async pushUploads(uploads) {
+    const email = this.email();
+    if (!email || !uploads.length) return;
+    try {
+      // Only send essential metadata (not full lesson content to save KV space)
+      const compact = uploads.map(function(u) {
+        return {
+          id:          u.id,
+          subjectId:   u.subjectId,
+          lessonId:    u.lessonId,
+          fileName:    u.fileName,
+          title:       u.title,
+          chapterTitle:u.chapterTitle,
+          savedAt:     u.savedAt,
+          _owner:      u._owner,
+          // Store compressed lesson for cross-device
+          lesson: u.lesson ? {
+            title:   u.lesson.title,
+            summary: u.lesson.summary || '',
+            content: {
+              definition: (u.lesson.content||{}).definition || '',
+              keyTerms:   ((u.lesson.content||{}).keyTerms||[]).slice(0,20),
+              steps:      ((u.lesson.content||{}).steps||[]).slice(0,15),
+            },
+            quiz: (u.lesson.quiz||[]).slice(0,10)
+          } : null
+        };
+      });
+      fetch(this._base + '/uploads/save', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({email, uploads: compact})
+      }).catch(function(){});
+    } catch(e) {}
+  },
+
+  async pullUploads() {
+    const email = this.email();
+    if (!email) return [];
+    try {
+      const r = await fetch(this._base + '/uploads/load?email=' + encodeURIComponent(email));
+      if (!r.ok) return [];
+      const d = await r.json();
+      return d.uploads || [];
+    } catch(e) { return []; }
+  },
+
+  async deleteUpload(uploadId) {
+    const email = this.email();
+    if (!email) return;
+    try {
+      fetch(this._base + '/uploads/delete', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({email, uploadId})
+      }).catch(function(){});
+    } catch(e) {}
+  },
+
+  // ── Full sync on login: pull everything from cloud ──
+  async onLogin() {
+    const email = this.email();
+    if (!email) return;
+
+    console.log('[ZAD_SYNC] Starting cloud pull for', email);
+
+    // 1. Pull uploads from cloud → merge with local IDB
+    const cloudUploads = await this.pullUploads();
+    if (cloudUploads.length > 0) {
+      const localUploads = ZAD_UPLOADS.getAll();
+      const localIds = new Set(localUploads.map(function(u){ return u.id; }));
+      let newCount = 0;
+      for (const u of cloudUploads) {
+        if (!localIds.has(u.id)) {
+          u._owner = email.replace(/[^a-z0-9]/gi,'_');
+          await ZAD_UPLOADS.save(u);
+          if (u.lesson && u.subjectId) {
+            try { _injectLessonToCurriculum(u.lesson, u.subjectId); } catch(e) {}
+          }
+          newCount++;
+        }
+      }
+      if (newCount > 0) {
+        console.log('[ZAD_SYNC] Pulled', newCount, 'new uploads from cloud');
+        if (typeof refreshUserCurriculumSection === 'function') refreshUserCurriculumSection();
+        showToast('☁️ تم استعادة ' + newCount + ' ملف من الحساب', 'success');
+      }
+    }
+
+    // 2. Pull other data (notes, bookmarks, planner, progress)
+    const dataKeys = ['notes', 'bookmarks', 'planner', 'progress', 'activity'];
+    for (const key of dataKeys) {
+      const cloudVal = await this.pull(key);
+      if (!cloudVal) continue;
+      const lsKey = 'zad_' + key + '_v2_' + email.replace(/[^a-z0-9]/gi,'_');
+      const localRaw = localStorage.getItem(lsKey);
+      const localVal = localRaw ? JSON.parse(localRaw) : [];
+      // Merge: progress is object, others are arrays
+      let merged;
+      if (key === 'progress' && cloudVal && typeof cloudVal === 'object' && !Array.isArray(cloudVal)) {
+        merged = Object.assign({}, localVal || {}, cloudVal); // cloud wins for progress
+        const pKey = 'zad_progress_' + email.replace(/[^a-z0-9]/gi,'_');
+        localStorage.setItem(pKey, JSON.stringify(merged));
+        Object.assign(APP.progress, merged); // update live state
+      } else {
+        merged = _mergeArraysById(cloudVal, Array.isArray(localVal)?localVal:[]);
+        localStorage.setItem(lsKey, JSON.stringify(merged));
+      }
+      console.log('[ZAD_SYNC] Merged', key, ':', merged.length, 'items');
+    }
+
+    console.log('[ZAD_SYNC] Login sync complete');
+  },
+
+  // ── Push everything on login/save ──
+  async pushAll() {
+    const email = this.email();
+    if (!email) return;
+    // Uploads
+    const uploads = ZAD_UPLOADS.getAll();
+    if (uploads.length) this.pushUploads(uploads);
+    // Notes
+    const notesKey = 'zad_notes_v2_' + email.replace(/[^a-z0-9]/gi,'_');
+    const notes = JSON.parse(localStorage.getItem(notesKey)||'[]');
+    if (notes.length) this.push('notes', notes);
+    // Bookmarks  
+    const bmKey = 'zad_bookmarks_v1_' + email.replace(/[^a-z0-9]/gi,'_');
+    const bms = JSON.parse(localStorage.getItem(bmKey)||'[]');
+    if (bms.length) this.push('bookmarks', bms);
+  }
+};
+
+// ── Helper: merge arrays by id, newest wins ──
+function _mergeArraysById(arr1, arr2) {
+  const map = {};
+  const all = [...(arr2||[]), ...(arr1||[])]; // arr1 (cloud) has priority
+  all.forEach(function(item) {
+    const id = item.id || item.lessonId || JSON.stringify(item);
+    if (!map[id] || (item.date||0) > (map[id].date||0)) map[id] = item;
+  });
+  return Object.values(map);
+}
+
+
+
 async function cloudSaveStudent() {
   const email = APP.student.email;
   if (!email) return;
@@ -13992,11 +14186,9 @@ async function cloudLoadStudent(email) {
 function saveCurrentStudent() {
   const email = APP.student.email;
   if (!email) return;
-  // Save locally
   const db = getAllStudents();
   db[email] = { student: APP.student, progress: APP.progress, savedAt: new Date().toISOString() };
   saveAllStudents(db);
-  // Sync to cloud (non-blocking)
   cloudSaveStudent();
 }
 
@@ -14164,8 +14356,12 @@ async function loginStudent() {
   Object.assign(APP.progress, saved.progress || {});
   setActiveEmail(email);
   updateStreak();
-  enterApp();
-  // Note: restoreUserAILessons() inside enterApp() already handles uploads
+  enterApp().then(function() {
+    // After local restore, pull cloud data
+    if (typeof ZAD_SYNC !== 'undefined') ZAD_SYNC.onLogin();
+  }).catch(function(){
+    if (typeof ZAD_SYNC !== 'undefined') ZAD_SYNC.onLogin();
+  });
   showToast(`مرحباً بعودتك يا ${APP.student.name}! 🌟`, 'success');
 }
 
@@ -14237,6 +14433,8 @@ function saveProgress() {
 }
 
 function updateStudentUI() {
+  // Reset sync indicator when user changes
+  setTimeout(function(){ if(typeof _syncSetStatus==='function') _syncSetStatus('offline'); }, 200);
   const { name, gender, email } = APP.student;
   const emailEl = document.getElementById('sidebar-email');
   if(emailEl) emailEl.textContent = email || '';
@@ -22394,10 +22592,21 @@ async function restoreUserAILessons() {
   const email = APP.student.email;
   if (!email) return;
 
-  // Init IDB cache first (loads all uploads from IndexedDB)
+  // Init IDB cache first
   await ZAD_UPLOADS.init();
 
-  const uploads = ZAD_UPLOADS.getAll();
+  let uploads = ZAD_UPLOADS.getAll();
+
+  // If IDB empty, try pulling from cloud (cross-device restore)
+  if (!uploads.length && typeof ZAD_SYNC !== 'undefined') {
+    const cloudUps = await ZAD_SYNC.pullUploads();
+    for (const u of cloudUps) {
+      u._owner = email.replace(/[^a-z0-9]/gi,'_');
+      await ZAD_UPLOADS.save(u);
+    }
+    uploads = ZAD_UPLOADS.getAll();
+  }
+
   if (!uploads.length) return;
 
   uploads.forEach(function(bundle) {
@@ -23214,6 +23423,7 @@ function getNotes() {
 
 function saveNotesAll(arr) {
   try { localStorage.setItem(_notesKey(), JSON.stringify(arr)); } catch(e) {}
+  if (typeof ZAD_SYNC !== 'undefined') ZAD_SYNC.schedule('notes', arr, 1500);
 }
 
 // Add or update a note (called from inside a lesson)
@@ -23432,6 +23642,7 @@ function toggleBookmark(subjectId, lessonId, title) {
     showToast('✅ تمت الإضافة للإشارات المرجعية', 'success');
   }
   localStorage.setItem(key, JSON.stringify(bookmarks));
+  if (typeof ZAD_SYNC !== 'undefined') ZAD_SYNC.schedule('bookmarks', bookmarks, 1000);
   return idx < 0; // returns true if added
 }
 
@@ -23449,6 +23660,41 @@ function buildBookmarksPanel() {
   return '<div style="direction:rtl"><div style="font-weight:800;margin-bottom:16px">🔖 إشاراتي المرجعية (' + bookmarks.length + ')</div>' + html + '</div>';
 }
 
+
+// ── Sync UI helper ──────────────────────────────────
+function _syncSetStatus(state) {
+  // state: 'syncing' | 'ok' | 'offline' | 'error'
+  var dot   = document.getElementById('sync-status-dot');
+  var label = document.getElementById('sync-label');
+  var colors = {syncing:'#FFD600', ok:'#28CA41', offline:'#555', error:'#FF5252'};
+  var labels = {syncing:'⟳ مزامنة...', ok:'☁️ محفوظ', offline:'● محلي', error:'⚠️ خطأ'};
+  if (dot)   dot.style.background  = colors[state] || '#555';
+  if (label) label.textContent     = labels[state] || '● محلي';
+}
+
+// Patch ZAD_SYNC to update UI
+if (typeof ZAD_SYNC !== 'undefined') {
+  var _origPush = ZAD_SYNC.push.bind(ZAD_SYNC);
+  ZAD_SYNC.push = async function(key, value) {
+    _syncSetStatus('syncing');
+    try {
+      await _origPush(key, value);
+      _syncSetStatus('ok');
+      setTimeout(function(){ _syncSetStatus('ok'); }, 3000);
+    } catch(e) {
+      _syncSetStatus('error');
+    }
+  };
+  var _origPushUploads = ZAD_SYNC.pushUploads.bind(ZAD_SYNC);
+  ZAD_SYNC.pushUploads = async function(uploads) {
+    _syncSetStatus('syncing');
+    try {
+      await _origPushUploads(uploads);
+      _syncSetStatus('ok');
+    } catch(e) { _syncSetStatus('error'); }
+  };
+}
+
 // ── 4. STUDY PLANNER ──────────────────────────────────────────
 var ZAD_PLANNER_KEY = 'zad_planner_v1';
 
@@ -23462,6 +23708,7 @@ function savePlannerTasks(tasks) {
   var email = APP.student.email || 'guest';
   var key = ZAD_PLANNER_KEY + '_' + email.replace(/[^a-z0-9]/gi,'_');
   localStorage.setItem(key, JSON.stringify(tasks));
+  if (typeof ZAD_SYNC !== 'undefined') ZAD_SYNC.schedule('planner', tasks, 2000);
 }
 
 function buildPlannerPanel() {

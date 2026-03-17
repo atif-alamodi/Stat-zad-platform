@@ -11786,32 +11786,24 @@ async function extractPdfText(file) {
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
 
-    let fullText = '';
-    const totalPages = pdf.numPages;
+    // Cap at 25 pages for speed
+    const totalPages = Math.min(pdf.numPages, 25);
 
-    for (let i = 1; i <= totalPages; i++) {
-      const page = await pdf.getPage(i);
-      const textContent = await page.getTextContent();
+    // Extract ALL pages in PARALLEL (3-5x faster)
+    const pageTexts = await Promise.all(
+      Array.from({length: totalPages}, (_, i) => i + 1).map(async (pageNum) => {
+        const page = await pdf.getPage(pageNum);
+        const tc = await page.getTextContent();
+        const items = tc.items.slice().sort((a,b) => {
+          const yDiff = Math.round((b.transform[5]-a.transform[5])/3);
+          return yDiff !== 0 ? yDiff : a.transform[4]-b.transform[4];
+        });
+        const raw = items.map(x=>x.str).filter(s=>s.trim().length>0).join(' ');
+        return normalizeArabicText(raw);
+      })
+    );
 
-      // Sort items by vertical position then horizontal (handles RTL PDFs)
-      const items = textContent.items.slice().sort((a, b) => {
-        const yDiff = Math.round((b.transform[5] - a.transform[5]) / 3);
-        return yDiff !== 0 ? yDiff : a.transform[4] - b.transform[4];
-      });
-
-      const pageText = items
-        .map(item => item.str)
-        .filter(s => s.trim().length > 0)
-        .join(' ');
-
-      // Normalize Arabic Presentation Forms (FB50-FEFF) to standard Arabic
-      // PDF libraries often extract Arabic in visually-ordered ligature form
-      const normalized = normalizeArabicText(pageText);
-
-      if (normalized.trim()) fullText += `\n${normalized}`;
-    }
-
-    return fullText.trim() || '';
+    return pageTexts.filter(t=>t.trim()).join('\n').trim() || '';
   } catch (e) {
     
     return await extractPdfTextBasic(file);
@@ -11895,7 +11887,12 @@ async function analyzeAndGenerate(text, subjectId, fileName) {
     const _textIsEnglish = _latinChars > _arabicChars * 2;
     const isEng = _enSubjects.indexOf(subjectId) > -1 || _textIsEnglish;
 
-    upd('🔍', 'تحليل هيكل الملف واكتشاف الدروس...', 8);
+    // Skip structure scan for small files — treat as single lesson
+    if (clean.length < 2000) {
+      upd('⚡', 'ملف صغير — معالجة مباشرة...', 25);
+    } else {
+      upd('🔍', 'تحليل هيكل الملف...', 8);
+    }
 
     // ── STEP 1: Efficient structure detection ────────────────────
     // Extract SHORT heading-candidate lines from full text (low token cost)
@@ -11921,11 +11918,11 @@ async function analyzeAndGenerate(text, subjectId, fileName) {
     const allTopics = [];
 
     try {
-      const candidateText = candidateLines.slice(0, 400).join('\n'); // max 400 lines
+      const candidateText = candidateLines.slice(0, 60).join('\n'); // max 60 lines — faster
       const sR = await zadFetch({
         model: 'llama-3.1-8b-instant',
-        max_tokens: 800,
-        system: 'Respond with valid JSON only. No markdown.',
+        max_tokens: 400,
+        system: 'JSON only. No markdown.',
         messages: [{ role: 'user', content:
           'From these lines extracted from an educational document, identify which ones are lesson/topic/section titles.\n' +
           'Lines:\n' + candidateText + '\n\n' +
@@ -12005,79 +12002,62 @@ LANGUAGE RULES:
     const CHUNK = 20000; // No limit
 
     if (topics) {
-      // Split text into sections by topic hints
-      for (let ti = 0; ti < topics.length; ti++) {
-        const topic = topics[ti];
-        const pct = 25 + (ti / topics.length) * 65;
-        upd('📖', `معالجة الدرس ${ti+1}/${topics.length}: ${topic.title}...`, pct);
+      // Process all topics IN PARALLEL (much faster than sequential)
+      const maxTopics = Math.min(topics.length, 5); // cap at 5
+      upd('📚', maxTopics + ' دروس — معالجة متوازية...', 25);
 
-        // Find section text using pre-computed _pos (document position)
-        let sectionStart = (topic._pos && topic._pos >= 0) ? topic._pos : Math.floor((ti / topics.length) * clean.length);
-
-        // End = next topic's position, or proportional
+      const topicPromises = topics.slice(0, maxTopics).map(async (topic, ti) => {
+        let sectionStart = (topic._pos && topic._pos >= 0) ? topic._pos : Math.floor((ti / maxTopics) * clean.length);
         let sectionEnd = clean.length;
-        if (ti < topics.length - 1) {
-          const nextPos = topics[ti+1]._pos;
-          if (nextPos && nextPos > sectionStart) {
-            sectionEnd = nextPos;
-          } else {
-            sectionEnd = Math.floor(((ti+1) / topics.length) * clean.length);
-          }
+        if (ti < maxTopics - 1) {
+          const nextPos = topics[ti+1]?._pos;
+          sectionEnd = (nextPos && nextPos > sectionStart) ? nextPos : Math.floor(((ti+1) / maxTopics) * clean.length);
         }
-        // Cap section at 5000 chars for Pollinations compatibility
         const sectionText = clean.slice(sectionStart, Math.min(sectionEnd, sectionStart + 5000));
+        const topicPrompt = (isEng?'Extract lesson about: ':'استخرج درساً عن: ')
+          + topic.title + '\n\nText:\n' + sectionText
+          + '\n\nReturn compact JSON:\n' + jsonTemplateCompact;
 
-        const topicPrompt = (isEng?'Extract lesson about: ':'استخرج درساً عن: ')+topic.title+'\n\nText:\n'+sectionText+'\n\nReturn compact JSON (be concise to fit in response):\n'+jsonTemplateCompact;
-
-        let lesson = null;
         try {
           const resp = await zadFetch({
             model: 'llama-3.1-8b-instant',
             max_tokens: 1800,
-            system: 'Educational content extractor. Reply with valid JSON only. No markdown. Be concise.',
+            system: 'Educational extractor. Reply with valid JSON only. No markdown. Be concise.',
             messages: [{ role: 'user', content: topicPrompt }]
           });
           const data = await resp.json();
-          const text = (data.content && data.content[0] && data.content[0].text) || '';
-          lesson = sanitizeLesson(repairAndParseJSON(text.trim()));
-        } catch(topicErr) {
-          console.warn('Topic', ti, 'failed:', topicErr.message);
-        }
-        if (!lesson) {
-          console.warn('Lesson', ti, 'skipped - no content generated');
-          upd('⚠️', 'تخطي درس ' + (ti+1) + ' — إعادة المحاولة بطريقة أبسط', 25 + (ti / topics.length) * 65);
-          // Try simpler fallback for this topic
-          try {
-            const fbR = await zadFetch({ model:'llama-3.1-8b-instant', max_tokens:2000,
-              system: isEng ? 'Educational JSON. English quiz only.' : 'مساعد تعليمي. JSON فقط.',
-              messages:[{role:'user', content:(isEng?'Create a short English lesson about: ':'أنشئ درساً قصيراً عن: ')
-                + topic.title + '\n\nReturn JSON:\n' + jsonTemplate}] });
-            const fbD = await fbR.json();
-            const fbT = (fbD.content&&fbD.content[0]&&fbD.content[0].text)||'';
-            lesson = sanitizeLesson(repairAndParseJSON(fbT.trim()));
-          } catch(fb2) { console.warn('Fallback lesson failed'); }
-          if (!lesson) continue;
-        }
+          const txt = (data.content && data.content[0] && data.content[0].text) || '';
+          const lesson = sanitizeLesson(repairAndParseJSON(txt.trim()));
+          if (lesson) {
+            lesson.lessonTitle = isValidTitle(lesson.lessonTitle) ? lesson.lessonTitle : topic.title;
+            lesson.definition = lesson.definition || '';
+            lesson.whyLearn = lesson.whyLearn || [];
+            lesson.keyTerms = lesson.keyTerms || [];
+            lesson.examples = lesson.examples || [];
+            lesson.steps = lesson.steps || [];
+            lesson.mindMapBranches = lesson.mindMapBranches || [];
+            lesson.quiz = lesson.quiz || [];
+            lesson.summary = lesson.summary || '';
+            return { lesson, topic, ti };
+          }
+        } catch(e) { console.warn('Topic', ti, 'failed:', e.message); }
+        return null;
+      });
 
-        // Ensure required fields
-        lesson.lessonTitle = isValidTitle(lesson.lessonTitle) ? lesson.lessonTitle : topic.title;
-        lesson.definition      = lesson.definition      || '';
-        lesson.whyLearn        = lesson.whyLearn        || [];
-        lesson.keyTerms        = lesson.keyTerms        || [];
-        lesson.examples        = lesson.examples        || [];
-        lesson.steps           = lesson.steps           || [];
-        lesson.mindMapBranches = lesson.mindMapBranches || [];
-        lesson.quiz            = lesson.quiz            || [];
-        lesson.summary         = lesson.summary         || '';
+      // Wait for all in parallel
+      const results = await Promise.all(topicPromises);
+      const validResults = results.filter(Boolean);
 
-        // Save each lesson separately
+      // Save all valid lessons
+      for (const { lesson, topic, ti } of validResults) {
         const lessonUploadId = uploadId + '_' + ti;
         if (typeof saveAILessonForUser === 'function') {
-          // Pass detected chapter title so chapter shows the doc title
           saveAILessonForUser(lesson, subjectId, lessonUploadId, detectedChapterTitle || fileName);
         }
         savedLessons.push(lesson);
       }
+
+      upd('✅', savedLessons.length + ' دروس جاهزة!', 90)
     } else {
       // Single lesson - process in chunks
       // Keep chunks small (5000 chars) for Pollinations compatibility
@@ -12087,9 +12067,8 @@ LANGUAGE RULES:
       console.log('[ZAD] numChunks:', numChunks, 'chunkSize:', chunkSize);
       const allResults = [];
 
-      for (let ci = 0; ci < numChunks; ci++) {
-        const pct = 30 + (ci / numChunks) * 55;
-        upd('📡', `تحليل الجزء ${ci+1}/${numChunks}...`, pct);
+      // Process chunks in PARALLEL
+      const chunkPromises = Array.from({length:numChunks}, async (_, ci) => {
         const chunk = clean.slice(ci * chunkSize, (ci+1) * chunkSize);
         const isFirst = ci === 0;
         const prompt = isFirst
@@ -12117,8 +12096,11 @@ LANGUAGE RULES:
         } catch(fetchErr) {
           console.warn('Chunk', ci, 'failed:', fetchErr.message);
         }
-        if (parsed) allResults.push(parsed);
-      }
+        return parsed || null;
+      });
+
+      const chunkResults = await Promise.all(chunkPromises);
+      chunkResults.filter(Boolean).forEach(r => allResults.push(r));
 
       console.log('[ZAD-DEBUG] allResults count:', allResults.length);
       if (!allResults.length) {
@@ -14979,12 +14961,19 @@ async function enterApp() {
   // Render activity feed from persisted log
   if (typeof renderActivityFeed === 'function') setTimeout(renderActivityFeed, 200);
 
+  // Preload PDF.js so first PDF upload is instant
+  setTimeout(function() {
+    if (typeof loadPDFjs === 'function' && !window.pdfjsLib) {
+      loadPDFjs().catch(function(){});
+    }
+  }, 2000);
+
   // Pre-load Pyodide in background so Python lab is ready immediately
   setTimeout(function() {
     if (typeof initPyodide !== 'undefined' && !pyReady && !_pyodideLoading) {
       initPyodide();
     }
-  }, 3000); // delay 3s to let page settle first
+  }, 5000); // delay 5s to let PDF.js load first
 
   const loc = loadLocation();
   if (loc) {

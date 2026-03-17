@@ -2331,9 +2331,28 @@ function elabXlFocus(r,c) {
   const ref = document.getElementById('elab-xl-ref');
   const fb  = document.getElementById('elab-xl-fbar');
   if (ref) ref.textContent = `${ELAB_XL_COLS[c-1]}${r}`;
-  // Show RAW formula in formula bar, not computed value
+  // Always show RAW formula/value in formula bar
   const raw = _exlData[`${r}_${c}`];
-  if (fb) fb.value = (raw !== undefined && raw !== null) ? String(raw) : '';
+  const rawStr = (raw !== undefined && raw !== null) ? String(raw) : '';
+  if (fb) {
+    fb.value = rawStr;
+    // Style formula bar to show it's a formula
+    if (rawStr.startsWith('=')) {
+      fb.style.color = '#79c0ff';
+      fb.style.fontStyle = 'normal';
+    } else {
+      fb.style.color = 'var(--text)';
+      fb.style.fontStyle = 'normal';
+    }
+  }
+  // Show cell formula hint
+  if (rawStr.startsWith('=')) {
+    const computed = elabXlCompute(rawStr);
+    _elabXlShowFormulaHint(`${r}_${c}`, rawStr);
+  } else {
+    const fb2 = document.getElementById('elab-xl-feedback');
+    if (fb2) fb2.innerHTML = '';
+  }
 }
 
 function elabXlNav(e,r,c) {
@@ -2349,19 +2368,26 @@ function elabXlNav(e,r,c) {
 
 function elabXlChange(e, key) {
   const v = e.target.value.trim();
-  // Store raw formula or auto-detect number
   if (v.startsWith('=')) {
     _exlData[key] = v;
+    // Immediately show computed value in cell
+    const computed = elabXlCompute(v);
+    e.target.value = (computed === null || computed === undefined) ? '' : String(computed);
+    e.target.style.color = String(computed).startsWith('#') ? '#FF5252' : '#79c0ff';
+    e.target.title = v + '  →  ' + e.target.value;
   } else if (v !== '' && !isNaN(v)) {
     _exlData[key] = Number(v);
+    e.target.style.color = '#e6edf3';
+    e.target.title = '';
   } else if (v === '') {
     delete _exlData[key];
+    e.target.style.color = '#e6edf3';
   } else {
     _exlData[key] = v;
+    e.target.style.color = '#e6edf3';
   }
-  elabXlComputeAll();
-  elabXlUpdateStats();
-  // Show formula hint
+  // Recompute all (handles dependent cells)
+  setTimeout(elabXlComputeAll, 0);
   _elabXlShowFormulaHint(key, v);
 }
 
@@ -2372,23 +2398,35 @@ function elabXlFbarInput() {
   const v   = fb.value.trim();
   if (v.startsWith('=')) {
     _exlData[key] = v;
+    fb.style.color = '#79c0ff';
   } else if (v !== '' && !isNaN(v)) {
     _exlData[key] = Number(v);
+    fb.style.color = 'var(--text)';
   } else if (v === '') {
     delete _exlData[key];
+    fb.style.color = 'var(--text)';
   } else {
     _exlData[key] = v;
+    fb.style.color = 'var(--text)';
   }
-  // Update cell display
+  // Update this cell display immediately
   const inp = document.querySelector(`input[data-key="${key}"]`);
   if (inp) {
-    inp.value = v.startsWith('=') ? String(elabXlCompute(v) ?? '') : v;
-    inp.style.color = v.startsWith('=') ? '#79c0ff' : '#e6edf3';
+    if (v.startsWith('=')) {
+      const computed = elabXlCompute(v);
+      inp.value = (computed === null || computed === undefined) ? '' : String(computed);
+      inp.style.color = String(computed).startsWith('#') ? '#FF5252' : '#79c0ff';
+      inp.title = v + '  →  ' + inp.value;
+    } else {
+      inp.value = v;
+      inp.style.color = '#e6edf3';
+      inp.title = '';
+    }
   }
+  // Recompute all dependent formulas
   elabXlComputeAll();
-  elabXlUpdateStats();
 }
-function elabXlFbarCommit() { elabXlComputeAll(); elabXlUpdateStats(); }
+function elabXlFbarCommit() { elabXlFbarInput(); }
 
 // ── Helpers ────────────────────────────────────────────────────
 function elabXlGetNum(key) {
@@ -2396,8 +2434,17 @@ function elabXlGetNum(key) {
   if (v === undefined || v === null || v === '') return null;
   if (typeof v === 'number') return v;
   if (typeof v === 'string' && v.startsWith('=')) {
-    const r = elabXlCompute(v);
-    return typeof r === 'number' ? r : null;
+    // First: try reading the already-computed DOM value (faster, avoids re-eval)
+    const inp = document.querySelector(`input[data-key="${key}"]`);
+    if (inp && inp.value !== '' && inp.value !== v) {
+      const cached = parseFloat(inp.value);
+      if (!isNaN(cached) && isFinite(cached)) return cached;
+    }
+    // Fallback: re-evaluate
+    try {
+      const r = elabXlCompute(v);
+      return typeof r === 'number' && isFinite(r) ? r : null;
+    } catch(e) { return null; }
   }
   const n = parseFloat(v);
   return isNaN(n) ? null : n;
@@ -2555,7 +2602,7 @@ function _xlCallFn(fnName, argsStr) {
     // ── Core math ──────────────────────────────────────────────
     SUM:      () => allNums(0).reduce((a,b)=>a+b, 0),
     AVERAGE:  () => { const v=allNums(0); return v.length ? v.reduce((a,b)=>a+b)/v.length : 0; },
-    COUNT:    () => rangeArg(0).length,
+    COUNT:    () => rangeArg(0).filter(v => v !== null && isFinite(v)).length,
     COUNTA:   () => { const rng=args[0]?.trim().toUpperCase().match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/); if(!rng)return 0; let cnt=0; for(let r=+rng[2];r<=+rng[4];r++) for(let c=ELAB_XL_COLS.indexOf(rng[1])+1;c<=ELAB_XL_COLS.indexOf(rng[3])+1;c++) if(_exlData[`${r}_${c}`]!==undefined&&_exlData[`${r}_${c}`]!=='')cnt++; return cnt; },
     MAX:      () => { const v=allNums(0); return v.length ? Math.max(...v) : 0; },
     MIN:      () => { const v=allNums(0); return v.length ? Math.min(...v) : 0; },
@@ -2787,16 +2834,33 @@ function _xlIFS(inner) {
 
 // ── Compute all formula cells (3 passes for dependencies) ─────
 function elabXlComputeAll() {
-  for (let pass = 0; pass < 3; pass++) {
-    Object.keys(_exlData).forEach(key => {
+  // Sort keys: process row by row, col by col (topological order)
+  const allKeys = Object.keys(_exlData).filter(k => {
+    const v = _exlData[k];
+    return typeof v === 'string' && v.startsWith('=');
+  }).sort((a, b) => {
+    const [ar, ac] = a.split('_').map(Number);
+    const [br, bc] = b.split('_').map(Number);
+    return ar !== br ? ar - br : ac - bc;
+  });
+
+  // 4 passes to handle dependency chains (A→B→C→D)
+  for (let pass = 0; pass < 4; pass++) {
+    allKeys.forEach(key => {
       const v = _exlData[key];
       if (typeof v === 'string' && v.startsWith('=')) {
-        const computed = elabXlCompute(v);
-        const inp = document.querySelector(`input[data-key="${key}"]`);
-        if (inp) {
-          inp.value = (computed===null||computed===undefined) ? '' : String(computed);
-          inp.style.color = '#79c0ff';
-          inp.title = v;
+        try {
+          const computed = elabXlCompute(v);
+          const inp = document.querySelector(`input[data-key="${key}"]`);
+          if (inp) {
+            const display = (computed === null || computed === undefined) ? '' : String(computed);
+            inp.value = display;
+            inp.style.color = String(computed).startsWith('#') ? '#FF5252' : '#79c0ff';
+            inp.title = v + '  →  ' + display;
+          }
+        } catch(e) {
+          const inp = document.querySelector(`input[data-key="${key}"]`);
+          if (inp) { inp.value = '#ERR!'; inp.style.color='#FF5252'; }
         }
       }
     });
@@ -2808,11 +2872,22 @@ function elabXlComputeAll() {
 function elabXlUpdateStats() {
   const panel = document.getElementById('elab-xl-stats');
   if (!panel) return;
+  // Only count RAW number cells (not formula cells) to avoid double-counting
+  // Detect the primary data column (most raw numbers)
+  const colCounts = {};
   const nums = [];
-  for(let r=2;r<=_exlRows;r++)
+  for(let r=1;r<=_exlRows;r++)
     for(let c=1;c<=_exlCols;c++) {
-      const v = elabXlGetNum(`${r}_${c}`);
-      if (v !== null && isFinite(v)) nums.push(v);
+      const raw = _exlData[`${r}_${c}`];
+      // Skip formula cells, empty cells, and text headers
+      if (raw === undefined || raw === null || raw === '') continue;
+      if (typeof raw === 'string' && raw.startsWith('=')) continue; // formula cell
+      if (typeof raw === 'string' && isNaN(raw.trim())) continue;   // text
+      const v = typeof raw === 'number' ? raw : parseFloat(raw);
+      if (!isNaN(v) && isFinite(v)) {
+        nums.push(v);
+        colCounts[c] = (colCounts[c]||0)+1;
+      }
     }
   if (nums.length < 2) { panel.innerHTML=''; return; }
   const mean   = nums.reduce((a,b)=>a+b,0)/nums.length;
@@ -3155,8 +3230,16 @@ function elabXlValidate(){
   });
   
 
+  // Only count RAW number cells (not formula results) for stats
   const allNums = [];
-  for(let r=2;r<=_exlRows;r++) for(let co=1;co<=_exlCols;co++){const v=elabXlGetNum(r+'_'+co);if(v!==null)allNums.push(v);}
+  for(let r=1;r<=_exlRows;r++) for(let co=1;co<=_exlCols;co++){
+    const raw=_exlData[r+'_'+co];
+    if(raw===undefined||raw===null||raw==='')continue;
+    if(typeof raw==='string'&&raw.startsWith('='))continue; // skip formula cells
+    if(typeof raw==='string'&&isNaN(raw.trim()))continue;   // skip text
+    const v=typeof raw==='number'?raw:parseFloat(raw);
+    if(!isNaN(v)&&isFinite(v))allNums.push(v);
+  }
   if(allNums.length >= 2){
     const sum = allNums.reduce((a,b)=>a+b,0);
     const avg = sum/allNums.length;
@@ -3222,6 +3305,25 @@ function elabXlChart(){
   const ctx=cv.getContext('2d');
   const COLORS=['#6C63FF','#00BFA5','#FF7043','#FFD600','#FF5252','#28CA41','#3776AB'];
   _exlChartInst=new Chart(ctx,{type:'bar',data:{labels,datasets:[{label:'القيم',data,backgroundColor:COLORS.slice(0,data.length),borderRadius:8}]},options:{responsive:true,plugins:{legend:{display:false},title:{display:true,text:'الرسم البياني',font:{size:15}}},scales:{y:{beginAtZero:true}}}});
+}
+
+// Formula hint in feedback bar
+function _elabXlShowFormulaHint(key, formula) {
+  const fb = document.getElementById('elab-xl-feedback');
+  if (!fb) return;
+  if (!String(formula).startsWith('=')) { fb.innerHTML=''; return; }
+  try {
+    const computed = elabXlCompute(formula);
+    const display = (computed===null||computed===undefined)?'""':String(computed);
+    if (display.startsWith('#')) {
+      fb.innerHTML = '<span style="color:#FF5252">⚠️ ' + display + ' — تحقق من مراجع الخلايا</span>';
+    } else {
+      const type = typeof computed==='number'?'🔢':typeof computed==='boolean'?'✓/✗':'🔤';
+      fb.innerHTML = '<span style="color:#00BFA5">' + type + ' = <strong style="font-size:0.92rem">' + display + '</strong></span>';
+    }
+  } catch(e) {
+    fb.innerHTML = '<span style="color:#FF5252">⚠️ خطأ في الصيغة</span>';
+  }
 }
 
 function elabBuildFnRef(){

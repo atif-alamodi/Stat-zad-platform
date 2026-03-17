@@ -10392,36 +10392,48 @@ function buildMyUploadsPanel(subjectId) {
     </div>`;
   }
 
-  return `<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">
-    <div style="font-size:0.82rem;font-weight:700;color:var(--text-muted);margin-bottom:4px">
-      📂 ملفاتي المرفوعة — ${uploads.length || ZAD_UPLOADS.getCount()} ملف (خاصة بك فقط)
+  return `<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
+    <div style="font-size:0.78rem;font-weight:700;color:var(--text-muted);margin-bottom:2px;direction:rtl">
+      📂 ملفاتي المرفوعة — ${uploads.length || ZAD_UPLOADS.getCount()} ملف
     </div>
-    ${uploads.map(u => `
+    ${uploads.map(u => {
+      // Clean title: remove long hash IDs, truncate cleanly
+      var displayTitle = (u.title||u.fileName||'ملف مرفوع').replace(/\.[^.]+$/, '');
+      // If title is a hash/ID (no spaces, long alphanumeric), use fileName instead
+      if (/^[a-f0-9_]{20,}$/i.test(displayTitle)) {
+        displayTitle = (u.fileName||'ملف مرفوع').replace(/\.[^.]+$/,'');
+      }
+      // Truncate to 40 chars
+      if (displayTitle.length > 40) displayTitle = displayTitle.slice(0,38) + '…';
+      var dateStr = u.savedAt ? new Date(u.savedAt).toLocaleDateString('ar-SA') : '';
+      var lid = u.lessonId || ('ai-'+u.id);
+      return \`
       <div style="background:rgba(255,255,255,0.04);border:1px solid var(--border);
-        border-radius:12px;padding:12px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-        <div style="flex:1;min-width:0">
-          <div style="font-weight:700;font-size:0.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
-            📄 ${u.title}
-          </div>
-          <div style="font-size:0.72rem;color:var(--text-muted);margin-top:2px">
-            ${u.fileName} • ${new Date(u.savedAt).toLocaleDateString('ar-SA')}
-          </div>
+        border-radius:12px;padding:10px 12px;direction:rtl">
+        <div style="font-weight:700;font-size:0.84rem;margin-bottom:6px;
+          overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)">
+          📄 \${displayTitle}
+        </div>
+        <div style="font-size:0.68rem;color:var(--text-muted);margin-bottom:8px;
+          overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+          \${dateStr}
         </div>
         <div style="display:flex;gap:6px">
-          <button onclick="openLesson('${subjectId}','${u.lessonId}')"
-            style="padding:6px 12px;border-radius:8px;border:none;
-              background:rgba(108,99,255,0.15);color:var(--primary);
-              font-family:var(--font);font-size:0.75rem;font-weight:700;cursor:pointer">
+          <button onclick="openLesson('\${subjectId}','\${lid}')"
+            style="flex:1;padding:7px 0;border-radius:8px;border:none;
+              background:rgba(108,99,255,0.18);color:var(--primary);
+              font-family:var(--font);font-size:0.78rem;font-weight:700;cursor:pointer">
             📖 فتح
           </button>
-          <button onclick="confirmDeleteUpload('${u.id}','${subjectId}')"
-            style="padding:6px 12px;border-radius:8px;border:none;
+          <button onclick="confirmDeleteUpload('\${u.id}','\${subjectId}')"
+            style="padding:7px 14px;border-radius:8px;border:none;
               background:rgba(255,82,82,0.1);color:#FF5252;
-              font-family:var(--font);font-size:0.75rem;font-weight:700;cursor:pointer">
-            🗑️ حذف
+              font-family:var(--font);font-size:0.78rem;font-weight:700;cursor:pointer">
+            🗑️
           </button>
         </div>
-      </div>`).join('')}
+      </div>\`;
+    }).join('')}
   </div>`;
 }
 

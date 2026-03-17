@@ -2432,34 +2432,35 @@ function elabXlFbarCommit() { elabXlFbarInput(); }
 function elabXlGetNum(key) {
   const v = _exlData[key];
   if (v === undefined || v === null || v === '') return null;
-  if (typeof v === 'number') return v;
+  if (typeof v === 'number') return isFinite(v) ? v : null;
   if (typeof v === 'string' && v.startsWith('=')) {
-    // First: try reading the already-computed DOM value (faster, avoids re-eval)
-    const inp = document.querySelector(`input[data-key="${key}"]`);
-    if (inp && inp.value !== '' && inp.value !== v) {
-      const cached = parseFloat(inp.value);
-      if (!isNaN(cached) && isFinite(cached)) return cached;
-    }
-    // Fallback: re-evaluate
     try {
       const r = elabXlCompute(v);
-      return typeof r === 'number' && isFinite(r) ? r : null;
+      if (typeof r === 'number' && isFinite(r)) return r;
+      if (typeof r === 'string') { const n = parseFloat(r); return isNaN(n)?null:n; }
+      return null;
     } catch(e) { return null; }
   }
-  const n = parseFloat(v);
+  const n = parseFloat(String(v).trim());
   return isNaN(n) ? null : n;
 }
 
 function elabXlParseRange(range) {
-  const m = range.trim().toUpperCase().match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/);
+  if (!range) return [];
+  const up = range.trim().toUpperCase();
+  const m = up.match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/);
   if (!m) return [];
-  const c1=ELAB_XL_COLS.indexOf(m[1])+1, r1=parseInt(m[2]);
-  const c2=ELAB_XL_COLS.indexOf(m[3])+1, r2=parseInt(m[4]);
-  const vals=[];
-  for(let r=Math.min(r1,r2);r<=Math.max(r1,r2);r++)
-    for(let c=Math.min(c1,c2);c<=Math.max(c1,c2);c++) {
-      const v=elabXlGetNum(`${r}_${c}`);
-      if(v!==null) vals.push(v);
+  const c1 = ELAB_XL_COLS.indexOf(m[1]) + 1;
+  const c2 = ELAB_XL_COLS.indexOf(m[3]) + 1;
+  const r1 = parseInt(m[2]), r2 = parseInt(m[4]);
+  if (c1 <= 0 || c2 <= 0) return [];
+  const vals = [];
+  for (let r = Math.min(r1,r2); r <= Math.max(r1,r2); r++)
+    for (let c = Math.min(c1,c2); c <= Math.max(c1,c2); c++) {
+      const raw = _exlData[r + '_' + c];
+      if (raw === undefined || raw === null || raw === '') continue;
+      const v = elabXlGetNum(r + '_' + c);
+      if (v !== null) vals.push(v);
     }
   return vals;
 }
@@ -2561,12 +2562,20 @@ function _xlArith(expr) {
     iterations++;
   } while (s !== prev && iterations < 20);
 
-  // Step 2: Replace all remaining cell references with their values
-  s = s.replace(/([A-Z]+)(\d+)/gi, (_, col, row) => {
+  // Step 2: guard scientific notation (1e5, 2.5e-3) before replacing cell refs
+  const _sciTokens = {};
+  let _sciN = 0;
+  s = s.replace(/(\d)(e[+-]?\d+)/gi, (_, d, exp) => {
+    const t = ' sci' + (_sciN++) + ' ';
+    _sciTokens[t] = exp;
+    return d + t;
+  });
+  s = s.replace(/([A-Z]+)(\d+)/gi, (match, col, row) => {
     const c = ELAB_XL_COLS.indexOf(col.toUpperCase()) + 1;
-    if (c <= 0) return '0';
+    if (c <= 0) return match;
     return String(elabXlGetNum(`${parseInt(row)}_${c}`) ?? 0);
   });
+  Object.keys(_sciTokens).forEach(t => { s = s.split(t).join(_sciTokens[t]); });
 
   // Step 3: Safe arithmetic eval
   try {
@@ -2587,15 +2596,27 @@ function _xlArith(expr) {
 function _xlCallFn(fnName, argsStr) {
   const args = _xlSplitArgs(argsStr);
 
-  // Helper: evaluate one arg (could be range, formula, or value)
   const evalArg  = (i) => _xlEval(args[i]?.trim() || '0');
   const numArg   = (i) => { const v = evalArg(i); return typeof v==='number'?v:parseFloat(v)||0; };
   const strArg   = (i) => { const v = evalArg(i); return String(v).replace(/^"|"$/g,''); };
   const rangeArg = (i) => elabXlParseRange(args[i]?.trim() || '');
-  const allNums  = (i) => {
-    const r = elabXlParseRange(args[i]?.trim() || '');
-    if (r.length) return r;
-    return [numArg(i)];
+  // allNums: gathers values from ALL args starting at startIdx
+  // Supports =SUM(A1:A5,A6,B1,10) — multiple ranges, cells, and literals
+  const allNums = (startIdx) => {
+    if (startIdx === undefined) startIdx = 0;
+    const result = [];
+    for (let i = startIdx; i < args.length; i++) {
+      const a = (args[i] || '').trim();
+      if (!a) continue;
+      if (/^[A-Z]+\d+:[A-Z]+\d+$/i.test(a)) {
+        result.push(...elabXlParseRange(a));
+      } else {
+        const v = _xlEval(a);
+        if (typeof v === 'number' && isFinite(v)) result.push(v);
+        else { const n = parseFloat(String(v)); if (!isNaN(n) && isFinite(n)) result.push(n); }
+      }
+    }
+    return result;
   };
 
   const FUNCS = {

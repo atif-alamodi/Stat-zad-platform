@@ -2359,9 +2359,33 @@ function elabXlNav(e,r,c) {
   const moves = {ArrowRight:[0,1],ArrowLeft:[0,-1],ArrowDown:[1,0],ArrowUp:[-1,0],Enter:[1,0],Tab:[0,1]};
   if (!moves[e.key]) return;
   e.preventDefault();
+  // CRITICAL: commit current cell BEFORE moving (onchange won't fire after preventDefault)
+  const curInp = document.querySelector(`input[data-key="${r}_${c}"]`);
+  if (curInp) {
+    const v = curInp.value.trim();
+    const curKey = r + '_' + c;
+    if (v.startsWith('=')) {
+      _exlData[curKey] = v;
+      const computed = elabXlCompute(v);
+      curInp.value = (computed === null || computed === undefined) ? '' : String(computed);
+      curInp.style.color = '#79c0ff';
+      curInp.title = v + '  →  ' + curInp.value;
+    } else if (v !== '' && !isNaN(v)) {
+      _exlData[curKey] = Number(v);
+      curInp.style.color = '#e6edf3';
+      curInp.title = '';
+    } else if (v === '') {
+      delete _exlData[curKey];
+    } else {
+      _exlData[curKey] = v;
+      curInp.style.color = '#e6edf3';
+    }
+    // Recompute all formulas that may depend on this cell
+    elabXlComputeAll();
+  }
   const [dr,dc] = moves[e.key];
-  const nr = Math.max(1,Math.min(_exlRows,r+dr));
-  const nc = Math.max(1,Math.min(_exlCols,c+dc));
+  const nr = Math.max(1, Math.min(_exlRows, r+dr));
+  const nc = Math.max(1, Math.min(_exlCols, c+dc));
   const inp = document.querySelector(`input[data-key="${nr}_${nc}"]`);
   if (inp) inp.focus();
 }

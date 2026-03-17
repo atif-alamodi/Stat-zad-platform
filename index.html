@@ -8771,6 +8771,8 @@ async function processUploadedFile(file, subjectId) {
 
   } catch(e) {
     if (e.message === 'NO_API_KEY' || e.message === 'INVALID_API_KEY' || e.message === 'BACKEND_NOT_CONFIGURED') return;
+    // AI_SERVICE_UNAVAILABLE already showed toast in zadFetch
+    if (e.message === 'AI_SERVICE_UNAVAILABLE') { showUploadStatus('error', '❌ فشلت خدمة الذكاء الاصطناعي — أعد المحاولة أو تحقق من الاتصال'); return; }
     showUploadStatus('error', `❌ خطأ في قراءة "${file.name}": ${e.message}`);
     console.error('processUploadedFile:', e);
   }
@@ -12014,8 +12016,8 @@ LANGUAGE RULES:
             sectionEnd = Math.floor(((ti+1) / topics.length) * clean.length);
           }
         }
-        // Cap section at 20000 chars to avoid token overflow
-        const sectionText = clean.slice(sectionStart, Math.min(sectionEnd, sectionStart + 20000));
+        // Cap section at 5000 chars for Pollinations compatibility
+        const sectionText = clean.slice(sectionStart, Math.min(sectionEnd, sectionStart + 5000));
 
         const topicPrompt = `${langNote}\n\n⚠️ تعليمات مهمة: استخدم المحتوى من النص التالي فقط. لا تضف معلومات خارجية.\n\nموضوع هذا الدرس: "${topic.title}"\n\n=== النص المصدر (استخرج منه فقط) ===\n${sectionText}\n=== نهاية النص ===\n\nأجب بـ JSON صالح فقط:\n${jsonTemplate}`;
 
@@ -12070,9 +12072,10 @@ LANGUAGE RULES:
       }
     } else {
       // Single lesson - process in chunks
+      // Keep chunks small (5000 chars) for Pollinations compatibility
       upd('📡', 'تحليل الملف...', 30);
-      const chunkSize = 20000; // large chunks — full coverage
-      const numChunks = Math.ceil(clean.length / chunkSize);
+      const chunkSize = 5000;
+      const numChunks = Math.min(4, Math.ceil(clean.length / chunkSize)); // max 4 chunks
       console.log('[ZAD] numChunks:', numChunks, 'chunkSize:', chunkSize);
       const allResults = [];
 
@@ -22528,7 +22531,28 @@ async function zadFetch(body) {
     return { status:200, json: async function(){ return {content:[{type:'text',text:text}]}; } };
   }
 
-  // ── ATTEMPT 1: Pollinations (free, no key, CORS-friendly) ──
+  // ── ATTEMPT 1: Worker proxy (Cloudflare Workers AI — handles large requests) ──
+  if (BACKEND_URL && !BACKEND_URL.includes('YOUR_NAME')) {
+    try {
+      var wResp = await fetch(BACKEND_URL + '/ai', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({model:model, messages:messages, max_tokens:body.max_tokens||4000}),
+        signal: AbortSignal.timeout ? AbortSignal.timeout(50000) : undefined
+      });
+      if (wResp.ok) {
+        var wData = await wResp.json();
+        if (!wData.error || wData.content) {
+          var wText=(wData.content&&wData.content[0]&&wData.content[0].text)||'';
+          if (wText && wText.length>5) {
+            console.log('[ZAD] Worker ✓ (' + wData.source + ')');
+            return makeResult(wText);
+          }
+        }
+      }
+    } catch(wErr) { console.warn('[ZAD] Worker failed:', wErr.message); }
+  }
+
+  // ── ATTEMPT 2: Pollinations (free, no key, CORS-friendly) ──
   try {
     var pollResp = await fetch('https://text.pollinations.ai/', {
       method:'POST',

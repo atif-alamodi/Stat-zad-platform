@@ -11274,6 +11274,8 @@ LANGUAGE RULES:
       out.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 
+  }
+  }
   } catch(err) {
     console.error('analyzeAndGenerate error:', err);
     if (err.message === 'NO_API_KEY' || err.message === 'INVALID_API_KEY' || err.message === 'BACKEND_NOT_CONFIGURED') return;

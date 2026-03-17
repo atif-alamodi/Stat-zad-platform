@@ -11919,8 +11919,8 @@ async function analyzeAndGenerate(text, subjectId, fileName) {
     try {
       const candidateText = candidateLines.slice(0, 400).join('\n'); // max 400 lines
       const sR = await zadFetch({
-        model: 'llama-3.3-70b-versatile',
-        max_tokens: 1500,
+        model: 'llama-3.1-8b-instant',
+        max_tokens: 800,
         system: 'Respond with valid JSON only. No markdown.',
         messages: [{ role: 'user', content:
           'From these lines extracted from an educational document, identify which ones are lesson/topic/section titles.\n' +
@@ -11990,6 +11990,10 @@ LANGUAGE RULES:
 
     const jsonTemplateEN = "{\n  \"lessonTitle\": \"Accurate English Title\",\n  \"definition\": \"Arabic explanation (4-6 simple sentences)\",\n  \"whyLearn\": [\"Arabic importance 1\", \"Importance 2\", \"Importance 3\"],\n  \"keyTerms\": [{\"term\":\"English Term\",\"def\":\"Arabic definition\"},{\"term\":\"Term 2\",\"def\":\"def\"},{\"term\":\"Term 3\",\"def\":\"def\"},{\"term\":\"Term 4\",\"def\":\"def\"},{\"term\":\"Term 5\",\"def\":\"def\"}],\n  \"examples\": [{\"icon\":\"💡\",\"title\":\"English Example 1\",\"content\":\"Arabic explanation\"},{\"icon\":\"📌\",\"title\":\"Example 2\",\"content\":\"explanation\"},{\"icon\":\"🔍\",\"title\":\"Example 3\",\"content\":\"explanation\"}],\n  \"steps\": [\"Arabic point 1\",\"Point 2\",\"Point 3\",\"Point 4\",\"Point 5\"],\n  \"properties\": [\"Arabic property 1\",\"Property 2\",\"Property 3\"],\n  \"types\": [\"Arabic type 1\",\"Type 2\",\"Type 3\"],\n  \"mindMapBranches\": [{\"label\":\"Branch 1\",\"color\":\"#6C63FF\",\"children\":[\"Sub 1\",\"Sub 2\",\"Sub 3\"]},{\"label\":\"Branch 2\",\"color\":\"#FF6584\",\"children\":[\"Sub 1\",\"Sub 2\",\"Sub 3\"]},{\"label\":\"Branch 3\",\"color\":\"#00BFA5\",\"children\":[\"Sub 1\",\"Sub 2\"]},{\"label\":\"Branch 4\",\"color\":\"#FFD600\",\"children\":[\"Sub 1\",\"Sub 2\"]}],\n  \"quiz\": [{\"q\":\"Question 1 in English?\",\"options\":[\"Correct answer\",\"Wrong 1\",\"Wrong 2\",\"Wrong 3\"],\"answer\":0,\"hint\":\"English hint\",\"explanation\":\"Arabic explanation of correct answer\"},{\"q\":\"Question 2?\",\"options\":[\"Correct\",\"Wrong 1\",\"Wrong 2\",\"Wrong 3\"],\"answer\":0,\"hint\":\"Hint\",\"explanation\":\"Arabic explanation\"},{\"q\":\"Question 3?\",\"options\":[\"Correct\",\"Wrong 1\",\"Wrong 2\",\"Wrong 3\"],\"answer\":0,\"hint\":\"Hint\",\"explanation\":\"Arabic explanation\"},{\"q\":\"Question 4?\",\"options\":[\"Correct\",\"Wrong 1\",\"Wrong 2\",\"Wrong 3\"],\"answer\":0,\"hint\":\"Hint\",\"explanation\":\"Arabic explanation\"},{\"q\":\"Question 5?\",\"options\":[\"Correct\",\"Wrong 1\",\"Wrong 2\",\"Wrong 3\"],\"answer\":0,\"hint\":\"Hint\",\"explanation\":\"Arabic explanation\"}],\n  \"summary\": \"Arabic summary\"\n}";
 
+    // Compact template for CF Workers AI (fits within 2048 token limit)
+    const jsonTemplateCompact = isEng
+      ? '{"lessonTitle":"string","definition":"2-3 sentences","keyTerms":[{"term":"t1","def":"d1"},{"term":"t2","def":"d2"},{"term":"t3","def":"d3"}],"steps":["step1","step2","step3","step4"],"quiz":[{"q":"Q1?","options":["correct","wrong1","wrong2","wrong3"],"answer":0,"explanation":"why"},{"q":"Q2?","options":["correct","wrong1","wrong2","wrong3"],"answer":0,"explanation":"why"},{"q":"Q3?","options":["correct","wrong1","wrong2","wrong3"],"answer":0,"explanation":"why"}],"summary":"1-2 sentences"}'
+      : '{"lessonTitle":"عنوان الدرس","definition":"2-3 جمل","keyTerms":[{"term":"م1","def":"تعريف1"},{"term":"م2","def":"تعريف2"},{"term":"م3","def":"تعريف3"}],"steps":["خطوة1","خطوة2","خطوة3","خطوة4"],"quiz":[{"q":"سؤال1؟","options":["صواب","خطأ1","خطأ2","خطأ3"],"answer":0,"explanation":"شرح"},{"q":"سؤال2؟","options":["صواب","خطأ1","خطأ2","خطأ3"],"answer":0,"explanation":"شرح"},{"q":"سؤال3؟","options":["صواب","خطأ1","خطأ2","خطأ3"],"answer":0,"explanation":"شرح"}],"summary":"ملخص قصير"}';
     const jsonTemplate = isEng ? jsonTemplateEN : jsonTemplateAR;
 
     // ── STEP 2: Process each topic/lesson ─────────────────────
@@ -12019,14 +12023,14 @@ LANGUAGE RULES:
         // Cap section at 5000 chars for Pollinations compatibility
         const sectionText = clean.slice(sectionStart, Math.min(sectionEnd, sectionStart + 5000));
 
-        const topicPrompt = `${langNote}\n\n⚠️ تعليمات مهمة: استخدم المحتوى من النص التالي فقط. لا تضف معلومات خارجية.\n\nموضوع هذا الدرس: "${topic.title}"\n\n=== النص المصدر (استخرج منه فقط) ===\n${sectionText}\n=== نهاية النص ===\n\nأجب بـ JSON صالح فقط:\n${jsonTemplate}`;
+        const topicPrompt = (isEng?'Extract lesson about: ':'استخرج درساً عن: ')+topic.title+'\n\nText:\n'+sectionText+'\n\nReturn compact JSON (be concise to fit in response):\n'+jsonTemplateCompact;
 
         let lesson = null;
         try {
           const resp = await zadFetch({
-            model: 'llama-3.3-70b-versatile',
-            max_tokens: 8000,
-            system: 'You are an educational content extractor. CRITICAL: Extract information ONLY from the provided text. NEVER add facts, examples, or content not present in the source text. Reply with valid JSON only. No markdown. No hallucination.',
+            model: 'llama-3.1-8b-instant',
+            max_tokens: 1800,
+            system: 'Educational content extractor. Reply with valid JSON only. No markdown. Be concise.',
             messages: [{ role: 'user', content: topicPrompt }]
           });
           const data = await resp.json();
@@ -12085,7 +12089,7 @@ LANGUAGE RULES:
         const chunk = clean.slice(ci * chunkSize, (ci+1) * chunkSize);
         const isFirst = ci === 0;
         const prompt = isFirst
-          ? `${langNote}\n\n⚠️ استخرج المحتوى التالي فقط — لا تضف شيئاً من خارجه:\n\n=== النص المصدر ===\n${chunk}\n=== نهاية النص ===\n\nأجب بـ JSON:\n${jsonTemplate}`
+          ? (isEng?'Extract lesson from this text:\n\n':'استخرج درساً من النص:\n\n')+chunk+'\n\nReturn compact JSON:\n'+jsonTemplateCompact
           : isEng
           ? `${langNote}\n\nAdditional source text (extract from this only):\n${chunk}\n\nReturn JSON with extra content only — from this text only:\n{"keyTerms":[{"term":"English term","def":"Arabic definition"}],"steps":["Arabic point"],"quiz":[{"q":"English question?","options":["Correct English","Wrong 1","Wrong 2","Wrong 3"],"answer":0,"hint":"English hint","explanation":"Arabic explanation"}]}`
           : `${langNote}\n\n⚠️ نص إضافي (استخرج منه فقط، لا تضف معلومات خارجه):\n${chunk}\n\nأجب بـ JSON مع مصطلحات وأسئلة مستخرجة من هذا النص فقط:\n{"keyTerms":[{"term":"...","def":"..."}],"steps":["..."],"quiz":[{"q":"...","options":["صحيح","خطأ1","خطأ2","خطأ3"],"answer":0,"explanation":"..."}]}`;
@@ -12094,9 +12098,9 @@ LANGUAGE RULES:
         console.log('[ZAD] chunk', ci, 'sending prompt length:', prompt.length);
         try {
           const resp = await zadFetch({
-            model: 'llama-3.3-70b-versatile',
-            max_tokens: 8000,
-            system: 'You are an educational content extractor. Extract ONLY from the provided text. No hallucination. Reply with valid JSON only. No markdown.',
+            model: 'llama-3.1-8b-instant',
+            max_tokens: 1800,
+            system: 'Educational extractor. Reply with valid JSON only. No markdown. Be concise.',
             messages: [{ role: 'user', content: prompt }]
           });
           const data = await resp.json();
@@ -12116,15 +12120,12 @@ LANGUAGE RULES:
         try {
           const fbResp = await zadFetch({
             model: 'llama-3.1-8b-instant',
-            max_tokens: 3000,
-            system: isEng
-              ? 'Educational JSON generator. Reply with valid JSON only.'
-              : 'مساعد تعليمي. أجب بـ JSON صالح فقط.',
+            max_tokens: 1500,
+            system: 'Educational extractor. Reply with valid JSON only. No markdown.',
             messages: [{ role: 'user', content:
-              (isEng
-                ? 'Create an educational lesson about: ' + fileName + '\n\nText:\n' + clean
-                : 'أنشئ درساً تعليمياً عن: ' + fileName + '\n\nنص:\n' + clean)
-              + '\n\nReturn JSON:\n' + jsonTemplate
+              (isEng?'Lesson about: ':'درس عن: ') + fileName
+              + '\n\nText:\n' + clean.slice(0,3000)
+              + '\n\nReturn compact JSON:\n' + jsonTemplateCompact
             }]
           });
           const fbData = await fbResp.json();
@@ -12231,17 +12232,44 @@ function isValidTitle(title) {
 function repairAndParseJSON(raw) {
   if (!raw) return null;
 
-  // Strip markdown
+  // Strip markdown code fences
   raw = raw.replace(/^```[a-z]*\n?/im,'').replace(/\n?```$/m,'').trim();
 
   // Find JSON boundaries
   var first = raw.indexOf('{');
   var last  = raw.lastIndexOf('}');
-  if (first < 0 || last <= first) return null;
-  raw = raw.slice(first, last + 1);
+  if (first < 0) return null;
 
-  // Try 1: direct
+  // If no closing brace (TRUNCATED by token limit), add it
+  if (last <= first) {
+    raw = raw.slice(first);
+    // Try to auto-close truncated JSON
+    var opens = (raw.match(/\{/g)||[]).length;
+    var closes = (raw.match(/\}/g)||[]).length;
+    var needed = opens - closes;
+    if (needed > 0) raw += '}'.repeat(needed);
+    last = raw.lastIndexOf('}');
+  } else {
+    raw = raw.slice(first, last + 1);
+  }
+
+  // Try 1: direct parse
   try { return JSON.parse(raw); } catch(e1) {}
+
+  // Try 1b: truncated — remove last incomplete field and close
+  var truncRepair = raw;
+  // Remove trailing incomplete string: cut at last complete ", or ,
+  truncRepair = truncRepair.replace(/,\s*"[^"]*$/, '');       // incomplete key
+  truncRepair = truncRepair.replace(/:\s*"[^"]*$/, ':"..."'); // incomplete value  
+  truncRepair = truncRepair.replace(/,\s*\[([^\]]*)$/, '');   // incomplete array
+  // Close all open braces/brackets
+  var needClose = [];
+  for (var ci=0;ci<truncRepair.length;ci++){
+    if(truncRepair[ci]==='{'||truncRepair[ci]==='[') needClose.push(truncRepair[ci]==='{'?'}':']');
+    else if(truncRepair[ci]==='}'||truncRepair[ci]===']') needClose.pop();
+  }
+  truncRepair = truncRepair.replace(/,\s*$/, '') + needClose.reverse().join('');
+  try { return JSON.parse(truncRepair); } catch(e1b) {}
 
   // Try 2: clean Arabic/special quotes and control chars
   var c2 = raw

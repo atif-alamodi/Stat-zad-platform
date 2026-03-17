@@ -8560,8 +8560,6 @@ function detectSubjectFromText(text) {
 function buildUploadTab(subjectId) {
   const subject = CURRICULUM[subjectId] || { id: subjectId, title: subjectId, icon: '📚', chapters: [] };
   return `
-    ${typeof buildMyUploadsPanel==='function'?buildMyUploadsPanel(subjectId):''}
-    
   <div id="upload-tab-container" style="direction:rtl">
     <!-- هيدر -->
     <div style="background:linear-gradient(135deg,rgba(108,99,255,0.12),rgba(232,160,32,0.08));
@@ -10365,7 +10363,7 @@ async function saveAILessonForUser(lesson, subjectId, uploadId, originalFileName
   // Sync to cloud for cross-device access
   if (typeof ZAD_SYNC !== 'undefined') ZAD_SYNC.pushUploads([bundle]);
 
-  showToast('✅ تم حفظ "' + (lesson.lessonTitle||'الدرس') + '" بنجاح', 'success');
+  // Toast shown by analyzeAndGenerate for all lessons together
 
   // Immediately refresh curriculum section on dashboard
   if (typeof refreshUserCurriculumSection === 'function') {
@@ -10382,58 +10380,8 @@ async function restoreUserUploads() {
   });
 }
 
-function buildMyUploadsPanel(subjectId) {
-  var uploads = ZAD_UPLOADS.getAll().filter(function(u){ return u.subjectId === subjectId; });
-
-  if (!uploads.length) {
-    return '<div style="text-align:center;padding:30px;color:var(--text-muted);font-size:0.85rem">'
-      + '<div style="font-size:2rem;margin-bottom:8px">📂</div>'
-      + 'لم ترفع ملفات لهذه المادة بعد</div>';
-  }
-
-  var html = '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;direction:rtl">'
-    + '<div style="font-size:0.78rem;font-weight:700;color:var(--text-muted);margin-bottom:4px">'
-    + '📂 ملفاتي المرفوعة — ' + uploads.length + ' ملف'
-    + '</div>';
-
-  uploads.forEach(function(u) {
-    var rawTitle = u.title || u.fileName || 'ملف مرفوع';
-    var displayTitle = rawTitle.replace(/\.[^.]+$/, '');
-    if (/^[a-f0-9_]{20,}$/i.test(displayTitle)) {
-      displayTitle = (u.fileName || 'ملف مرفوع').replace(/\.[^.]+$/, '');
-    }
-    if (displayTitle.length > 38) displayTitle = displayTitle.slice(0,36) + '…';
-    var dateStr = u.savedAt ? new Date(u.savedAt).toLocaleDateString('ar-SA') : '';
-    var lid = u.lessonId || ('ai-' + u.id);
-    var sid = (subjectId||'').replace(/'/g,"\'");
-    var safeId = (u.id||'').replace(/'/g,"\'");
-    var safeLid = lid.replace(/'/g,"\'");
-
-    html += '<div style="background:rgba(255,255,255,0.04);border:1px solid var(--border);'
-      + 'border-radius:12px;padding:10px 12px">'
-        + '<div style="font-weight:700;font-size:0.84rem;margin-bottom:4px;'
-          + 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)">'
-          + '📄 ' + displayTitle
-        + '</div>'
-        + '<div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:8px">'
-          + dateStr
-        + '</div>'
-        + '<div style="display:flex;gap:6px">'
-          + '<button onclick="openLesson(\'' + sid + '\',\'' + safeLid + '\')" '
-            + 'style="flex:1;padding:8px 0;border-radius:8px;border:none;'
-            + 'background:rgba(108,99,255,0.18);color:var(--primary);'
-            + 'font-family:var(--font);font-size:0.8rem;font-weight:700;cursor:pointer">📖 فتح</button>'
-          + '<button onclick="confirmDeleteUpload(\'' + safeId + '\',\'' + sid + '\')" '
-            + 'style="padding:8px 14px;border-radius:8px;border:none;'
-            + 'background:rgba(255,82,82,0.1);color:#FF5252;'
-            + 'font-family:var(--font);font-size:0.8rem;font-weight:700;cursor:pointer">🗑️</button>'
-        + '</div>'
-      + '</div>';
-  });
-
-  html += '</div>';
-  return html;
-}
+// buildMyUploadsPanel removed — uploads shown in lessons tab only
+function buildMyUploadsPanel(subjectId) { return ''; }
 
 function getRandomExamples(topic, count) {
   const bank = ZAD_EXAMPLES[topic] || [];
@@ -11134,7 +11082,7 @@ LANGUAGE RULES:
       for (const { lesson, topic, ti } of validResults) {
         const lessonUploadId = uploadId + '_' + ti;
         if (typeof saveAILessonForUser === 'function') {
-          saveAILessonForUser(lesson, subjectId, lessonUploadId, detectedChapterTitle || fileName);
+          await saveAILessonForUser(lesson, subjectId, lessonUploadId, detectedChapterTitle || fileName);
         }
         savedLessons.push(lesson);
       }
@@ -11253,11 +11201,15 @@ LANGUAGE RULES:
       if (st) st.innerHTML = '';
     }, 1200);
 
-    // Navigate to lessons
-    setTimeout(function() {
+    // Navigate to lessons - wait for IDB writes to complete
+    setTimeout(async function() {
+      // Re-init uploads cache to ensure IDB data is loaded
+      if (typeof ZAD_UPLOADS !== 'undefined' && typeof ZAD_UPLOADS.init === 'function') {
+        await ZAD_UPLOADS.init();
+      }
       showSubject(subjectId, 'lessons');
       if (typeof refreshUserCurriculumSection === 'function') refreshUserCurriculumSection();
-    }, 1500);
+    }, 800);
 
     // Show green card
     if (out) {

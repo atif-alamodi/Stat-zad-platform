@@ -11861,6 +11861,11 @@ async function analyzeAndGenerate(text, subjectId, fileName) {
   if (barWrap) barWrap.style.display = 'block';
   if (out) { out.innerHTML = ''; out.style.opacity = '1'; }
 
+  // Pre-check: verify we have a way to call AI before starting
+  const _adminKey = localStorage.getItem('zad_admin_groq_key') || '';
+  const _hasGroqKey = _adminKey && _adminKey.startsWith('gsk_') && _adminKey.length > 30;
+  const _hasWorker = (window._ZAD_BACKEND_URL || 'https://zad-proxy.atif-alamodi.workers.dev').indexOf('YOUR_NAME') < 0;
+
   try {
     const subject  = CURRICULUM[subjectId];
     const subTitle = subject ? subject.title : (subjectId || 'المادة');
@@ -22477,131 +22482,111 @@ function clearApiKey() {
   localStorage.removeItem(ZAD_API_KEY);
 }
 
-async function zadFetch(body) {
-  var BACKEND_URL = window._ZAD_BACKEND_URL || 'https://zad-proxy.atif-alamodi.workers.dev';
-  if (!BACKEND_URL || BACKEND_URL.includes('YOUR_NAME')) {
-    showToast('⚠️ لم يتم إعداد الخادم بعد — تواصل مع المشرف', 'warning');
-    throw new Error('BACKEND_NOT_CONFIGURED');
-  }
+// Update GROQ key in Cloudflare Worker via API
+async function _updateWorkerGroqKey(newKey) {
+  if (!newKey || !newKey.startsWith('gsk_')) return;
+  try {
+    await fetch('https://api.cloudflare.com/client/v4/accounts/51c0ba2dcb4a7c82e0f8219117d006ca/workers/scripts/zad-proxy/secrets', {
+      method: 'PUT',
+      headers: { 'Authorization': 'Bearer 5D4tQQQM6YE4RSY9Nk6x7YNgO-u0u8BRlEPVOx43', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name:'GROQ_API_KEY', text:newKey, type:'secret_text' })
+    });
+    console.log('[ZAD] Worker GROQ key updated');
+  } catch(e) { console.warn('[ZAD] Could not update Worker key:', e.message); }
+}
 
-  // Build OpenAI-format messages
+async function zadFetch(body) {
+  var BACKEND_URL = (window._ZAD_BACKEND_URL || 'https://zad-proxy.atif-alamodi.workers.dev').replace(/\/+$/, '');
+  var DIRECT_KEY  = localStorage.getItem('zad_admin_groq_key') || '';
+
+  // ── Build OpenAI-format message array ──────────────────────
   var messages = [];
   if (body.system) messages.push({ role: 'system', content: body.system });
-
-  var userContent = body.messages && body.messages[0] ? body.messages[0].content : '';
+  var userContent = (body.messages && body.messages[0]) ? body.messages[0].content : '';
   if (Array.isArray(userContent)) {
-    var textParts = userContent.filter(function(p){ return p.type==='text'; });
-    var imgParts  = userContent.filter(function(p){ return p.type==='image'; });
-    if (imgParts.length > 0) {
-      var parts = [];
-      imgParts.forEach(function(img) {
-        parts.push({ type:'image_url', image_url:{ url:'data:'+img.source.media_type+';base64,'+img.source.data } });
+    var txtParts = userContent.filter(function(p){ return p.type==='text'; });
+    var imgParts = userContent.filter(function(p){ return p.type==='image'; });
+    if (imgParts.length) {
+      var parts2 = imgParts.map(function(img){
+        return { type:'image_url', image_url:{ url:'data:'+img.source.media_type+';base64,'+img.source.data } };
       });
-      textParts.forEach(function(t){ parts.push({ type:'text', text:t.text }); });
-      messages.push({ role:'user', content: parts });
+      txtParts.forEach(function(t){ parts2.push({ type:'text', text:t.text }); });
+      messages.push({ role:'user', content: parts2 });
     } else {
-      messages.push({ role:'user', content: textParts.map(function(t){return t.text;}).join('\n') });
+      messages.push({ role:'user', content: txtParts.map(function(t){return t.text;}).join('\n') });
     }
   } else {
     messages.push({ role:'user', content: userContent });
   }
 
   var hasImage = Array.isArray(userContent) && userContent.some(function(p){ return p.type==='image'; });
-  var model = hasImage ? 'meta-llama/llama-4-scout-17b-16e-instruct' : 'llama-3.3-70b-versatile';
+  var model    = body.model || (hasImage ? 'meta-llama/llama-4-scout-17b-16e-instruct' : 'llama-3.3-70b-versatile');
+  var payload  = { model: model, messages: messages, max_tokens: body.max_tokens||4000, temperature: 0.1 };
 
-  // Send to backend worker — try up to 3 times with exponential backoff
-  var baseUrl = BACKEND_URL.replace(/\/+$/, '');
-  var resp, lastErr;
-  for (var attempt = 0; attempt < 3; attempt++) {
+  // ── Helper: parse response into standard format ────────────
+  function parseGroqResp(data) {
+    if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
+    var txt = (data.content && data.content[0] && data.content[0].text)
+           || (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content)
+           || '';
+    return { status:200, json: async function(){ return { content:[{ type:'text', text:txt }] }; } };
+  }
+
+  // ── Attempt 1: Worker proxy ────────────────────────────────
+  if (BACKEND_URL && !BACKEND_URL.includes('YOUR_NAME')) {
     try {
-      if (attempt > 0) await new Promise(function(r){ setTimeout(r, attempt * 1500); });
-      resp = await fetch(baseUrl + '/ai', {
-        method : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body   : JSON.stringify({
-          model     : model,
-          messages  : messages,
-          max_tokens: body.max_tokens || 4000,
-          temperature: 0.1
-        })
+      var wResp = await fetch(BACKEND_URL + '/ai', {
+        method: 'POST', headers: { 'Content-Type':'application/json' },
+        body: JSON.stringify(payload)
       });
-      if (resp.ok) break;
-      lastErr = 'HTTP ' + resp.status;
-    } catch(netErr) {
-      lastErr = netErr.message;
-      resp = null;
-    }
-  }
-
-  if (!resp || !resp.ok) {
-    var errData = {};
-    try { if(resp) errData = await resp.json(); } catch(e){}
-    var errMsg = errData?.error?.message || errData?.detail || lastErr || 'خطأ في الاتصال';
-    // Check if it's a key issue vs network issue
-    if (resp && (resp.status === 401 || resp.status === 403)) {
-      console.error('[ZAD] API key error - needs renewal');
-      // Try fallback: direct Anthropic call (works in Claude.ai context)
-      try {
-        var antResp = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'anthropic-version': '2023-06-01' },
-          body: JSON.stringify({
-            model: 'claude-sonnet-4-20250514',
-            max_tokens: body.max_tokens || 4000,
-            system: messages.find(function(m){return m.role==='system';})?.content || '',
-            messages: messages.filter(function(m){return m.role!=='system';})
-          })
-        });
-        if (antResp.ok) {
-          var antData = await antResp.json();
-          var antText = antData.content && antData.content[0] && antData.content[0].text || '';
-          if (antText) {
-            console.log('[ZAD] Fallback to Anthropic succeeded');
-            return { status:200, json: async function(){ return { content:[{type:'text',text:antText}] }; } };
-          }
+      if (wResp.ok) {
+        var wData = await wResp.json();
+        // Check for all_models_failed (GROQ key issue on worker)
+        if (!wData.error || wData.error !== 'all_models_failed') {
+          return parseGroqResp(wData);
         }
-      } catch(antErr) { console.warn('[ZAD] Anthropic fallback failed:', antErr.message); }
-      throw new Error('مشكلة في مفتاح الذكاء الاصطناعي — تواصل مع المسؤول');
+        console.warn('[ZAD] Worker returned all_models_failed — trying direct fallback');
+      }
+    } catch(wErr) {
+      console.warn('[ZAD] Worker failed:', wErr.message, '— trying direct GROQ');
     }
-    throw new Error(errMsg);
   }
 
-  var groqData = await resp.json();
-  if (groqData.error) {
-    var gErr = groqData.error.message || JSON.stringify(groqData.error);
-    // If AI key error, try Anthropic fallback
-    if (gErr.includes('key') || gErr.includes('auth') || gErr.includes('401')) {
+  // ── Attempt 2: Direct GROQ (using admin-saved key) ─────────
+  if (DIRECT_KEY && DIRECT_KEY.startsWith('gsk_')) {
+    var FALLBACK_MODELS = [
+      'llama-3.1-8b-instant',       // fastest, most available
+      'llama-3.3-70b-versatile',
+      'meta-llama/llama-4-scout-17b-16e-instruct'
+    ];
+    for (var mi = 0; mi < FALLBACK_MODELS.length; mi++) {
       try {
-        var antResp2 = await fetch('https://api.anthropic.com/v1/messages', {
+        var dPayload = Object.assign({}, payload, { model: FALLBACK_MODELS[mi] });
+        var dResp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'anthropic-version': '2023-06-01' },
-          body: JSON.stringify({
-            model: 'claude-sonnet-4-20250514',
-            max_tokens: body.max_tokens || 4000,
-            messages: messages.filter(function(m){return m.role!=='system';})
-          })
+          headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+DIRECT_KEY },
+          body: JSON.stringify(dPayload)
         });
-        if (antResp2.ok) {
-          var antData2 = await antResp2.json();
-          var antText2 = antData2.content && antData2.content[0] && antData2.content[0].text || '';
-          if (antText2) return { status:200, json: async function(){ return { content:[{type:'text',text:antText2}] }; } };
-        }
-      } catch(e2) {}
+        if (dResp.status === 429) { await new Promise(function(r){setTimeout(r,500);}); continue; }
+        if (!dResp.ok) { var dE=await dResp.json().catch(function(){return{};}); continue; }
+        var dData = await dResp.json();
+        if (!dData.error) return parseGroqResp(dData);
+      } catch(dErr) { console.warn('[ZAD] Direct GROQ model', FALLBACK_MODELS[mi], 'failed:', dErr.message); }
     }
-    throw new Error('AI: ' + gErr);
   }
 
-  // Support both response formats:
-  // • Anthropic format  → groqData.content[0].text   (used by this Worker)
-  // • OpenAI/Groq format → groqData.choices[0].message.content
-  var text = (groqData.content && groqData.content[0] && groqData.content[0].text)
-          || groqData.choices?.[0]?.message?.content
-          || '';
-  return {
-    status: 200,
-    json: async function() { return { content: [{ type:'text', text: text }] }; }
-  };
+  // ── Both failed ────────────────────────────────────────────
+  if (isAdmin && isAdmin()) {
+    var msg = DIRECT_KEY
+      ? '❌ مفتاح GROQ غير صالح — حدّثه من لوحة الإدارة ← إعدادات'
+      : '❌ أدخل مفتاح GROQ من لوحة الإدارة ← إعدادات (مجاني من groq.com)';
+    showToast(msg, 'error');
+  } else {
+    showToast('❌ خدمة الذكاء الاصطناعي غير متاحة حالياً — تواصل مع المشرف', 'error');
+  }
+  throw new Error('AI_SERVICE_UNAVAILABLE');
 }
+
 
 function showApiKeyPrompt(msg) {
   // No-op: API key is handled server-side via Cloudflare Worker
@@ -23450,6 +23435,8 @@ setInterval(loadPlatformKey, 600000); // refresh every 10 min
 
 // ── Admin: save Groq key to GitHub → all users get it ─────────
 async function adminSavePlatformKey() {
+  // Pre-fill from localStorage
+  try { var _lsKey=localStorage.getItem('zad_admin_groq_key'); if(_lsKey&&document.getElementById('admin-groq-key-inp'))document.getElementById('admin-groq-key-inp').value=_lsKey; }catch(e){}
   const keyInp = document.getElementById('admin-groq-key-inp');
   const patInp = document.getElementById('admin-github-pat-inp');
 
@@ -23466,6 +23453,10 @@ async function adminSavePlatformKey() {
   setAdminPKStatus('loading', '⏳ جاري الحفظ...');
 
   try {
+    // Save to localStorage immediately for direct GROQ fallback
+    localStorage.setItem('zad_admin_groq_key', groqKey);
+    // Also update worker via Cloudflare API
+    _updateWorkerGroqKey(groqKey);
     // Encode key to avoid GitHub secret scanning
     const encoded = btoa(groqKey.split('').reverse().join(''));
     const cfg = JSON.stringify({ k: encoded, v: 2 }, null, 2);

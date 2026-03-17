@@ -13994,6 +13994,7 @@ table { display: block; overflow-x: auto; max-width: 100%; }
       <div>
         <div class="student-name-mini" id="sidebar-name">الطالب</div>
         <div id="sync-label" style="font-size:0.6rem;color:#555;margin-top:1px">●  محلي</div>
+        <div style="display:flex;align-items:center;gap:3px;margin-top:2px"><div id="zad-ai-health-dot" style="width:5px;height:5px;border-radius:50%;background:#555;flex-shrink:0"></div><span id="zad-ai-health-tip" style="font-size:0.55rem;color:#555">AI...</span></div>
       <div id="sidebar-email" style="font-size:0.65rem;color:var(--text-muted);margin-top:2px;direction:ltr;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px;"></div>
         <span class="student-level-mini" id="sidebar-level">مستوى مبتدئ</span>
       </div>
@@ -24255,6 +24256,37 @@ function buildBookmarksPanel() {
   return '<div style="direction:rtl"><div style="font-weight:800;margin-bottom:16px">🔖 إشاراتي المرجعية (' + bookmarks.length + ')</div>' + html + '</div>';
 }
 
+
+
+// ── ZAD AI Health Monitor ──────────────────────────────────────
+var _ZAD_AI_STATUS = { status:'UNKNOWN', providers:{}, primary:'?' };
+
+async function zadCheckAIHealth() {
+  try {
+    var resp = await fetch('https://zad-proxy.atif-alamodi.workers.dev/health');
+    if (resp.ok) {
+      _ZAD_AI_STATUS = await resp.json();
+      console.log('[ZAD] AI Health:', _ZAD_AI_STATUS.status, 'Primary:', _ZAD_AI_STATUS.primary);
+      _zadUpdateHealthUI();
+    }
+  } catch(e) { console.warn('[ZAD] Health check failed:', e.message); }
+}
+
+function _zadUpdateHealthUI() {
+  var dot = document.getElementById('zad-ai-health-dot');
+  var tip = document.getElementById('zad-ai-health-tip');
+  if (!dot) return;
+  var colors = { OK:'#28CA41', DEGRADED:'#FFD600', CRITICAL:'#FF5252', UNKNOWN:'#555' };
+  var icons  = { OK:'🟢', DEGRADED:'🟡', CRITICAL:'🔴', UNKNOWN:'⚫' };
+  var status = _ZAD_AI_STATUS.status || 'UNKNOWN';
+  dot.style.background = colors[status] || '#555';
+  dot.title = (icons[status]||'') + ' AI: ' + status + ' | Primary: ' + (_ZAD_AI_STATUS.primary||'?');
+  if (tip) tip.textContent = 'AI: ' + (_ZAD_AI_STATUS.primary||'?');
+}
+
+// Run health check 30s after login and every 6 hours
+setTimeout(zadCheckAIHealth, 30000);
+setInterval(zadCheckAIHealth, 6 * 60 * 60 * 1000);
 
 // ── Sync UI helper ──────────────────────────────────
 function _syncSetStatus(state) {

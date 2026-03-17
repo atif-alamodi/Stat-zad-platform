@@ -2311,6 +2311,7 @@ function elabXlRender() {
       h += `<td style="${cellStyle}" onclick="elabXlSel(${r},${c})">`;
       h += `<input data-key="${key}" value="${safeDisplay}" style="${inputStyle}"`;
       h += ` onchange="elabXlChange(event,'${key}')"`;
+      h += ` oninput="elabXlInput(event,'${key}')"`;
       h += ` onfocus="elabXlFocus(${r},${c})"`;
       h += ` onkeydown="elabXlNav(event,${r},${c})"`;
       h += ` title="${isFormula ? raw : ''}"`;
@@ -2388,6 +2389,24 @@ function elabXlNav(e,r,c) {
   const nc = Math.max(1, Math.min(_exlCols, c+dc));
   const inp = document.querySelector(`input[data-key="${nr}_${nc}"]`);
   if (inp) inp.focus();
+}
+
+// Store data on every keystroke (ensures _exlData always current)
+function elabXlInput(e, key) {
+  const v = e.target.value; // raw, not trimmed (user still typing)
+  const vt = v.trim();
+  if (vt === '') {
+    delete _exlData[key];
+  } else if (!vt.startsWith('=') && !isNaN(vt) && vt !== '') {
+    _exlData[key] = Number(vt);
+  } else if (!vt.startsWith('=')) {
+    _exlData[key] = vt;
+  }
+  // For formulas: wait until committed (onchange/Enter)
+  // But recompute immediately so dependent formulas update
+  if (!vt.startsWith('=')) {
+    elabXlComputeAll();
+  }
 }
 
 function elabXlChange(e, key) {
@@ -22420,19 +22439,39 @@ function buildAIFlashCards(lesson) {
     </div>`;
   }).join('');
   
-  return `<div style="direction:rtl">
-    <div style="font-weight:800;margin-bottom:12px;color:var(--primary)">🃏 بطاقات المصطلحات</div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-bottom:16px">
-      ${cards}
-    </div>
-    ${exCards ? `<div style="font-weight:800;margin-bottom:10px;color:var(--primary)">📚 الأمثلة</div><div style="display:grid;gap:8px">${exCards}</div>` : ''}
-  </div>`;
+  // Grammar rule cards from steps[]
+  var grammarCards = (lesson.steps||[]).filter(function(s){
+    return /[:—\-]/.test(s) && s.length > 15;
+  }).map(function(s,i){
+    var parts = s.split(/[:—]/);
+    var rName = parts.length>1 ? parts[0].trim() : ('قاعدة '+(i+1));
+    var rBody = parts.length>1 ? parts.slice(1).join(' ').trim() : s;
+    return '<div style="background:rgba(255,214,0,0.07);border:1.5px solid rgba(255,214,0,0.25);'
+      + 'border-radius:14px;padding:14px">'      + '<div style="font-weight:800;font-size:0.85rem;color:#FFD600;direction:ltr;margin-bottom:6px">' + rName + '</div>'      + '<div style="font-size:0.82rem;line-height:1.7;direction:rtl;color:var(--text)">' + rBody + '</div>'      + '</div>';
+  }).join('');
+
+  return '<div style="direction:rtl">'
+    + '<div style="font-weight:800;margin-bottom:12px;color:var(--primary)">🃏 بطاقات المصطلحات</div>'
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-bottom:16px">'
+    + cards + '</div>'
+    + (grammarCards ? '<div style="font-weight:800;margin-bottom:12px;color:#FFD600;margin-top:4px">📐 القواعد النحوية</div>'
+      + '<div style="display:grid;gap:8px;margin-bottom:16px">' + grammarCards + '</div>' : '')
+    + (exCards ? '<div style="font-weight:800;margin-bottom:10px;color:var(--primary)">📚 الأمثلة</div>'
+      + '<div style="display:grid;gap:8px">' + exCards + '</div>' : '')
+    + '</div>';
 }
 
 function buildAIExplanation(lesson) {
   if (!lesson) return '';
   
+  var _isGrammarSteps = (lesson.steps||[]).some(function(s){ return /[:—\-]/.test(s) && s.length>20; });
   var stepsHTML = (lesson.steps||[]).map(function(s, i) {
+    if (_isGrammarSteps) {
+      var parts=s.split(/[:—]/); var rn=parts.length>1?parts[0].trim():''; var rb=parts.length>1?parts.slice(1).join(' ').trim():s;
+      return '<div style="background:rgba(255,214,0,0.06);border:1px solid rgba(255,214,0,0.2);border-radius:10px;padding:10px 12px;margin-bottom:6px">'
+        +(rn?'<div style="font-weight:700;color:#FFD600;font-size:0.82rem;direction:ltr;margin-bottom:3px">'+rn+'</div>':'')
+        +'<div style="font-size:0.83rem;line-height:1.7;direction:rtl">'+rb+'</div></div>';
+    }
     return `<div style="display:flex;gap:10px;margin-bottom:8px">
       <div style="width:26px;height:26px;border-radius:50%;flex-shrink:0;
         background:var(--primary);display:flex;align-items:center;justify-content:center;
@@ -24746,10 +24785,22 @@ function buildAILessonFallback(lesson) {
   }
 
   if (lesson.steps && lesson.steps.length) {
-    html += '<div style="background:rgba(108,99,255,0.05);border:1px solid rgba(108,99,255,0.15);border-radius:14px;padding:14px;margin-bottom:12px">'
-      + '<div style="font-weight:800;margin-bottom:8px">📋 النقاط الرئيسية</div>'
-      + lesson.steps.map(function(s,i){ return '<div style="padding:5px 0;font-size:0.85rem"><span style="color:var(--primary);font-weight:700">' + (i+1) + '. </span>' + s + '</div>'; }).join('')
-      + '</div>';
+    var _isGrammar = lesson.steps.some(function(s){
+      return /[:—\-]/.test(s) && s.length > 20;
+    });
+    var _stepsLabel = _isGrammar ? '📐 القواعد النحوية' : '📋 النقاط الرئيسية';
+    var _stepsBg    = _isGrammar ? 'rgba(255,214,0,0.06)' : 'rgba(108,99,255,0.05)';
+    var _stepsBdr   = _isGrammar ? 'rgba(255,214,0,0.2)'  : 'rgba(108,99,255,0.15)';
+    var _stepsCol   = _isGrammar ? '#FFD600' : 'var(--primary)';
+    html += '<div style="background:' + _stepsBg + ';border:1.5px solid ' + _stepsBdr + ';border-radius:14px;padding:14px;margin-bottom:12px">'      + '<div style="font-weight:800;margin-bottom:10px;color:' + _stepsCol + '">' + _stepsLabel + '</div>'      + lesson.steps.map(function(s,i){
+          if (_isGrammar) {
+            var parts = s.split(/[:—]/);
+            var rName = parts.length > 1 ? parts[0].trim() : '';
+            var rBody = parts.length > 1 ? parts.slice(1).join(' ').trim() : s;
+            return '<div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:10px 12px;margin-bottom:6px">'              + (rName ? '<div style="font-weight:700;color:' + _stepsCol + ';font-size:0.82rem;direction:ltr;margin-bottom:3px">' + rName + '</div>' : '')              + '<div style="font-size:0.83rem;line-height:1.7;direction:rtl">' + rBody + '</div>'              + '</div>';
+          }
+          return '<div style="padding:5px 0;font-size:0.85rem"><span style="color:' + _stepsCol + ';font-weight:700">' + (i+1) + '. </span>' + s + '</div>';
+        }).join('')      + '</div>';
   }
 
   if (lesson.quiz && lesson.quiz.length) {

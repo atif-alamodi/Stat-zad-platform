@@ -7523,9 +7523,11 @@ async function engConvoSend() {
 
   try {
     var r = await zadFetch({
-      model:'llama-3.1-8b-instant', max_tokens:500,
-      system: 'You are an English conversation practice teacher. Topic: "' + title + '". Context: ' + ctx.slice(0,300)
-        + '. Keep responses short (2-4 sentences). Correct any grammar mistakes gently. If student writes Arabic, reply in English and Arabic.',
+      model:'llama-3.1-8b-instant', max_tokens:300,
+      system: 'You are a conversational English practice partner for a Saudi university student. Lesson topic: "' + title + '".'
+        + ' Rules: (1) Keep every response to MAX 2-3 short sentences. (2) ALWAYS end with a question to keep conversation going. '
+        + '(3) If student makes a grammar mistake, correct it briefly like: "Great! (small fix: say \"are\" not \"is\"). Now..." '
+        + '(4) If student writes in Arabic, respond bilingually. (5) Stay on topic: ' + ctx.slice(0,200),
       messages: _engConvoHistory.slice(-6)
     });
     var d = await r.json();
@@ -11213,22 +11215,26 @@ async function analyzeAndGenerate(text, subjectId, fileName) {
     upd('📚', 'جارٍ تحليل المحتوى...', 22);
 
     const langNote = isEng
-      ? `You are an educational content extractor. Extract and simplify content FROM THE PROVIDED TEXT ONLY.
+      ? `You are an expert English language teacher for Saudi university students (ELG201 level).
+Extract and structure content from the provided text into a clear lesson.
 
-ANTI-HALLUCINATION RULES (MANDATORY):
-1. Use ONLY information present in the given text — never add outside knowledge
-2. If a concept is not in the text, do not invent it — use what IS there
-3. Quiz questions and ALL answer options must be directly from the text
-4. Do NOT add examples, facts, or terms not mentioned in the source text
-5. Preserve all numbers, formulas, and technical terms exactly as written
+CONTENT RULES:
+1. lessonTitle: English title of the lesson
+2. definition: 4-6 Arabic sentences explaining the main topic simply (NOT objectives/goals)
+3. whyLearn: 3 reasons why this topic matters (Arabic)
+4. keyTerms: English term + Arabic translation/definition for each vocabulary word
+5. steps: Grammar rules or language structures found in the text, each as: "Rule name: explanation with example"
+   Example: "Present Simple: نستخدمه للحقائق العامة — She reads every day."
+6. types: types or categories mentioned (English + Arabic)
+7. summary: 2-3 Arabic sentences summarizing the lesson
+8. quiz: questions testing both language AND content from the text
 
-LANGUAGE RULES:
-1. lessonTitle: ENGLISH ONLY
-2. definition, whyLearn, steps, summary: Arabic only (simple, beginner-friendly)
-3. keyTerms: term = ENGLISH, def = Arabic
-4. quiz.q and quiz.options: ENGLISH ONLY — NEVER Arabic
-5. quiz.explanation: Arabic only
-6. NO emoji in quiz questions or answer options`
+LANGUAGE FORMAT:
+- definition, whyLearn, summary → Arabic only
+- keyTerms.term → English word, keyTerms.def → Arabic meaning + example sentence
+- steps → Arabic explanation with English grammar example
+- quiz.q + quiz.options → English only
+- quiz.explanation → Arabic`
       : `أنت مساعد تعليمي متخصص لطلاب الجامعة السعودية الإلكترونية.
 مهمتك الوحيدة: استخرج المحتوى من النص المُعطى وبسّطه — لا تضف شيئاً من خارجه.
 
@@ -11247,7 +11253,7 @@ LANGUAGE RULES:
     // Compact template for CF Workers AI (fits within 2048 token limit)
     // Ultra-compact template fits within 1024 tokens output limit
     const jsonTemplateCompact = isEng
-      ? '{"lessonTitle":"string","definition":"2 sentences","keyTerms":[{"term":"T1","def":"D1"},{"term":"T2","def":"D2"}],"steps":["s1","s2","s3"],"quiz":[{"q":"Q?","options":["A","B","C","D"],"answer":0,"explanation":"E"},{"q":"Q2?","options":["A","B","C","D"],"answer":0,"explanation":"E"}],"summary":"1 sentence"}'
+      ? '{"lessonTitle":"English Title","definition":"4 Arabic sentences explaining the topic simply","keyTerms":[{"term":"English word","def":"المعنى بالعربية + example sentence"},{"term":"Word2","def":"المعنى + مثال"},{"term":"Word3","def":"المعنى + مثال"}],"steps":["Grammar rule 1: Arabic explanation — English example","Grammar rule 2: Arabic explanation — English example","Grammar rule 3: explanation"],"quiz":[{"q":"English question?","options":["A","B","C","D"],"answer":0,"explanation":"Arabic explanation"},{"q":"Question 2?","options":["A","B","C","D"],"answer":0,"explanation":"Arabic explanation"}],"summary":"2 Arabic sentences summarizing the lesson"}'
       : '{"lessonTitle":"العنوان","definition":"جملتان","keyTerms":[{"term":"م1","def":"ت1"},{"term":"م2","def":"ت2"}],"steps":["خ1","خ2","خ3"],"quiz":[{"q":"س؟","options":["أ","ب","ج","د"],"answer":0,"explanation":"ش"},{"q":"س2؟","options":["أ","ب","ج","د"],"answer":0,"explanation":"ش"}],"summary":"ملخص"}';
     const jsonTemplate = isEng ? jsonTemplateEN : jsonTemplateAR;
 
@@ -25493,84 +25499,136 @@ function buildUploadedLessonsPanel(subjectId) {
 function buildLessonExercises(bundle) {
   if (!bundle || !bundle.lesson) return '';
   var l = bundle.lesson;
-  var content = l.content || {};
-  var keyTerms = content.keyTerms || [];
-  var types = content.types || [];
-  var examples = content.realExamples || [];
-  var quiz = l.quiz || [];
+  var content_data = l.content || {};
+  var keyTerms  = content_data.keyTerms  || [];
+  var steps     = content_data.steps     || [];
+  var examples  = content_data.realExamples || [];
+  var definition= content_data.definition|| '';
+  var summary   = l.summary || '';
+  var quiz      = l.quiz    || [];
   var html = '';
 
-  // ── 1. Key Terms Flashcards ─────────────────────────────
+  // ── 0. Definition (شرح الدرس) ────────────────────────────
+  if (definition) {
+    html += '<div style="background:rgba(33,150,243,0.07);border:1.5px solid rgba(33,150,243,0.22);'
+      + 'border-radius:14px;padding:14px;margin-bottom:14px;direction:rtl">'
+      + '<div style="font-weight:800;font-size:0.85rem;margin-bottom:8px;color:#42A5F5">📘 شرح الدرس</div>'
+      + '<div style="font-size:0.85rem;line-height:1.85;color:var(--text)">' + definition + '</div>'
+      + '</div>';
+  }
+
+  // ── 1. Grammar Rules (القواعد) ───────────────────────────
+  if (steps.length) {
+    html += '<div style="background:rgba(255,214,0,0.07);border:1.5px solid rgba(255,214,0,0.25);'
+      + 'border-radius:14px;padding:14px;margin-bottom:14px;direction:rtl">'
+      + '<div style="font-weight:800;font-size:0.85rem;margin-bottom:10px;color:#FFD600">📐 القواعد النحوية</div>'
+      + '<div style="display:flex;flex-direction:column;gap:8px">';
+    steps.forEach(function(step, i) {
+      // Try to split "Rule name: explanation" format
+      var parts = step.split(/[:—\-]/);
+      var ruleName = parts.length > 1 ? parts[0].trim() : ('قاعدة ' + (i+1));
+      var ruleBody = parts.length > 1 ? parts.slice(1).join(' — ').trim() : step;
+      html += '<div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:10px 12px;">'
+        + '<div style="font-weight:700;font-size:0.82rem;color:#FFD600;margin-bottom:3px;direction:ltr">' + ruleName + '</div>'
+        + '<div style="font-size:0.83rem;color:var(--text);direction:rtl;line-height:1.7">' + ruleBody + '</div>'
+        + '</div>';
+    });
+    html += '</div></div>';
+  }
+
+  // ── 2. Key Terms — Vocabulary Flashcards ─────────────────
   if (keyTerms.length) {
-    html += '<div style="background:rgba(33,150,243,0.06);border:1.5px solid rgba(33,150,243,0.2);border-radius:14px;padding:14px;margin-bottom:14px">'
-      + '<div style="font-weight:800;font-size:0.85rem;margin-bottom:12px;color:#42A5F5">🔤 Key Terms — بطاقات المصطلحات</div>'
-      + '<div style="display:flex;flex-direction:column;gap:8px">'
-      + keyTerms.map(function(k,i) {
-          var term = k.term || k;
-          var def  = k.def || k.definition || '';
-          return '<div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:10px 14px;cursor:pointer;border:1px solid rgba(255,255,255,0.07)" onclick="this.querySelector(\'.def\').style.display=this.querySelector(\'.def\').style.display===\'none\'?\'block\':\'none\'">'
-            + '<div style="font-weight:700;font-size:0.88rem;direction:ltr;color:#42A5F5">' + term + ' <span style="font-size:0.7rem;color:var(--text-muted)">(اضغط للمعنى)</span></div>'
-            + '<div class="def" style="display:none;font-size:0.82rem;color:var(--text-muted);margin-top:5px;padding-top:5px;border-top:1px solid rgba(255,255,255,0.06)">' + def + '</div>'
-          + '</div>';
-        }).join('')
-      + '</div></div>';
+    html += '<div style="background:rgba(0,191,165,0.07);border:1.5px solid rgba(0,191,165,0.22);'
+      + 'border-radius:14px;padding:14px;margin-bottom:14px;direction:rtl">'
+      + '<div style="font-weight:800;font-size:0.85rem;margin-bottom:10px;color:#00BFA5">🔤 المفردات والترجمة</div>'
+      + '<div style="display:flex;flex-direction:column;gap:7px">';
+    keyTerms.forEach(function(k) {
+      var term = k.term || k;
+      var def  = k.def  || k.definition || '';
+      html += '<div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:10px 12px;'
+        + 'display:flex;gap:10px;align-items:flex-start">'
+        + '<div style="font-weight:800;font-size:0.9rem;color:#00BFA5;direction:ltr;min-width:fit-content;padding-top:1px">' + term + '</div>'
+        + '<div style="font-size:0.83rem;color:var(--text);direction:rtl;flex:1;line-height:1.6">— ' + def + '</div>'
+        + '</div>';
+    });
+    html += '</div></div>';
   }
 
-  // ── 2. Fill-in-the-blank from key terms ────────────────
+  // ── 3. Fill-in-the-blank exercise ───────────────────────
   if (keyTerms.length >= 3) {
-    var blanks = keyTerms.slice(0, Math.min(5, keyTerms.length));
-    html += '<div style="background:rgba(0,191,165,0.06);border:1.5px solid rgba(0,191,165,0.2);border-radius:14px;padding:14px;margin-bottom:14px">'
-      + '<div style="font-weight:800;font-size:0.85rem;margin-bottom:12px;color:#00BFA5">✏️ Fill in the Blanks</div>'
-      + '<div id="blanks-container" style="display:flex;flex-direction:column;gap:10px">'
-      + blanks.map(function(k,i) {
-          var term = typeof k==='string' ? k : (k.term||'');
-          var def  = typeof k==='string' ? '' : (k.def||k.definition||'');
-          return '<div style="padding:10px;background:rgba(255,255,255,0.03);border-radius:10px">'
-            + '<div style="font-size:0.82rem;margin-bottom:7px;direction:rtl">معنى: <strong>' + def + '</strong></div>'
-            + '<div style="display:flex;gap:8px;align-items:center;direction:ltr">'
-              + '<input id="blank-'+i+'" type="text" placeholder="Type the English term..." style="flex:1;padding:8px 10px;border-radius:8px;border:1.5px solid rgba(0,191,165,0.3);background:rgba(255,255,255,0.05);color:var(--text);font-family:inherit;font-size:0.85rem;outline:none">'
-              + '<button onclick="checkBlank('+i+',\''+term.replace(/'/g,"\\'")+'\')" style="padding:8px 14px;border-radius:8px;border:none;background:#00BFA5;color:white;cursor:pointer;font-weight:700;font-size:0.8rem">Check</button>'
-            + '</div>'
-            + '<div id="blank-result-'+i+'" style="font-size:0.78rem;margin-top:4px;min-height:16px"></div>'
-          + '</div>';
-        }).join('')
-      + '</div></div>';
+    var blanks = keyTerms.slice(0, Math.min(4, keyTerms.length));
+    html += '<div style="background:rgba(156,39,176,0.07);border:1.5px solid rgba(156,39,176,0.22);'
+      + 'border-radius:14px;padding:14px;margin-bottom:14px;direction:rtl">'
+      + '<div style="font-weight:800;font-size:0.85rem;margin-bottom:10px;color:#CE93D8">✏️ Fill in the Blanks</div>'
+      + '<div style="display:flex;flex-direction:column;gap:10px">';
+    blanks.forEach(function(k, i) {
+      var term = typeof k==='string' ? k : (k.term||'');
+      var def  = typeof k==='string' ? '' : (k.def||'');
+      html += '<div style="background:rgba(255,255,255,0.03);border-radius:10px;padding:10px">'
+        + '<div style="font-size:0.82rem;margin-bottom:7px;color:var(--text-muted)">معنى: <strong style="color:var(--text)">' + def.split('—')[0].trim() + '</strong></div>'
+        + '<div style="display:flex;gap:8px;direction:ltr">'
+        + '<input id="blank-' + i + '" type="text" placeholder="Type English term..." '
+        + 'style="flex:1;padding:8px 10px;border-radius:8px;border:1.5px solid rgba(156,39,176,0.3);'
+        + 'background:rgba(255,255,255,0.05);color:var(--text);font-family:inherit;font-size:0.85rem;outline:none">'
+        + '<button onclick="checkBlank(' + i + ',\'' + term.replace(/'/g,"\'") + '\')" '
+        + 'style="padding:8px 14px;border-radius:8px;border:none;background:#9C27B0;color:white;cursor:pointer;font-weight:700;font-size:0.8rem">✓</button>'
+        + '</div><div id="blank-result-' + i + '" style="font-size:0.78rem;margin-top:4px;min-height:16px"></div>'
+        + '</div>';
+    });
+    html += '</div></div>';
   }
 
-  // ── 3. Quiz from uploaded lesson ───────────────────────
+  // ── 4. Quiz ──────────────────────────────────────────────
   if (quiz.length) {
     var q = quiz[Math.floor(Math.random() * quiz.length)];
-    html += '<div style="background:rgba(156,39,176,0.06);border:1.5px solid rgba(156,39,176,0.2);border-radius:14px;padding:14px;margin-bottom:14px">'
-      + '<div style="font-weight:800;font-size:0.85rem;margin-bottom:12px;color:#9C27B0">❓ Practice Quiz</div>'
-      + '<div id="lab-quiz-q" style="font-size:0.88rem;font-weight:700;margin-bottom:12px;direction:ltr">' + q.q + '</div>'
-      + '<div style="display:flex;flex-direction:column;gap:7px">'
-      + (q.options||[]).map(function(opt,i) {
-          return '<button onclick="labCheckAnswer('+i+','+q.answer+',this,\'lab-quiz-expl\')" '
-            + 'style="padding:10px 14px;border-radius:10px;border:1.5px solid rgba(156,39,176,0.2);background:rgba(156,39,176,0.06);color:var(--text);font-family:var(--font);font-size:0.83rem;cursor:pointer;text-align:left;direction:ltr">'
-            + opt + '</button>';
-        }).join('')
-      + '</div>'
-      + '<div id="lab-quiz-expl" style="margin-top:10px;font-size:0.8rem;min-height:16px"></div>'
-    + '</div>';
+    html += '<div style="background:rgba(255,82,82,0.07);border:1.5px solid rgba(255,82,82,0.22);'
+      + 'border-radius:14px;padding:14px;margin-bottom:14px">'
+      + '<div style="font-weight:800;font-size:0.85rem;margin-bottom:10px;color:#FF5252;direction:rtl">❓ اختبر نفسك</div>'
+      + '<div style="font-size:0.88rem;font-weight:700;margin-bottom:12px;direction:ltr;color:var(--text)">' + q.q + '</div>'
+      + '<div style="display:flex;flex-direction:column;gap:7px">';
+    (q.options||[]).forEach(function(opt, i) {
+      html += '<button onclick="labCheckAnswer(' + i + ',' + q.answer + ',this,\'lab-quiz-expl\')" '
+        + 'style="padding:10px 14px;border-radius:10px;border:1.5px solid rgba(255,82,82,0.2);'
+        + 'background:rgba(255,82,82,0.06);color:var(--text);font-family:var(--font);'
+        + 'font-size:0.83rem;cursor:pointer;text-align:left;direction:ltr">' + opt + '</button>';
+    });
+    html += '</div><div id="lab-quiz-expl" style="margin-top:10px;font-size:0.8rem;direction:rtl;min-height:16px"></div>'
+      + '</div>';
   }
 
-  // ── 4. AI Conversation about the lesson ────────────────
-  html += '<div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:14px">'
-    + '<div style="font-weight:800;font-size:0.85rem;margin-bottom:10px;color:var(--primary)">🤖 Ask AI About This Lesson</div>'
-    + '<div id="eng-lab-chat-hist" style="min-height:80px;max-height:240px;overflow-y:auto;margin-bottom:10px;font-size:0.82rem;color:var(--text-muted);text-align:center;padding:10px">اسأل أي سؤال عن الدرس...</div>'
+  // ── 5. AI Chat about lesson ──────────────────────────────
+  html += '<div style="background:rgba(108,99,255,0.07);border:1.5px solid rgba(108,99,255,0.22);'
+    + 'border-radius:14px;padding:14px;margin-bottom:14px;direction:rtl">'
+    + '<div style="font-weight:800;font-size:0.85rem;margin-bottom:10px;color:var(--primary)">🤖 اسأل عن الدرس</div>'
+    + '<div id="eng-lab-chat-hist" style="min-height:60px;max-height:200px;overflow-y:auto;margin-bottom:10px;'
+    + 'font-size:0.82rem;color:var(--text-muted);text-align:center;padding:8px">اسأل أي سؤال...</div>'
     + '<div style="display:flex;gap:8px">'
-      + '<input id="eng-lab-chat-inp" placeholder="E.g. Explain the difference between..." style="flex:1;padding:9px;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text);font-family:var(--font);font-size:0.83rem;outline:none;direction:ltr">'
-      + '<button onclick="engLabAsk()" style="padding:9px 14px;border-radius:10px;border:none;background:var(--primary);color:white;font-weight:800;cursor:pointer;font-size:0.85rem">Ask</button>'
+    + '<input id="eng-lab-chat-inp" placeholder="E.g. Explain Present Simple..." '
+    + 'style="flex:1;padding:9px;border-radius:10px;border:1px solid var(--border);'
+    + 'background:rgba(255,255,255,0.05);color:var(--text);font-family:var(--font);font-size:0.83rem;outline:none;direction:ltr">'
+    + '<button onclick="engLabAsk()" style="padding:9px 14px;border-radius:10px;border:none;'
+    + 'background:var(--primary);color:white;font-weight:800;cursor:pointer">Ask</button>'
     + '</div>'
-    + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">'
-    + ['Explain this topic simply', 'Give me 3 examples', 'Quiz me on this', 'What are the key rules?'].map(function(q){
-        return '<button onclick="document.getElementById(\'eng-lab-chat-inp\').value=\''+q+'\'" style="padding:4px 8px;border-radius:7px;border:1px solid var(--border);background:rgba(255,255,255,0.04);color:var(--text-muted);font-size:0.7rem;cursor:pointer">'+q+'</button>';
-      }).join('')
-    + '</div>'
-  + '</div>';
+    + '<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:8px">';
+  ['Translate this', 'Give grammar examples', 'Quiz me', 'What is the main idea?'].forEach(function(q_text) {
+    html += '<button onclick="document.getElementById(\'eng-lab-chat-inp\').value=\'' + q_text + '\'" '
+      + 'style="padding:4px 8px;border-radius:7px;border:1px solid var(--border);background:rgba(255,255,255,0.04);'
+      + 'color:var(--text-muted);font-size:0.7rem;cursor:pointer">' + q_text + '</button>';
+  });
+  html += '</div></div>';
+
+  // ── 6. Summary ───────────────────────────────────────────
+  if (summary) {
+    html += '<div style="background:rgba(255,255,255,0.04);border:1px solid var(--border);'
+      + 'border-radius:12px;padding:12px;direction:rtl">'
+      + '<div style="font-weight:800;font-size:0.82rem;margin-bottom:6px;color:var(--text-muted)">📝 الملخص</div>'
+      + '<div style="font-size:0.83rem;line-height:1.8;color:var(--text)">' + summary + '</div>'
+      + '</div>';
+  }
 
   return html;
 }
+
 
 function engLabSwitchLesson(idx) {
   var uploads = ZAD_UPLOADS.getAll().filter(function(u){ return u.subjectId==='english' && u.lesson; });

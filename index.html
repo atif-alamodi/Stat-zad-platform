@@ -11073,9 +11073,10 @@ LANGUAGE RULES:
     const jsonTemplateEN = "{\n  \"lessonTitle\": \"Accurate English Title\",\n  \"definition\": \"Arabic explanation (4-6 simple sentences)\",\n  \"whyLearn\": [\"Arabic importance 1\", \"Importance 2\", \"Importance 3\"],\n  \"keyTerms\": [{\"term\":\"English Term\",\"def\":\"Arabic definition\"},{\"term\":\"Term 2\",\"def\":\"def\"},{\"term\":\"Term 3\",\"def\":\"def\"},{\"term\":\"Term 4\",\"def\":\"def\"},{\"term\":\"Term 5\",\"def\":\"def\"}],\n  \"examples\": [{\"icon\":\"💡\",\"title\":\"English Example 1\",\"content\":\"Arabic explanation\"},{\"icon\":\"📌\",\"title\":\"Example 2\",\"content\":\"explanation\"},{\"icon\":\"🔍\",\"title\":\"Example 3\",\"content\":\"explanation\"}],\n  \"steps\": [\"Arabic point 1\",\"Point 2\",\"Point 3\",\"Point 4\",\"Point 5\"],\n  \"properties\": [\"Arabic property 1\",\"Property 2\",\"Property 3\"],\n  \"types\": [\"Arabic type 1\",\"Type 2\",\"Type 3\"],\n  \"mindMapBranches\": [{\"label\":\"Branch 1\",\"color\":\"#6C63FF\",\"children\":[\"Sub 1\",\"Sub 2\",\"Sub 3\"]},{\"label\":\"Branch 2\",\"color\":\"#FF6584\",\"children\":[\"Sub 1\",\"Sub 2\",\"Sub 3\"]},{\"label\":\"Branch 3\",\"color\":\"#00BFA5\",\"children\":[\"Sub 1\",\"Sub 2\"]},{\"label\":\"Branch 4\",\"color\":\"#FFD600\",\"children\":[\"Sub 1\",\"Sub 2\"]}],\n  \"quiz\": [{\"q\":\"Question 1 in English?\",\"options\":[\"Correct answer\",\"Wrong 1\",\"Wrong 2\",\"Wrong 3\"],\"answer\":0,\"hint\":\"English hint\",\"explanation\":\"Arabic explanation of correct answer\"},{\"q\":\"Question 2?\",\"options\":[\"Correct\",\"Wrong 1\",\"Wrong 2\",\"Wrong 3\"],\"answer\":0,\"hint\":\"Hint\",\"explanation\":\"Arabic explanation\"},{\"q\":\"Question 3?\",\"options\":[\"Correct\",\"Wrong 1\",\"Wrong 2\",\"Wrong 3\"],\"answer\":0,\"hint\":\"Hint\",\"explanation\":\"Arabic explanation\"},{\"q\":\"Question 4?\",\"options\":[\"Correct\",\"Wrong 1\",\"Wrong 2\",\"Wrong 3\"],\"answer\":0,\"hint\":\"Hint\",\"explanation\":\"Arabic explanation\"},{\"q\":\"Question 5?\",\"options\":[\"Correct\",\"Wrong 1\",\"Wrong 2\",\"Wrong 3\"],\"answer\":0,\"hint\":\"Hint\",\"explanation\":\"Arabic explanation\"}],\n  \"summary\": \"Arabic summary\"\n}";
 
     // Compact template for CF Workers AI (fits within 2048 token limit)
+    // Ultra-compact template fits within 1024 tokens output limit
     const jsonTemplateCompact = isEng
-      ? '{"lessonTitle":"string","definition":"2-3 sentences","keyTerms":[{"term":"t1","def":"d1"},{"term":"t2","def":"d2"},{"term":"t3","def":"d3"}],"steps":["step1","step2","step3","step4"],"quiz":[{"q":"Q1?","options":["correct","wrong1","wrong2","wrong3"],"answer":0,"explanation":"why"},{"q":"Q2?","options":["correct","wrong1","wrong2","wrong3"],"answer":0,"explanation":"why"},{"q":"Q3?","options":["correct","wrong1","wrong2","wrong3"],"answer":0,"explanation":"why"}],"summary":"1-2 sentences"}'
-      : '{"lessonTitle":"عنوان الدرس","definition":"2-3 جمل","keyTerms":[{"term":"م1","def":"تعريف1"},{"term":"م2","def":"تعريف2"},{"term":"م3","def":"تعريف3"}],"steps":["خطوة1","خطوة2","خطوة3","خطوة4"],"quiz":[{"q":"سؤال1؟","options":["صواب","خطأ1","خطأ2","خطأ3"],"answer":0,"explanation":"شرح"},{"q":"سؤال2؟","options":["صواب","خطأ1","خطأ2","خطأ3"],"answer":0,"explanation":"شرح"},{"q":"سؤال3؟","options":["صواب","خطأ1","خطأ2","خطأ3"],"answer":0,"explanation":"شرح"}],"summary":"ملخص قصير"}';
+      ? '{"lessonTitle":"string","definition":"2 sentences","keyTerms":[{"term":"T1","def":"D1"},{"term":"T2","def":"D2"}],"steps":["s1","s2","s3"],"quiz":[{"q":"Q?","options":["A","B","C","D"],"answer":0,"explanation":"E"},{"q":"Q2?","options":["A","B","C","D"],"answer":0,"explanation":"E"}],"summary":"1 sentence"}'
+      : '{"lessonTitle":"العنوان","definition":"جملتان","keyTerms":[{"term":"م1","def":"ت1"},{"term":"م2","def":"ت2"}],"steps":["خ1","خ2","خ3"],"quiz":[{"q":"س؟","options":["أ","ب","ج","د"],"answer":0,"explanation":"ش"},{"q":"س2؟","options":["أ","ب","ج","د"],"answer":0,"explanation":"ش"}],"summary":"ملخص"}';
     const jsonTemplate = isEng ? jsonTemplateEN : jsonTemplateAR;
 
     // ── STEP 2: Process each topic/lesson ─────────────────────
@@ -11102,8 +11103,8 @@ LANGUAGE RULES:
         try {
           const resp = await zadFetch({
             model: 'llama-3.1-8b-instant',
-            max_tokens: 1800,
-            system: 'Educational extractor. Reply with valid JSON only. No markdown. Be concise.',
+            max_tokens: 1024,
+            system: 'JSON only. No markdown.',
             messages: [{ role: 'user', content: topicPrompt }]
           });
           const data = await resp.json();
@@ -11166,8 +11167,8 @@ LANGUAGE RULES:
         try {
           const resp = await zadFetch({
             model: 'llama-3.1-8b-instant',
-            max_tokens: 1800,
-            system: 'Educational extractor. Reply with valid JSON only. No markdown. Be concise.',
+            max_tokens: 1024,
+            system: 'JSON only. No markdown.',
             messages: [{ role: 'user', content: prompt }]
           });
           const data = await resp.json();

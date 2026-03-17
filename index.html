@@ -7358,7 +7358,7 @@ function _engPopulatePanel(tab) {
         var def  = k.def  || k.definition || '';
         html += '<div style="background:rgba(33,150,243,0.08);border:1px solid rgba(33,150,243,0.2);'
           + 'border-radius:11px;padding:12px;cursor:pointer" '
-          + 'onclick="this.querySelector('.kdef').style.display=this.querySelector('.kdef').style.display==='none'?'block':'none'">'
+          + 'onclick="var d=this.querySelector(\'.kdef\');d.style.display=d.style.display===\'none\'?\'block\':\'none\'">' 
           + '<div style="font-weight:700;color:#42A5F5;font-size:0.92rem;direction:ltr">' + (i+1) + '. ' + term + '</div>'
           + '<div class="kdef" style="display:none;font-size:0.83rem;color:var(--text-muted);margin-top:6px;padding-top:6px;'
           + 'border-top:1px solid rgba(255,255,255,0.08);direction:rtl">' + def + '</div>'

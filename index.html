@@ -13890,10 +13890,23 @@ const ZAD_SYNC = {
     return (APP.student && APP.student.email) || null;
   },
 
+  _lastPushed: {},
   // ── Generic data save (notes, bookmarks, progress, etc) ──
   async push(key, value) {
     const email = this.email();
     if (!email) return;
+    // De-duplicate: skip if same value was saved in last 5 minutes
+    var cacheKey = email + '_' + key;
+    var serialized = JSON.stringify(value);
+    var now = Date.now();
+    if (this._lastPushed[cacheKey]) {
+      var last = this._lastPushed[cacheKey];
+      if (last.val === serialized && now - last.ts < 5 * 60 * 1000) {
+        console.log('[ZAD_SYNC] Skip duplicate push:', key);
+        return;
+      }
+    }
+    this._lastPushed[cacheKey] = { val: serialized, ts: now };
     try {
       await fetch(this._base + '/data/save', {
         method: 'POST',
@@ -13918,7 +13931,9 @@ const ZAD_SYNC = {
   // ── Debounced push (avoid too many requests) ──
   schedule(key, value, delayMs) {
     clearTimeout(this._timers[key]);
-    this._timers[key] = setTimeout(() => this.push(key, value), delayMs || 2000);
+    // Minimum 30s debounce to reduce KV writes (free tier: 1000/day)
+    var actualDelay = Math.max(30000, delayMs || 30000);
+    this._timers[key] = setTimeout(() => this.push(key, value), actualDelay);
   },
 
   // ── Upload files sync ──
@@ -14067,9 +14082,16 @@ function _mergeArraysById(arr1, arr2) {
 
 
 
+var _lastCloudSave = 0;
 async function cloudSaveStudent() {
   const email = APP.student.email;
   if (!email) return;
+  // Throttle: max 1 KV write per 10 minutes per student
+  var now = Date.now();
+  if (now - _lastCloudSave < 10 * 60 * 1000) {
+    return; // Skip — too soon
+  }
+  _lastCloudSave = now;
   try {
     fetch(ZAD_WORKER_BASE + '/student/save', {
       method: 'POST',
@@ -23960,7 +23982,7 @@ function startPresencePing() {
   clearInterval(_pingInterval);
   _pingInterval = setInterval(function() {
     pingWorker(window._currentTab || 'لوحة التحكم');
-  }, 2 * 60 * 1000);
+  }, 15 * 60 * 1000); // 15 min — reduces KV writes
 }
 
 // Stop pinging on logout

@@ -22501,88 +22501,102 @@ async function zadFetch(body) {
 
   // ── Build OpenAI-format message array ──────────────────────
   var messages = [];
-  if (body.system) messages.push({ role: 'system', content: body.system });
+  if (body.system) messages.push({ role:'system', content:body.system });
   var userContent = (body.messages && body.messages[0]) ? body.messages[0].content : '';
   if (Array.isArray(userContent)) {
     var txtParts = userContent.filter(function(p){ return p.type==='text'; });
     var imgParts = userContent.filter(function(p){ return p.type==='image'; });
     if (imgParts.length) {
       var parts2 = imgParts.map(function(img){
-        return { type:'image_url', image_url:{ url:'data:'+img.source.media_type+';base64,'+img.source.data } };
+        return {type:'image_url',image_url:{url:'data:'+img.source.media_type+';base64,'+img.source.data}};
       });
-      txtParts.forEach(function(t){ parts2.push({ type:'text', text:t.text }); });
-      messages.push({ role:'user', content: parts2 });
+      txtParts.forEach(function(t){ parts2.push({type:'text',text:t.text}); });
+      messages.push({role:'user',content:parts2});
     } else {
-      messages.push({ role:'user', content: txtParts.map(function(t){return t.text;}).join('\n') });
+      messages.push({role:'user',content:txtParts.map(function(t){return t.text;}).join('\n')});
     }
   } else {
-    messages.push({ role:'user', content: userContent });
+    messages.push({role:'user',content:userContent});
   }
 
-  var hasImage = Array.isArray(userContent) && userContent.some(function(p){ return p.type==='image'; });
-  var model    = body.model || (hasImage ? 'meta-llama/llama-4-scout-17b-16e-instruct' : 'llama-3.3-70b-versatile');
-  var payload  = { model: model, messages: messages, max_tokens: body.max_tokens||4000, temperature: 0.1 };
+  var hasImage = Array.isArray(userContent) && userContent.some(function(p){return p.type==='image';});
+  var model    = body.model || (hasImage?'meta-llama/llama-4-scout-17b-16e-instruct':'llama-3.3-70b-versatile');
 
-  // ── Helper: parse response into standard format ────────────
-  function parseGroqResp(data) {
-    if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
-    var txt = (data.content && data.content[0] && data.content[0].text)
-           || (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content)
-           || '';
-    return { status:200, json: async function(){ return { content:[{ type:'text', text:txt }] }; } };
+  // ── Helper: parse any AI response to standard format ───────
+  function makeResult(text) {
+    return { status:200, json: async function(){ return {content:[{type:'text',text:text}]}; } };
   }
 
-  // ── Attempt 1: Worker proxy ────────────────────────────────
+  // ── ATTEMPT 1: Pollinations (free, no key, CORS-friendly) ──
+  try {
+    var pollResp = await fetch('https://text.pollinations.ai/', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        model:'openai',
+        messages: messages,
+        seed: Math.floor(Math.random()*99999)
+      }),
+      signal: AbortSignal.timeout ? AbortSignal.timeout(45000) : undefined
+    });
+    if (pollResp.ok) {
+      var pollText = await pollResp.text();
+      if (pollText && pollText.length > 5) {
+        console.log('[ZAD] Pollinations ✓ (' + pollText.length + ' chars)');
+        return makeResult(pollText);
+      }
+    }
+    console.warn('[ZAD] Pollinations empty/bad:', pollResp.status);
+  } catch(pollErr) {
+    console.warn('[ZAD] Pollinations failed:', pollErr.message);
+  }
+
+  // ── ATTEMPT 2: Direct GROQ (admin-saved key) ───────────────
+  if (DIRECT_KEY && DIRECT_KEY.startsWith('gsk_')) {
+    var groqModels = ['llama-3.1-8b-instant','llama-3.3-70b-versatile'];
+    for (var mi=0; mi<groqModels.length; mi++) {
+      try {
+        var gPayload = {model:groqModels[mi],messages:messages,max_tokens:body.max_tokens||4000,temperature:0.1};
+        var gResp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method:'POST',
+          headers:{'Content-Type':'application/json','Authorization':'Bearer '+DIRECT_KEY},
+          body:JSON.stringify(gPayload)
+        });
+        if (gResp.status===429){await new Promise(function(r){setTimeout(r,800);});continue;}
+        if (gResp.status===401||gResp.status===403) break; // bad key, don't retry
+        if (!gResp.ok) continue;
+        var gData = await gResp.json();
+        if (gData.error) continue;
+        var gText = (gData.choices&&gData.choices[0]&&gData.choices[0].message&&gData.choices[0].message.content)||'';
+        if (gText) { console.log('[ZAD] GROQ direct ✓'); return makeResult(gText); }
+      } catch(gErr) { console.warn('[ZAD] GROQ direct failed:', gErr.message); }
+    }
+  }
+
+  // ── ATTEMPT 3: Worker proxy ─────────────────────────────────
   if (BACKEND_URL && !BACKEND_URL.includes('YOUR_NAME')) {
     try {
-      var wResp = await fetch(BACKEND_URL + '/ai', {
-        method: 'POST', headers: { 'Content-Type':'application/json' },
-        body: JSON.stringify(payload)
+      var wResp = await fetch(BACKEND_URL+'/ai', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({model:model,messages:messages,max_tokens:body.max_tokens||4000})
       });
       if (wResp.ok) {
         var wData = await wResp.json();
-        // Check for all_models_failed (GROQ key issue on worker)
-        if (!wData.error || wData.error !== 'all_models_failed') {
-          return parseGroqResp(wData);
+        if (!wData.error) {
+          var wText=(wData.content&&wData.content[0]&&wData.content[0].text)||'';
+          if (wText) { console.log('[ZAD] Worker ✓'); return makeResult(wText); }
         }
-        console.warn('[ZAD] Worker returned all_models_failed — trying direct fallback');
       }
-    } catch(wErr) {
-      console.warn('[ZAD] Worker failed:', wErr.message, '— trying direct GROQ');
-    }
+    } catch(wErr) { console.warn('[ZAD] Worker failed:', wErr.message); }
   }
 
-  // ── Attempt 2: Direct GROQ (using admin-saved key) ─────────
-  if (DIRECT_KEY && DIRECT_KEY.startsWith('gsk_')) {
-    var FALLBACK_MODELS = [
-      'llama-3.1-8b-instant',       // fastest, most available
-      'llama-3.3-70b-versatile',
-      'meta-llama/llama-4-scout-17b-16e-instruct'
-    ];
-    for (var mi = 0; mi < FALLBACK_MODELS.length; mi++) {
-      try {
-        var dPayload = Object.assign({}, payload, { model: FALLBACK_MODELS[mi] });
-        var dResp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-          method: 'POST',
-          headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+DIRECT_KEY },
-          body: JSON.stringify(dPayload)
-        });
-        if (dResp.status === 429) { await new Promise(function(r){setTimeout(r,500);}); continue; }
-        if (!dResp.ok) { var dE=await dResp.json().catch(function(){return{};}); continue; }
-        var dData = await dResp.json();
-        if (!dData.error) return parseGroqResp(dData);
-      } catch(dErr) { console.warn('[ZAD] Direct GROQ model', FALLBACK_MODELS[mi], 'failed:', dErr.message); }
-    }
-  }
-
-  // ── Both failed ────────────────────────────────────────────
-  if (isAdmin && isAdmin()) {
-    var msg = DIRECT_KEY
-      ? '❌ مفتاح GROQ غير صالح — حدّثه من لوحة الإدارة ← إعدادات'
-      : '❌ أدخل مفتاح GROQ من لوحة الإدارة ← إعدادات (مجاني من groq.com)';
-    showToast(msg, 'error');
+  // ── All failed ─────────────────────────────────────────────
+  if (typeof isAdmin === 'function' && isAdmin()) {
+    showToast(DIRECT_KEY
+      ? '❌ مفتاح GROQ غير صالح — حدّثه من لوحة الإدارة'
+      : '❌ أدخل مفتاح GROQ الجديد من لوحة الإدارة (مجاني من groq.com)', 'error');
   } else {
-    showToast('❌ خدمة الذكاء الاصطناعي غير متاحة حالياً — تواصل مع المشرف', 'error');
+    showToast('❌ خدمة الذكاء الاصطناعي غير متاحة مؤقتاً — أعد المحاولة', 'error');
   }
   throw new Error('AI_SERVICE_UNAVAILABLE');
 }

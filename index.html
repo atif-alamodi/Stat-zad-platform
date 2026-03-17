@@ -8678,6 +8678,7 @@ async function processUploadedFile(file, subjectId) {
   const vidExts = ['mp4','mov','avi','mkv','webm','flv','wmv','m4v','3gp'];
   const audioExts = ['mp3','wav','ogg','m4a','aac','flac','wma'];
 
+  console.log('[ZAD-DEBUG] processUploadedFile START:', file.name, file.size, 'bytes', 'ext:', file.name.split('.').pop());
   showUploadStatus('loading', `⏳ جاري قراءة "${file.name}"...`);
 
   try {
@@ -8766,6 +8767,7 @@ async function processUploadedFile(file, subjectId) {
       return;
     }
 
+    console.log('[ZAD-DEBUG] Text extracted:', text.length, 'chars, first 100:', text.slice(0,100));
     showUploadStatus('loading', `📖 قُرئ ${text.length.toLocaleString()} حرف — الذكاء الاصطناعي يحلّل...`);
     await analyzeAndGenerate(text, subjectId, file.name);
 
@@ -11883,7 +11885,9 @@ async function analyzeAndGenerate(text, subjectId, fileName) {
     clean = clean.replace(/شكراً?\s*لكم/g, '');
     // Collapse multiple blank lines
     clean = clean.replace(/\n{3,}/g, '\n\n').trim();
-    console.log('[ZAD] text length:', text.length, 'clean:', clean.length, 'subjectId:', subjectId);
+    console.log('[ZAD-DEBUG] analyzeAndGenerate START — text:', text.length, 'clean:', clean.length, 'subject:', subjectId);
+    console.log('[ZAD-DEBUG] text sample:', clean.slice(0,200));
+    console.log('[ZAD-DEBUG] text.length:', text.length, 'clean:', clean.length, 'subjectId:', subjectId);
     // Detect language from the actual text content, not just subjectId
     const _enSubjects = ['english', 'elg201', 'elg101', 'communication'];
     const _arabicChars = (clean.match(/[\u0600-\u06FF]/g) || []).length;
@@ -12107,6 +12111,8 @@ LANGUAGE RULES:
           const text = (data.content && data.content[0] && data.content[0].text) || '';
           console.log('[ZAD] chunk', ci, 'got text length:', text.length, 'preview:', text.slice(0,100));
           parsed = sanitizeLesson(repairAndParseJSON(text.trim()));
+          console.log('[ZAD-DEBUG] chunk', ci, 'parsed:', !!parsed, parsed ? Object.keys(parsed) : 'null');
+          if (!parsed) console.warn('[ZAD-DEBUG] JSON parse FAILED. Raw text was:', text ? text.slice(0,300) : 'EMPTY');
           console.log('[ZAD] chunk', ci, 'parsed:', !!parsed);
         } catch(fetchErr) {
           console.warn('Chunk', ci, 'failed:', fetchErr.message);
@@ -12114,6 +12120,7 @@ LANGUAGE RULES:
         if (parsed) allResults.push(parsed);
       }
 
+      console.log('[ZAD-DEBUG] allResults count:', allResults.length);
       if (!allResults.length) {
         // Fallback: try one more time with simplified prompt
         upd('🔄', 'إعادة المحاولة بطريقة مختلفة...', 85);
@@ -22561,23 +22568,37 @@ async function zadFetch(body) {
 
   // ── ATTEMPT 1: Worker proxy (Cloudflare Workers AI — handles large requests) ──
   if (BACKEND_URL && !BACKEND_URL.includes('YOUR_NAME')) {
+    console.log('[ZAD-DEBUG] zadFetch START — BACKEND_URL:', BACKEND_URL, 'msg count:', messages.length);
+    console.log('[ZAD-DEBUG] First message preview:', JSON.stringify(messages[0]).slice(0,100));
     try {
+      console.log('[ZAD-DEBUG] Attempt 1: Worker at', BACKEND_URL + '/ai');
       var wResp = await fetch(BACKEND_URL + '/ai', {
         method: 'POST', headers: {'Content-Type':'application/json'},
         body: JSON.stringify({model:model, messages:messages, max_tokens:body.max_tokens||4000}),
         signal: AbortSignal.timeout ? AbortSignal.timeout(50000) : undefined
       });
+      console.log('[ZAD-DEBUG] Worker response status:', wResp.status, wResp.statusText);
       if (wResp.ok) {
         var wData = await wResp.json();
+        console.log('[ZAD-DEBUG] Worker response data:', JSON.stringify(wData).slice(0,300));
         if (!wData.error || wData.content) {
           var wText=(wData.content&&wData.content[0]&&wData.content[0].text)||'';
+          console.log('[ZAD-DEBUG] Worker text length:', wText.length, 'preview:', wText.slice(0,100));
           if (wText && wText.length>5) {
             console.log('[ZAD] Worker ✓ (' + wData.source + ')');
             return makeResult(wText);
+          } else {
+            console.warn('[ZAD-DEBUG] Worker text empty or too short!');
           }
+        } else {
+          console.warn('[ZAD-DEBUG] Worker error:', wData.error);
         }
+      } else {
+        console.warn('[ZAD-DEBUG] Worker HTTP error:', wResp.status);
       }
-    } catch(wErr) { console.warn('[ZAD] Worker failed:', wErr.message); }
+    } catch(wErr) {
+      console.error('[ZAD-DEBUG] Worker EXCEPTION:', wErr.message, wErr.stack);
+    }
   }
 
   // ── ATTEMPT 2: Pollinations (free, no key, CORS-friendly) ──

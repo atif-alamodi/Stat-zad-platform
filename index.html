@@ -3208,7 +3208,6 @@ function elabXlAddCol(){if(_exlCols<ELAB_XL_COLS.length){_exlCols++;elabXlRender
 function elabXlClear(){_exlData={};_exlStyles={};elabXlRender();const s=document.getElementById('elab-xl-stats');if(s)s.innerHTML='';const cw=document.getElementById('elab-xl-chart-wrap');if(cw)cw.style.display='none';const fb=document.getElementById('elab-xl-feedback');if(fb)fb.innerHTML='';}
 
 
-
 function elabXlValidate(){
   const fb = document.getElementById('elab-xl-feedback');
   if(!fb) return;
@@ -3351,25 +3350,7 @@ function getXlFormulaHint(formula, computed, isError){
   return 'راجع كتابة الصيغة — تأكد من الأقواس والفاصلة';
 }
 
-function elabXlChart(){
-  let lblCol=-1, numCol=-1;
-  for(let c=1;c<=_exlCols;c++){const v=_exlData[`2_${c}`];if(v&&typeof v==='string'&&!v.startsWith('=')&&isNaN(v)){lblCol=c;break;}}
-  for(let c=1;c<=_exlCols;c++){if(elabXlGetNum(`2_${c}`)!==null){numCol=c;break;}}
-  const labels=[],data=[];
-  for(let r=2;r<=_exlRows;r++){
-    const lbl=lblCol>=1?(String(_exlData[`${r}_${lblCol}`]||`صف${r}`)): `صف${r}`;
-    const val=numCol>=1?elabXlGetNum(`${r}_${numCol}`):null;
-    if(val!==null&&lbl){labels.push(lbl);data.push(val);}
-  }
-  if(!data.length) return;
-  const cw=document.getElementById('elab-xl-chart-wrap'), cv=document.getElementById('elab-xl-chart');
-  if(!cw||!cv) return;
-  cw.style.display='block';
-  if(_exlChartInst){_exlChartInst.destroy();_exlChartInst=null;}
-  const ctx=cv.getContext('2d');
-  const COLORS=['#6C63FF','#00BFA5','#FF7043','#FFD600','#FF5252','#28CA41','#3776AB'];
-  _exlChartInst=new Chart(ctx,{type:'bar',data:{labels,datasets:[{label:'القيم',data,backgroundColor:COLORS.slice(0,data.length),borderRadius:8}]},options:{responsive:true,plugins:{legend:{display:false},title:{display:true,text:'الرسم البياني',font:{size:15}}},scales:{y:{beginAtZero:true}}}});
-}
+
 
 // Formula hint in feedback bar
 function _elabXlShowFormulaHint(key, formula) {
@@ -6142,7 +6123,6 @@ const VOCAB_CARDS = [
 
 let _vocabIdx = 0, _vocabFlipped = false;
 
-/* [dup removed: engInitVocab] */
 
 function engRenderVocab() {
   const el = document.getElementById('eng-vocab-content');
@@ -6668,7 +6648,6 @@ ${lessonRef || 'تصحيح عام بدون درس محدد.'}
         messages: [{ role:'user', content:`إجابة الطالب:\n${answer}` }]
       });
     
-    if (!response.ok) throw new Error('API error');
     const data = await response.json();
     const text = data.content?.[0]?.text || '';
     
@@ -6731,7 +6710,6 @@ async function submitHomeworkWithImage(subjectId, base64, mediaType) {
           }]
         }]
       });
-    if (!response.ok) throw new Error('API error');
     const data = await response.json();
     const text = data.content?.[0]?.text || '';
     if (out) out.innerHTML = `
@@ -6921,8 +6899,6 @@ function buildEnhancedMindMapFull(mm, lessonTitle) {
   var cloned = Object.assign({}, mm, { branches: original });
   return buildEnhancedMindMap(cloned, lessonTitle);
 }
-
-
 
 
 function buildAdaptiveDashboard(subjectId) {
@@ -7164,9 +7140,8 @@ async function loadAdaptiveRecommendations(subjectId) {
       });
     clearTimeout(timeout);
 
-    if (!response.ok) throw new Error('API ' + response.status);
     const data = await response.json();
-    const text = data.content?.[0]?.text || '';
+    const text = (data.content && data.content[0] && data.content[0].text) || '';
     if (!text.trim()) throw new Error('empty');
 
     renderRecommendations(el, text, overallPct, true);
@@ -8970,7 +8945,6 @@ async function processUploadedFile(file, subjectId) {
   const vidExts = ['mp4','mov','avi','mkv','webm','flv','wmv','m4v','3gp'];
   const audioExts = ['mp3','wav','ogg','m4a','aac','flac','wma'];
 
-  console.log('[ZAD-DEBUG] processUploadedFile START:', file.name, file.size, 'bytes', 'ext:', file.name.split('.').pop());
   showUploadStatus('loading', `⏳ جاري قراءة "${file.name}"...`);
 
   try {
@@ -9059,7 +9033,6 @@ async function processUploadedFile(file, subjectId) {
       return;
     }
 
-    console.log('[ZAD-DEBUG] Text extracted:', text.length, 'chars, first 100:', text.slice(0,100));
     showUploadStatus('loading', `📖 قُرئ ${text.length.toLocaleString()} حرف — الذكاء الاصطناعي يحلّل...`);
     await analyzeAndGenerate(text, subjectId, file.name);
 
@@ -9226,9 +9199,6 @@ async function generateLessonWithAI(text, subjectId, title, subject) {
         }]
       });
 
-    if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
-    }
 
     updateStep('📊', 'معالجة الاستجابة...', 70);
     const data = await response.json();
@@ -9531,7 +9501,6 @@ function renderAutoSummary(text, subjectId) {
     </div>`;
 }
 
-/* [dup removed: showUploadStatus] */
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
@@ -10096,7 +10065,6 @@ function makeTypeCardClickable(html, types, colors) {
   return html;
 }
 
-/* [dup removed: buildInfoCards] */
 
 function toggleInfoCard(uid) {
   // Track card viewed
@@ -10235,7 +10203,6 @@ document.addEventListener('click', function(e) {
   }
 });
 
-/* [dup removed: openTypeCardModal] */
 
 function injectAllMindMaps() {
 
@@ -11262,9 +11229,6 @@ async function analyzeAndGenerate(text, subjectId, fileName) {
     clean = clean.replace(/شكراً?\s*لكم/g, '');
     // Collapse multiple blank lines
     clean = clean.replace(/\n{3,}/g, '\n\n').trim();
-    console.log('[ZAD-DEBUG] analyzeAndGenerate START — text:', text.length, 'clean:', clean.length, 'subject:', subjectId);
-    console.log('[ZAD-DEBUG] text sample:', clean.slice(0,200));
-    console.log('[ZAD-DEBUG] text.length:', text.length, 'clean:', clean.length, 'subjectId:', subjectId);
     // Detect language from the actual text content, not just subjectId
     const _enSubjects = ['english', 'elg201', 'elg101', 'communication'];
     const _arabicChars = (clean.match(/[\u0600-\u06FF]/g) || []).length;
@@ -11421,8 +11385,7 @@ LANGUAGE FORMAT:
           const text = (data.content && data.content[0] && data.content[0].text) || '';
           console.log('[ZAD] chunk', ci, 'got text length:', text.length, 'preview:', text.slice(0,100));
           parsed = sanitizeLesson(repairAndParseJSON(text.trim()));
-          console.log('[ZAD-DEBUG] chunk', ci, 'parsed:', !!parsed, parsed ? Object.keys(parsed) : 'null');
-          if (!parsed) console.warn('[ZAD-DEBUG] JSON parse FAILED. Raw text was:', text ? text.slice(0,300) : 'EMPTY');
+          if (!parsed) console.warn('JSON parse FAILED. Raw text was:', text ? text.slice(0,300) : 'EMPTY');
           console.log('[ZAD] chunk', ci, 'parsed:', !!parsed);
         } catch(fetchErr) {
           console.warn('Chunk', ci, 'failed:', fetchErr.message);
@@ -11433,7 +11396,6 @@ LANGUAGE FORMAT:
       const chunkResults = await Promise.all(chunkPromises);
       chunkResults.filter(Boolean).forEach(r => allResults.push(r));
 
-      console.log('[ZAD-DEBUG] allResults count:', allResults.length);
       if (!allResults.length) {
         // Fallback: try one more time with simplified prompt
         upd('🔄', 'إعادة المحاولة بطريقة مختلفة...', 85);
@@ -11758,6 +11720,8 @@ function buildStatChip(icon, label, count) {
   --success: #00E676;
   --warning: #FFD600;
   --error: #FF5252;
+  --danger: #FF5252;
+  --surface: rgba(255,255,255,0.04);
   --font: 'Cairo', 'Tajawal', sans-serif;
   --radius: 20px;
   --shadow: 0 20px 60px rgba(0,0,0,0.3);
@@ -13779,7 +13743,7 @@ table { display: block; overflow-x: auto; max-width: 100%; }
 
           <button onclick="addXlRow()" style="padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text);font-family:var(--font);font-size:0.82rem;cursor:pointer;">+ صف</button>
           <button onclick="addXlCol()" style="padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.05);color:var(--text);font-family:var(--font);font-size:0.82rem;cursor:pointer;">+ عمود</button>
-          <button onclick="xlChart()" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(232,160,32,0.4);background:rgba(232,160,32,0.1);color:#E8A020;font-family:var(--font);font-size:0.82rem;cursor:pointer;font-weight:600;">📊 رسم بياني</button>
+          <button onclick="elabXlChart()" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(232,160,32,0.4);background:rgba(232,160,32,0.1);color:#E8A020;font-family:var(--font);font-size:0.82rem;cursor:pointer;font-weight:600;">📊 رسم بياني</button>
           <button onclick="clearXl()" style="padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:rgba(255,82,82,0.07);color:#FF5252;font-family:var(--font);font-size:0.82rem;cursor:pointer;">🗑️ مسح</button>
         </div>
 
@@ -14104,7 +14068,6 @@ function _mergeArraysById(arr1, arr2) {
   });
   return Object.values(map);
 }
-
 
 
 var _lastCloudSave = 0;
@@ -20178,7 +20141,6 @@ function renderXl() {
   updateXlResults();
 }
 
-/* [dup removed: escHtml] */
 
 function xlDisplayVal(val) {
   if (val === undefined || val === null || val === '') return '';
@@ -21980,36 +21942,30 @@ async function zadFetch(body) {
 
   // ── ATTEMPT 1: Worker proxy (Cloudflare Workers AI — handles large requests) ──
   if (BACKEND_URL && !BACKEND_URL.includes('YOUR_NAME')) {
-    console.log('[ZAD-DEBUG] zadFetch START — BACKEND_URL:', BACKEND_URL, 'msg count:', messages.length);
-    console.log('[ZAD-DEBUG] First message preview:', JSON.stringify(messages[0]).slice(0,100));
     try {
-      console.log('[ZAD-DEBUG] Attempt 1: Worker at', BACKEND_URL + '/ai');
       var wResp = await fetch(BACKEND_URL + '/ai', {
         method: 'POST', headers: {'Content-Type':'application/json'},
         body: JSON.stringify({model:model, messages:messages, max_tokens:body.max_tokens||4000}),
         signal: AbortSignal.timeout ? AbortSignal.timeout(20000) : undefined
       });
-      console.log('[ZAD-DEBUG] Worker response status:', wResp.status, wResp.statusText);
       if (wResp.ok) {
         var wData = await wResp.json();
-        console.log('[ZAD-DEBUG] Worker response data:', JSON.stringify(wData).slice(0,300));
         if (!wData.error || wData.content) {
           var wText=(wData.content&&wData.content[0]&&wData.content[0].text)||'';
-          console.log('[ZAD-DEBUG] Worker text length:', wText.length, 'preview:', wText.slice(0,100));
           if (wText && wText.length>5) {
             console.log('[ZAD] Worker ✓ (' + wData.source + ')');
             return makeResult(wText);
           } else {
-            console.warn('[ZAD-DEBUG] Worker text empty or too short!');
+            console.warn('Worker text empty or too short!');
           }
         } else {
-          console.warn('[ZAD-DEBUG] Worker error:', wData.error);
+          console.warn('Worker error:', wData.error);
         }
       } else {
-        console.warn('[ZAD-DEBUG] Worker HTTP error:', wResp.status);
+        console.warn('Worker HTTP error:', wResp.status);
       }
     } catch(wErr) {
-      console.error('[ZAD-DEBUG] Worker EXCEPTION:', wErr.message, wErr.stack);
+      console.error('Worker EXCEPTION:', wErr.message, wErr.stack);
     }
   }
 
@@ -22387,7 +22343,6 @@ function quizGoBack() {
   var area = document.getElementById('ai-quiz-q-area');
   if (area) area.innerHTML = renderAIQuizQuestion();
 }
-
 
 
 function buildAIQuizResult() {
@@ -22891,13 +22846,11 @@ function updateApiBanner() {
 // ── Platform Key Loader ─────────────────────────────────────────
 window._ZAD_PLATFORM_KEY = '';
 
-/* [dup removed: loadPlatformKey] */
 
 loadPlatformKey();
 // Reload key every 10 minutes in case admin updates
 setInterval(loadPlatformKey, 600000);
 
-/* [dup removed: buildAdminPlatformKeySection] */
 
 function adminDownloadConfig() {
   var key = document.getElementById('admin-platform-key-inp')?.value?.trim() || '';
@@ -23112,7 +23065,6 @@ function setupAdminTopbarBtn() {
     +'font-size:0.8rem;font-weight:800;box-shadow:0 3px 10px rgba(255,107,53,0.4)';
   tb.insertBefore(btn, tb.firstChild);
 }
-
 
 
 // ── Admin Worker URL Management ────────────────────────────────
@@ -23762,7 +23714,6 @@ function buildBookmarksPanel() {
 }
 
 
-
 // ── ZAD AI Health Monitor ──────────────────────────────────────
 var _ZAD_AI_STATUS = { status:'UNKNOWN', providers:{}, primary:'?' };
 
@@ -24203,10 +24154,6 @@ document.addEventListener('visibilitychange', function() {
 // ── Long-press to delete AI lesson ─────────────────────────────
 var _lpTimer = null;
 
-// [removed duplicate] //
-
-// [removed duplicate] //
-
 
 // ══════════════════════════════════════════════════════════════
 // PER-STUDENT LESSON DELETION SYSTEM
@@ -24337,7 +24284,6 @@ restoreUserLessons = function() {
 
 
 // ── Delete entire chapter ─────────────────────────────────────
-// [removed duplicate] //
 
 function startChapterLongPress(e, subjectId, chapterId, chapterTitle) {
   clearLongPress();
@@ -26168,7 +26114,6 @@ async function buildAIQuizUIAsync(subject, subjectId) {
   if (area3) area3.innerHTML = renderAIQuizQuestion();
 }
 </script>
-
 
 
 <!-- ══ Python input() collector modal ══ -->

@@ -6423,6 +6423,31 @@ const ZAD_ADAPTIVE = {
             <span style="color:var(--text-muted)">${p.weakTopics.slice(0,3).join(' | ')}</span>
           </div>` : ''}
       </div>`;
+  },
+
+  // Reset adaptive learning profile
+  resetProfile() {
+    localStorage.removeItem('zad_adaptive_v2');
+    localStorage.removeItem('zad_quiz_history');
+    showToast('✅ تم إعادة ضبط بيانات التعلم', 'success');
+    // Refresh current view
+    var cur = window._currentTab || 'dashboard';
+    if (typeof showSection === 'function') showSection(cur);
+  },
+
+  // Set preferred learning style
+  setLearningStyle(styleId) {
+    const p = this.getProfile();
+    p.learningStyle = styleId;
+    localStorage.setItem('zad_adaptive_v2', JSON.stringify(p));
+    showToast('✅ تم حفظ أسلوب التعلم: ' + styleId, 'success');
+    // Re-render adaptive dashboard
+    const containers = document.querySelectorAll('[id$="-adaptive"]');
+    containers.forEach(function(el) {
+      if (el && typeof buildAdaptiveDashboard === 'function') {
+        el.innerHTML = buildAdaptiveDashboard(el.id.replace('-adaptive',''));
+      }
+    });
   }
 };
 
@@ -15101,6 +15126,7 @@ function openSidebar() {
   if (ov) { ov.style.display = 'block'; requestAnimationFrame(() => ov.classList.add('active')); }
 }
 
+var closeNav = null; // set to closeSidebar if needed
 function closeSidebar() {
   document.getElementById('sidebar').classList.remove('open');
   const ov = document.getElementById('sidebar-overlay');
@@ -15114,6 +15140,8 @@ function toggleSidebar() {
   const isOpen = document.getElementById('sidebar').classList.contains('open');
   isOpen ? closeSidebar() : openSidebar();
 }
+closeNav = closeSidebar; // alias
+
 
 function initDashboard() {
   // Restore uploaded lessons into CURRICULUM first

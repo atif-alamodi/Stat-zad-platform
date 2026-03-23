@@ -14945,14 +14945,36 @@ function buildLessonContentHTML(lesson, subject, chapter, subjectId, prev, next,
   }
 
   // ── Navigation ───────────────────────────────────────────
-  html += '<div style="display:flex;gap:8px;margin-top:20px;margin-bottom:80px">';
+  html += '<div style="display:flex;gap:8px;margin-top:20px">';
+  // ── زر السابق (يمين) ──────────────────────────────────────
   if (prev) {
-    html += '<button onclick="openLesson(\''+subjectId+'\',\''+prev.lesson.id+'\')" style="flex:1;padding:11px;border-radius:12px;border:1px solid var(--border);background:rgba(255,255,255,0.04);cursor:pointer;font-family:var(--font);font-weight:700;font-size:0.78rem;direction:rtl">→ '+(prev.lesson.title||'')+'</button>';
+    html += '<button onclick="openLesson(\''+subjectId+'\',\''+prev.lesson.id+'\')"'
+      + ' style="flex:1;padding:12px 14px;border-radius:12px;cursor:pointer;'
+      + 'font-family:var(--font);font-weight:700;font-size:0.8rem;direction:rtl;'
+      + 'background:rgba(255,255,255,0.08);border:1.5px solid rgba(255,255,255,0.15);'
+      + 'color:var(--text);text-align:right;display:flex;align-items:center;gap:6px">'
+      + '<span style="font-size:1rem">→</span>'
+      + '<span style="flex:1">'
+        + '<div style="font-size:0.65rem;color:var(--text-muted);margin-bottom:2px">السابق</div>'
+        + '<div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px">'+(prev.lesson.title||'')+'</div>'
+      + '</span>'
+      + '</button>';
   } else {
     html += '<div style="flex:1"></div>';
   }
+  // ── زر التالي (يسار) ───────────────────────────────────────
   if (next) {
-    html += '<button onclick="openLesson(\''+subjectId+'\',\''+next.lesson.id+'\')" style="flex:1;padding:11px;border-radius:12px;border:none;background:linear-gradient(135deg,'+color+',var(--secondary));color:white;cursor:pointer;font-family:var(--font);font-weight:700;font-size:0.78rem;direction:rtl">'+(next.lesson.title||'')+' ←</button>';
+    html += '<button onclick="openLesson(\''+subjectId+'\',\''+next.lesson.id+'\')"'
+      + ' style="flex:1;padding:12px 14px;border-radius:12px;cursor:pointer;'
+      + 'font-family:var(--font);font-weight:700;font-size:0.8rem;direction:rtl;'
+      + 'background:linear-gradient(135deg,'+color+',var(--secondary));'
+      + 'border:none;color:white;text-align:left;display:flex;align-items:center;gap:6px">'
+      + '<span style="flex:1;text-align:right">'
+        + '<div style="font-size:0.65rem;color:rgba(255,255,255,0.75);margin-bottom:2px">التالي</div>'
+        + '<div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px">'+(next.lesson.title||'')+'</div>'
+      + '</span>'
+      + '<span style="font-size:1rem">←</span>'
+      + '</button>';
   }
   html += '</div></div>';
   return html;

@@ -11532,7 +11532,53 @@ function repairAndParseJSON(raw) {
   // Strip markdown code fences
   raw = raw.replace(/^```[a-z]*\n?/im,'').replace(/\n?```$/m,'').trim();
 
-  // Find JSON boundaries
+  // ── TRY DIRECT PARSE FIRST (handles both arrays and objects) ──
+  try { return JSON.parse(raw); } catch(e0) {}
+
+  // ── DETECT if response is an ARRAY (starts with [) ──────────
+  var firstBracket = raw.indexOf('[');
+  var firstBrace   = raw.indexOf('{');
+  var isArray = firstBracket >= 0 && (firstBrace < 0 || firstBracket < firstBrace);
+
+  if (isArray) {
+    // Extract array content: from first [ to last ]
+    var arrStart = firstBracket;
+    var arrEnd   = raw.lastIndexOf(']');
+    var arrStr = arrEnd > arrStart ? raw.slice(arrStart, arrEnd + 1) : raw.slice(arrStart);
+
+    // Try direct parse
+    try { return JSON.parse(arrStr); } catch(ea1) {}
+
+    // Try cleaning: trailing commas, truncation
+    var cleaned = arrStr
+      .replace(/,(\s*[\]}])/g, '$1')     // trailing commas
+      .replace(/[\u0000-\u001F\u007F]/g, ' '); // control chars
+
+    // Auto-close truncated array
+    var openB = (cleaned.match(/\[/g)||[]).length;
+    var closeB = (cleaned.match(/\]/g)||[]).length;
+    var openC = (cleaned.match(/\{/g)||[]).length;
+    var closeC = (cleaned.match(/\}/g)||[]).length;
+    if (openC > closeC) cleaned = cleaned.replace(/,\s*"[^"]*$/, '').replace(/,\s*$/, '') + '}'.repeat(openC - closeC);
+    if (openB > closeB) cleaned = cleaned.replace(/,\s*$/, '') + ']'.repeat(openB - closeB);
+    try { return JSON.parse(cleaned); } catch(ea2) {}
+
+    // Extract individual objects from array text
+    var objects = [];
+    var regex = /\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g;
+    var match;
+    while ((match = regex.exec(arrStr)) !== null) {
+      try { objects.push(JSON.parse(match[0])); } catch(e) {
+        try {
+          var fixed = match[0].replace(/,(\s*\})/g,'$1').replace(/'/g,'"');
+          objects.push(JSON.parse(fixed));
+        } catch(e2) {}
+      }
+    }
+    if (objects.length > 0) return objects;
+  }
+
+  // ── OBJECT EXTRACTION (original logic) ──────────────────────
   var first = raw.indexOf('{');
   var last  = raw.lastIndexOf('}');
   if (first < 0) return null;
@@ -16463,8 +16509,45 @@ async function generateQuizFromContentAI(subjectId, count) {
 
     var data = await resp.json();
     var text = (data.content && data.content[0] && data.content[0].text) || '';
-    var parsed = repairAndParseJSON(text.trim());
-    var qArr = Array.isArray(parsed) ? parsed : (parsed && parsed.quiz ? parsed.quiz : (parsed && parsed.questions ? parsed.questions : []));
+    console.log('[ZAD-QUIZ] AI response length:', text.length, 'preview:', text.slice(0,150));
+
+    // Parse: try array-aware parsing
+    var qArr = [];
+    if (text.trim()) {
+      // Strip markdown
+      var cleanText = text.trim().replace(/^```[a-z]*\n?/m,'').replace(/\n?```$/m,'').trim();
+
+      // Try 1: direct parse
+      try {
+        var direct = JSON.parse(cleanText);
+        if (Array.isArray(direct)) qArr = direct;
+        else if (direct && direct.quiz) qArr = direct.quiz;
+        else if (direct && direct.questions) qArr = direct.questions;
+      } catch(e) {
+        console.log('[ZAD-QUIZ] Direct parse failed, trying repair...');
+      }
+
+      // Try 2: repairAndParseJSON
+      if (!qArr.length) {
+        var parsed = repairAndParseJSON(cleanText);
+        if (Array.isArray(parsed)) qArr = parsed;
+        else if (parsed && parsed.quiz) qArr = parsed.quiz;
+        else if (parsed && parsed.questions) qArr = parsed.questions;
+        else if (parsed && parsed.q) qArr = [parsed]; // single question object
+      }
+
+      // Try 3: extract objects with regex as last resort
+      if (!qArr.length) {
+        console.log('[ZAD-QUIZ] Repair failed, extracting objects...');
+        var objRegex = /\{[^{}]*"q"\s*:\s*"[^"]+[^{}]*\}/g;
+        var m;
+        while ((m = objRegex.exec(cleanText)) !== null) {
+          try { qArr.push(JSON.parse(m[0])); } catch(e2) {}
+        }
+      }
+    }
+
+    console.log('[ZAD-QUIZ] Parsed questions:', qArr.length);
 
     var questions = [];
     qArr.forEach(function(q, qi) {

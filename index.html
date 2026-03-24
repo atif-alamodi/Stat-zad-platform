@@ -14701,16 +14701,67 @@ function openLesson(subjectId, lessonId) {
     window._ZAD_AI_LESSON = { lesson: aiLesson, subjectId: subjectId };
     window._ZAD_AI_QUIZ   = aiLesson.quiz;
     showSection('lesson');
+
+    // ── Compute prev/next for uploaded lessons ──────────────────
+    var _merged = getSubjectWithUploads(subjectId);
+    var _allLessons = [];
+    if (_merged) {
+      (_merged.chapters||[]).forEach(function(ch) {
+        (ch.lessons||[]).forEach(function(l) { _allLessons.push({lesson:l, chapter:ch}); });
+      });
+    }
+    var _currentLid = bundle.lessonId || ('ai-'+bundle.id);
+    var _curIdx = _allLessons.findIndex(function(e){ return e.lesson.id === _currentLid; });
+    var _prev = _curIdx > 0 ? _allLessons[_curIdx-1] : null;
+    var _next = _curIdx < _allLessons.length-1 ? _allLessons[_curIdx+1] : null;
+    var _color = (CURRICULUM[subjectId]||{}).color || '#6C63FF';
+    var _lessonNum = _curIdx >= 0 ? _curIdx + 1 : 1;
+    var _totalLessons = _allLessons.length || 1;
+
+    // Build nav buttons HTML
+    var _navHTML = '<div style="display:flex;gap:8px;margin-top:20px;margin-bottom:80px">';
+    if (_prev) {
+      var _pid = _prev.lesson.id.replace(/'/g,"\\'");
+      _navHTML += '<button onclick="openLesson(\''+subjectId+'\',\''+_pid+'\')"'
+        + ' style="flex:1;padding:12px 14px;border-radius:12px;cursor:pointer;'
+        + 'font-family:var(--font);font-weight:700;font-size:0.8rem;direction:rtl;'
+        + 'background:rgba(255,255,255,0.08);border:1.5px solid rgba(255,255,255,0.15);'
+        + 'color:var(--text);text-align:right;display:flex;align-items:center;gap:6px">'
+        + '<span style="font-size:1rem">→</span>'
+        + '<span style="flex:1">'
+          + '<div style="font-size:0.65rem;color:var(--text-muted);margin-bottom:2px">السابق</div>'
+          + '<div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px">'+(_prev.lesson.title||'')+'</div>'
+        + '</span></button>';
+    } else {
+      _navHTML += '<div style="flex:1"></div>';
+    }
+    if (_next) {
+      var _nid = _next.lesson.id.replace(/'/g,"\\'");
+      _navHTML += '<button onclick="openLesson(\''+subjectId+'\',\''+_nid+'\')"'
+        + ' style="flex:1;padding:12px 14px;border-radius:12px;cursor:pointer;'
+        + 'font-family:var(--font);font-weight:700;font-size:0.8rem;direction:rtl;'
+        + 'background:linear-gradient(135deg,'+_color+',var(--secondary));'
+        + 'border:none;color:white;text-align:left;display:flex;align-items:center;gap:6px">'
+        + '<span style="flex:1;text-align:right">'
+          + '<div style="font-size:0.65rem;color:rgba(255,255,255,0.75);margin-bottom:2px">التالي</div>'
+          + '<div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px">'+(_next.lesson.title||'')+'</div>'
+        + '</span>'
+        + '<span style="font-size:1rem">←</span></button>';
+    }
+    _navHTML += '</div>';
+
     var lc = document.getElementById('lesson-content');
     if (lc) {
       lc.innerHTML = '<div style="direction:rtl;padding:0">'
         + '<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">'
           + '<button class="back-btn" onclick="showSubject(\''+subjectId+'\',\'lessons\')">←</button>'
-          + '<div><div style="font-size:1.1rem;font-weight:900">'+aiLesson.lessonTitle+'</div>'
-          + '<div style="font-size:0.75rem;color:var(--text-muted)">✨ '+(bundle.fileName||'')+'</div></div>'
+          + '<div style="flex:1"><div style="font-size:1.1rem;font-weight:900">'+aiLesson.lessonTitle+'</div>'
+          + '<div style="font-size:0.75rem;color:var(--text-muted)">✨ '+(bundle.fileName||'')+' — '+_lessonNum+'/'+_totalLessons+'</div></div>'
         + '</div>'
         + (renderAILesson(aiLesson)||buildAILessonFallback(aiLesson))
+        + _navHTML
         + '</div>';
+      lc.scrollTop = 0;
     }
     return;
   }
@@ -14762,6 +14813,11 @@ function openLesson(subjectId, lessonId) {
   // Build comprehensive lesson content
   var lessonHTML = buildLessonContentHTML(lesson, subject, chapter, subjectId, prev, next, progressPct, lessonNum, totalLessons);
   container.innerHTML = lessonHTML;
+  // Scroll to top when navigating between lessons
+  container.scrollTop = 0;
+  var mainContent = document.getElementById('main-content');
+  if (mainContent) mainContent.scrollTop = 0;
+  window.scrollTo(0, 0);
 }
 
 function buildLessonContentHTML(lesson, subject, chapter, subjectId, prev, next, progressPct, lessonNum, totalLessons) {
@@ -14955,7 +15011,7 @@ function buildLessonContentHTML(lesson, subject, chapter, subjectId, prev, next,
   }
 
   // ── Navigation ───────────────────────────────────────────
-  html += '<div style="display:flex;gap:8px;margin-top:20px">';
+  html += '<div style="display:flex;gap:8px;margin-top:20px;margin-bottom:80px">';
   // ── زر السابق (يمين) ──────────────────────────────────────
   if (prev) {
     html += '<button onclick="openLesson(\''+subjectId+'\',\''+prev.lesson.id+'\')"'

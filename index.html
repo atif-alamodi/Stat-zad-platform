@@ -1808,7 +1808,17 @@ function generateQuiz(subjectId, count, difficulty) {
 }
 
 function generateMixedExam(count = 20, selectedSubjects = null) {
-  const subjects = selectedSubjects || Object.keys(CURRICULUM);
+  // Collect ALL subject IDs: built-in + custom + uploaded
+  var allSids = new Set(Object.keys(CURRICULUM));
+  if (typeof getCustomSubjects === 'function') {
+    getCustomSubjects().forEach(function(s) { if (s && s.id) allSids.add(s.id); });
+  }
+  if (typeof ZAD_UPLOADS !== 'undefined') {
+    ZAD_UPLOADS.getAll().forEach(function(u) {
+      if (u.subjectId && u.lesson && u.lesson.quiz && u.lesson.quiz.length > 0) allSids.add(u.subjectId);
+    });
+  }
+  const subjects = selectedSubjects || Array.from(allSids);
   const allQ = [];
   subjects.forEach(sid => {
     const q = generateQuiz(sid, 999, 'mixed');
@@ -16115,22 +16125,58 @@ function showExamGenerator() {
   if (window.innerWidth <= 768) closeSidebar();
   showSection('exam-generator');
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  
-  const totalStats = Object.keys(CURRICULUM).map(sid => {
-    const count = getQuestionCount(sid);
-    const s = CURRICULUM[sid];
+
+  // ── Collect ALL subjects: built-in + custom + any with uploads ──
+  var allSids = new Set(Object.keys(CURRICULUM));
+  // Add custom subjects
+  if (typeof getCustomSubjects === 'function') {
+    getCustomSubjects().forEach(function(s) { if (s && s.id) allSids.add(s.id); });
+  }
+  // Add subjects that have uploaded lessons with quizzes
+  if (typeof ZAD_UPLOADS !== 'undefined') {
+    ZAD_UPLOADS.getAll().forEach(function(u) {
+      if (u.subjectId && u.lesson && u.lesson.quiz && u.lesson.quiz.length > 0) allSids.add(u.subjectId);
+    });
+  }
+
+  // Build subject info array with question counts
+  var subjectList = Array.from(allSids).map(function(sid) {
+    var s = CURRICULUM[sid];
+    if (!s) {
+      var custom = (typeof getCustomSubjects === 'function') ? getCustomSubjects().find(function(x){return x.id===sid;}) : null;
+      s = custom || { id:sid, title:sid, icon:'📚', color:'#6C63FF' };
+    }
+    var count = getQuestionCount(sid);
+    return { id: sid, title: s.title || sid, icon: s.icon || '📚', color: s.color || '#6C63FF', count: count };
+  }).filter(function(s) { return s.count > 0; }); // Only show subjects that have questions
+
+  // Build stats HTML
+  const totalStats = subjectList.map(function(s) {
     return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:rgba(255,255,255,0.03);border-radius:10px;margin-bottom:6px;">
       <span>${s.icon} ${s.title}</span>
-      <span style="background:var(--primary);color:white;padding:2px 10px;border-radius:10px;font-size:0.75rem;font-weight:700;">${count} سؤال</span>
+      <span style="background:var(--primary);color:white;padding:2px 10px;border-radius:10px;font-size:0.75rem;font-weight:700;">${s.count} سؤال</span>
     </div>`;
   }).join('');
+
+  // Build dropdown options
+  const subjectOptions = subjectList.map(function(s) {
+    return `<option value="${s.id}">${s.icon} ${s.title}</option>`;
+  }).join('')
+  + '<option value="mixed">🌐 مزيج من جميع المواد</option>';
+
+  // Total questions
+  var totalQ = subjectList.reduce(function(a,s){ return a + s.count; }, 0);
 
   document.getElementById('exam-generator-content').innerHTML = `
     <div style="max-width:700px;">
       <!-- Bank info -->
       <div style="background:rgba(108,99,255,0.08);border:1px solid rgba(108,99,255,0.2);border-radius:20px;padding:24px;margin-bottom:24px;">
-        <div style="font-size:1rem;font-weight:700;margin-bottom:14px;">📚 بنك الأسئلة المتاح</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+          <div style="font-size:1rem;font-weight:700;">📚 بنك الأسئلة المتاح</div>
+          <span style="background:linear-gradient(135deg,var(--primary),var(--secondary));color:white;padding:4px 12px;border-radius:10px;font-size:0.8rem;font-weight:700;">${totalQ} سؤال</span>
+        </div>
         ${totalStats}
+        ${!subjectList.length ? '<div style="text-align:center;padding:20px;color:var(--text-muted)">لا توجد أسئلة بعد — ارفع ملفات لمادة أو ادرس الدروس المتاحة</div>' : ''}
       </div>
 
       <!-- Config card -->
@@ -16140,12 +16186,7 @@ function showExamGenerator() {
         <div style="margin-bottom:18px;">
           <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:8px;">المادة</div>
           <select id="exam-subj" style="width:100%;padding:12px;background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:12px;color:var(--text);font-family:var(--font);font-size:0.9rem;">
-            <option value="statistics">📊 الإحصاء وتحليل البيانات</option>
-            <option value="python">🐍 برمجة Python</option>
-            <option value="os">💻 أنظمة التشغيل</option>
-            <option value="communication">🗣️ مهارات التواصل</option>
-            <option value="english">🇬🇧 الإنجليزية التطبيقية</option>
-            <option value="mixed">🌐 مزيج من جميع المواد</option>
+            ${subjectOptions}
           </select>
         </div>
 

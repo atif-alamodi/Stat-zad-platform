@@ -16203,15 +16203,30 @@ function showExamGenerator() {
       s = custom || { id:sid, title:sid, icon:'📚', color:'#6C63FF' };
     }
     var count = getQuestionCount(sid);
-    return { id: sid, title: s.title || sid, icon: s.icon || '📚', color: s.color || '#6C63FF', count: count };
-  }).filter(function(s) { return s.count > 0; }); // Only show subjects that have questions
+    // Check if subject has uploaded content (terms/definitions) even without pre-made quiz
+    var hasContent = false;
+    if (typeof ZAD_UPLOADS !== 'undefined') {
+      hasContent = ZAD_UPLOADS.getAll().some(function(u) {
+        if (u.subjectId !== sid || !u.lesson) return false;
+        var l = u.lesson;
+        var kt = (l.content && l.content.keyTerms) || l.keyTerms || [];
+        var def = (l.content && l.content.definition) || l.definition || '';
+        var steps = (l.content && l.content.steps) || l.steps || [];
+        return kt.length > 0 || def.length > 20 || steps.length > 0;
+      });
+    }
+    return { id: sid, title: s.title || sid, icon: s.icon || '📚', color: s.color || '#6C63FF', count: count, hasContent: hasContent };
+  }).filter(function(s) { return s.count > 0 || s.hasContent; }); // Show subjects with questions OR uploaded content
 
   // Build stats HTML
   const totalStats = subjectList.map(function(s) {
-    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:rgba(255,255,255,0.03);border-radius:10px;margin-bottom:6px;">
-      <span>${s.icon} ${s.title}</span>
-      <span style="background:var(--primary);color:white;padding:2px 10px;border-radius:10px;font-size:0.75rem;font-weight:700;">${s.count} سؤال</span>
-    </div>`;
+    var badge = s.count > 0
+      ? '<span style="background:var(--primary);color:white;padding:2px 10px;border-radius:10px;font-size:0.75rem;font-weight:700;">' + s.count + ' سؤال</span>'
+      : '<span style="background:linear-gradient(135deg,#f59e0b,#d97706);color:white;padding:2px 10px;border-radius:10px;font-size:0.75rem;font-weight:700;">🤖 توليد تلقائي</span>';
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:rgba(255,255,255,0.03);border-radius:10px;margin-bottom:6px;">'
+      + '<span>' + s.icon + ' ' + s.title + '</span>'
+      + badge
+      + '</div>';
   }).join('');
 
   // Build dropdown options
@@ -16344,7 +16359,7 @@ function selectExamTime(t) {
   if(btn) { btn.style.background='var(--primary)'; btn.style.borderColor='var(--primary)'; btn.style.color='white'; }
 }
 
-function startExam() {
+async function startExam() {
   const subj = document.getElementById('exam-subj').value;
   const count = window._examCount || 10;
   const diff  = window._examDiff || 'mixed';
@@ -16357,8 +16372,16 @@ function startExam() {
     questions = generateQuiz(subj, count, diff);
   }
 
+  // ── If no pre-made questions, generate from uploaded content via AI ──
+  if (!questions.length) {
+    var aiQuestions = await generateQuizFromContentAI(subj, count);
+    if (aiQuestions && aiQuestions.length) {
+      questions = aiQuestions;
+    }
+  }
+
   if(!questions.length) {
-    alert('لا توجد أسئلة كافية لهذه الإعدادات!');
+    showToast('لا توجد أسئلة كافية — ارفع ملفات أكثر لهذه المادة', 'error');
     return;
   }
 
@@ -16379,6 +16402,144 @@ function startExam() {
 
   renderExamQuestion();
   if(time > 0) startExamTimer();
+}
+
+// ── Generate quiz questions from uploaded lesson content via AI ──────
+async function generateQuizFromContentAI(subjectId, count) {
+  count = count || 10;
+
+  // Collect content from uploaded lessons
+  var subject = null;
+  try { subject = getSubjectWithUploads(subjectId); } catch(e) {}
+  if (!subject) subject = CURRICULUM[subjectId];
+  if (!subject || !subject.chapters) return [];
+
+  var contentParts = [];
+  (subject.chapters || []).forEach(function(ch) {
+    (ch.lessons || []).forEach(function(l) {
+      var cnt = l.content || {};
+      var def = cnt.definition || l.definition || '';
+      var terms = (cnt.keyTerms || l.keyTerms || []).map(function(k) { return k.term + ': ' + k.def; }).join('\n');
+      var steps = (cnt.steps || l.steps || []).join('\n');
+      var title = l.title || '';
+      if (def || terms || steps) {
+        contentParts.push('## ' + title + '\n' + def + '\n' + terms + '\n' + steps);
+      }
+    });
+  });
+
+  if (!contentParts.length) return [];
+
+  // Trim to fit in prompt
+  var fullContent = contentParts.join('\n\n').slice(0, 4000);
+  var subjectTitle = subject.title || subjectId;
+
+  // Show loading
+  var btn = document.querySelector('[onclick="startExam()"]');
+  var origBtnHTML = '';
+  if (btn) {
+    origBtnHTML = btn.innerHTML;
+    btn.innerHTML = '🤖 جاري توليد ' + count + ' سؤال بالذكاء الاصطناعي...';
+    btn.disabled = true;
+    btn.style.opacity = '0.7';
+  }
+
+  try {
+    var prompt = 'أنشئ ' + count + ' سؤال اختيار من متعدد (4 خيارات) من المحتوى التالي.\n'
+      + 'لكل سؤال: خيار واحد صحيح + 3 خاطئة. نوّع بين سهل ومتوسط وصعب.\n'
+      + 'أجب بمصفوفة JSON فقط بدون أي نص إضافي.\n\n'
+      + 'المادة: ' + subjectTitle + '\n\n'
+      + 'المحتوى:\n' + fullContent + '\n\n'
+      + 'الصيغة المطلوبة:\n'
+      + '[{"q":"السؤال؟","options":["الإجابة الصحيحة","خطأ1","خطأ2","خطأ3"],"answer":0,"explanation":"شرح مختصر","difficulty":"easy"}]\n\n'
+      + 'أنشئ ' + count + ' سؤال متنوع:';
+
+    var resp = await zadFetch({
+      model: 'llama-3.3-70b-versatile',
+      max_tokens: 4000,
+      system: 'أنت مولّد أسئلة تعليمية. أجب بمصفوفة JSON صالحة فقط. بدون markdown أو backticks.',
+      messages: [{ role: 'user', content: prompt }]
+    });
+
+    var data = await resp.json();
+    var text = (data.content && data.content[0] && data.content[0].text) || '';
+    var parsed = repairAndParseJSON(text.trim());
+    var qArr = Array.isArray(parsed) ? parsed : (parsed && parsed.quiz ? parsed.quiz : (parsed && parsed.questions ? parsed.questions : []));
+
+    var questions = [];
+    qArr.forEach(function(q, qi) {
+      if (!q || !q.q || !q.options || !Array.isArray(q.options) || q.options.length < 2) return;
+
+      // Shuffle options
+      var origAnswer = typeof q.answer === 'number' ? q.answer : 0;
+      if (origAnswer < 0 || origAnswer >= q.options.length) origAnswer = 0;
+      var indices = q.options.map(function(_, i) { return i; });
+      for (var k = indices.length - 1; k > 0; k--) {
+        var j = Math.floor(Math.random() * (k + 1));
+        var tmp = indices[k]; indices[k] = indices[j]; indices[j] = tmp;
+      }
+
+      questions.push({
+        q: q.q,
+        options: indices.map(function(i) { return q.options[i]; }),
+        answer: indices.indexOf(origAnswer),
+        hint: q.hint || '',
+        explanation: q.explanation || '',
+        difficulty: q.difficulty || 'medium',
+        subjectId: subjectId,
+        subjectTitle: subjectTitle,
+        lesson: '',
+        chapter: '',
+        page: 'مولّد تلقائي 🤖',
+        id: subjectId + '_ai_q' + qi
+      });
+    });
+
+    // Cache generated questions in the subject's lessons for future use
+    if (questions.length > 0) {
+      _cacheGeneratedQuiz(subjectId, questions);
+    }
+
+    return questions.slice(0, count);
+  } catch (err) {
+    console.error('[ZAD] AI quiz generation failed:', err);
+    showToast('تعذّر توليد الأسئلة — تحقق من الاتصال', 'error');
+    return [];
+  } finally {
+    if (btn) {
+      btn.innerHTML = origBtnHTML || '🚀 ابدأ الاختبار الآن!';
+      btn.disabled = false;
+      btn.style.opacity = '1';
+    }
+  }
+}
+
+// Cache AI-generated quiz back into uploads for future use
+function _cacheGeneratedQuiz(subjectId, questions) {
+  try {
+    var uploads = ZAD_UPLOADS.getAll().filter(function(u) { return u.subjectId === subjectId && u.lesson; });
+    if (!uploads.length) return;
+    // Distribute questions across lessons
+    var perLesson = Math.ceil(questions.length / uploads.length);
+    uploads.forEach(function(u, i) {
+      var start = i * perLesson;
+      var chunk = questions.slice(start, start + perLesson);
+      if (!chunk.length) return;
+      var existingQuiz = (u.lesson.quiz || []);
+      var existingQs = new Set(existingQuiz.map(function(q) { return q.q; }));
+      chunk.forEach(function(q) {
+        if (!existingQs.has(q.q)) {
+          existingQuiz.push({ q: q.q, options: q.options, answer: q.answer, explanation: q.explanation, hint: q.hint || '' });
+        }
+      });
+      u.lesson.quiz = existingQuiz;
+      ZAD_UPLOADS.save(u);
+    });
+    // Re-inject into CURRICULUM
+    if (typeof restoreUserLessons === 'function') restoreUserLessons();
+  } catch (e) {
+    console.warn('[ZAD] Cache quiz error:', e);
+  }
 }
 
 function renderExamQuestion() {

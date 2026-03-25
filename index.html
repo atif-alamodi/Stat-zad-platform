@@ -2,6 +2,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="format-detection" content="telephone=no">
 <title>منصة زاد - رحلتك نحو التميز الأكاديمي</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2635,7 +2638,7 @@ function _xlArith(expr) {
     const safe = s
       .replace(/\^/g, '**')          // ^ to power
       .replace(/<>/g, '!==')         // <> to JS !=
-      .replace(/(?<![=!<>])=(?!=)/g, '=='); // single = to == (for comparisons)
+      .replace(/([^=!<>])=([^=])/g, '$1==$2'); // single = to == (Safari-safe, no lookbehind)
     const res = Function('"use strict"; return (' + safe + ')')();
     if (typeof res === 'number') return isFinite(res) ? res : '#DIV/0!';
     if (typeof res === 'boolean') return res;
@@ -5640,8 +5643,9 @@ const ENG_GRAMMAR_RULES = [
     color: '#FF5252'
   },
   {
-    test: s => /\b(he|she|it)\s+(?!doesn't|don'?t|is|was|has|can|will|would|could|should|must|might)\b[a-z]+(?<!s)\b/i.test(s) 
-              && !/\b(he|she|it)\s+(is|was|has|can|will|would|could|should|must|might)\b/i.test(s),
+    test: s => /\b(he|she|it)\s+(?!doesn't|don'?t|is|was|has|can|will|would|could|should|must|might)\b([a-z]+)\b/i.test(s) 
+              && !/\b(he|she|it)\s+(is|was|has|can|will|would|could|should|must|might)\b/i.test(s)
+              && !/\b(he|she|it)\s+[a-z]*s\b/i.test(s),
     error: 'مع he/she/it في المضارع البسيط — الفعل يحتاج -s',
     rule: '❌ "He go" → ✅ "He goes" | ❌ "She work" → ✅ "She works"',
     color: '#FF7043'
@@ -5662,7 +5666,7 @@ const ENG_GRAMMAR_RULES = [
   },
 
   {
-    test: s => /\bam\s+[a-z]+(?<!ing)\b/i.test(s) && /\bnow|currently|right now\b/i.test(s),
+    test: s => /\bam\s+([a-z]+)\b/i.test(s) && !/\bam\s+[a-z]*ing\b/i.test(s) && /\bnow|currently|right now\b/i.test(s),
     error: 'في المضارع المستمر — الفعل يحتاج -ing بعد am/is/are',
     rule: '❌ "I am study now" → ✅ "I am studying now"',
     color: '#FF9800'
@@ -9522,7 +9526,7 @@ function openModal(title, content, color) {
     position:fixed;inset:0;z-index:9000;
     background:rgba(0,0,0,0.75);
     display:flex;align-items:center;justify-content:center;
-    padding:16px;backdrop-filter:blur(8px);
+    padding:16px;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
     animation:fadeInModal 0.2s ease;
   `;
   modal.innerHTML = `
@@ -11856,14 +11860,30 @@ function buildStatChip(icon, label, count) {
   --bg-gradient: var(--female-gradient);
 }
 
+/* ============ iOS / Safari FIXES ============ */
+/* Fix iOS input zoom (Safari zooms on focus if font < 16px) */
+@supports (-webkit-touch-callout: none) {
+  input, select, textarea { font-size: max(16px, 1em) !important; }
+  input:focus, select:focus, textarea:focus { font-size: max(16px, 1em) !important; }
+}
+/* iOS safe area for notch / home bar */
+.mobile-toggle {
+  bottom: max(20px, env(safe-area-inset-bottom, 20px)) !important;
+}
+/* Fix iOS button appearance */
+button, input, select, textarea {
+  -webkit-appearance: none;
+}
+
 /* ============ RESET & BASE ============ */
 * { margin: 0; padding: 0; box-sizing: border-box; }
-html { scroll-behavior: smooth; overflow-x: hidden; max-width: 100vw; }
+html { scroll-behavior: smooth; overflow-x: hidden; max-width: 100vw; height: -webkit-fill-available; }
 body {
   font-family: var(--font);
   background: var(--bg-dark);
   color: var(--text);
-  min-height: 100vh;
+  -webkit-overflow-scrolling: touch; /* iOS momentum scroll */
+  min-height: 100vh; min-height: -webkit-fill-available;
   overflow-x: hidden;
   max-width: 100vw;
   overflow-x: hidden;
@@ -11877,7 +11897,7 @@ body {
 .page {
   position: relative;
   z-index: 1;
-  min-height: 100vh;
+  min-height: 100vh; min-height: -webkit-fill-available;
   display: none;
 }
 .page.active { display: flex; }
@@ -11926,7 +11946,7 @@ body {
   padding: 50px;
   max-width: 600px;
   width: 100%;
-  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);
   box-shadow: 0 30px 80px rgba(0,0,0,0.5);
 }
 
@@ -12036,7 +12056,7 @@ body {
   width: 280px;
   background: rgba(10,11,30,0.95);
   border-left: 1px solid var(--border);
-  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);
   z-index: 150;
   padding: 30px 0;
   display: flex;
@@ -12137,7 +12157,7 @@ body {
 /* ============ MAIN CONTENT ============ */
 .main-content {
   margin-right: 280px;
-  min-height: 100vh;
+  min-height: 100vh; min-height: -webkit-fill-available;
   padding: 30px;
   overflow-x: hidden;
 }
@@ -12152,7 +12172,7 @@ body {
   background: rgba(255,255,255,0.03);
   border: 1px solid var(--border);
   border-radius: 20px;
-  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
 }
 .topbar-greeting { font-size: 1.3rem; font-weight: 700; }
 .topbar-greeting span { color: var(--primary); }
@@ -13011,7 +13031,7 @@ body {
   padding: 13px 18px;
   font-size: 0.87rem;
   font-weight: 600;
-  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter:blur(24px);backdrop-filter:blur(24px);
   -webkit-backdrop-filter: blur(24px);
   z-index: 999999;
   transition: transform 0.38s cubic-bezier(0.34, 1.4, 0.64, 1), opacity 0.3s ease;
@@ -22602,7 +22622,7 @@ function _doShowApiKeyPrompt(msg) {
   var savedKey = getApiKey();
   var html = `
     <div id="api-key-modal" style="position:fixed;inset:0;z-index:99999;
-      background:rgba(0,0,0,0.85);backdrop-filter:blur(12px);
+      background:rgba(0,0,0,0.85);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
       display:flex;align-items:center;justify-content:center;padding:20px">
       <div style="background:linear-gradient(160deg,#0f0f1e,#1a1030);
         border:2px solid rgba(108,99,255,0.5);border-radius:24px;
@@ -23058,7 +23078,7 @@ function showUploadStatus(type, msg) {
       'z-index:99998;padding:13px 18px 13px 16px;border-radius:16px;' +
       'font-size:0.84rem;font-weight:700;font-family:Cairo,Tajawal,sans-serif;' +
       'display:flex;align-items:center;gap:10px;direction:rtl;' +
-      'backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);' +
+      '-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);' +
       'box-shadow:0 8px 32px rgba(0,0,0,0.45);overflow:hidden;' +
       'transition:opacity 0.3s,transform 0.3s;';
     document.body.appendChild(el);
@@ -26649,7 +26669,7 @@ async function buildAIQuizUIAsync(subject, subjectId) {
 <!-- ══ Python input() collector modal ══ -->
 <div id="py-input-modal" style="
   display:none;position:fixed;inset:0;z-index:99999;
-  background:rgba(0,0,0,0.7);backdrop-filter:blur(8px);
+  background:rgba(0,0,0,0.7);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
   align-items:center;justify-content:center;padding:16px;box-sizing:border-box;">
   <div style="
     background:#1e1e2e;border:1.5px solid rgba(108,99,255,0.5);
@@ -26780,7 +26800,7 @@ async function buildAIQuizUIAsync(subject, subjectId) {
   inset: 0;
   background: rgba(0,0,0,0.85);
   z-index: 10999;
-  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
   align-items: center;
   justify-content: center;
 }
@@ -26868,7 +26888,7 @@ body.light-mode .top-header,
 body.light-mode header {
   background: rgba(255,255,255,0.95);
   border-bottom: 1px solid rgba(91,79,245,0.1);
-  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);
 }
 
 /* الأزرار العامة */
@@ -26891,7 +26911,7 @@ body.light-mode .icon-btn:hover {
 /* الـ modal */
 body.light-mode #zad-modal-overlay {
   background: rgba(91,79,245,0.15);
-  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
 }
 
 body.light-mode #zad-modal-box {
@@ -27091,7 +27111,7 @@ body.light-mode .theme-btn-light {
    ══════════════════════════════════ */
 #admin-panel-overlay {
   display:none;position:fixed;inset:0;z-index:9999;
-  background:rgba(0,0,0,0.7);backdrop-filter:blur(8px);
+  background:rgba(0,0,0,0.7);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
   align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto;
 }
 #admin-panel-overlay.show { display:flex; }
@@ -27135,7 +27155,7 @@ body.light-mode .theme-btn-light {
 /* ══ Quiz Celebration ══ */
 #quiz-celebration-overlay {
   display:none;position:fixed;inset:0;z-index:9998;
-  background:rgba(0,0,0,0.85);backdrop-filter:blur(12px);
+  background:rgba(0,0,0,0.85);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
   align-items:center;justify-content:center;flex-direction:column;
 }
 #quiz-celebration-overlay.show { display:flex; }
@@ -27173,7 +27193,7 @@ body.light-mode .theme-btn-light {
    ════════════════════════════════════ */
 #admin-panel-overlay {
   display:none;position:fixed;inset:0;z-index:9999;
-  background:rgba(0,0,0,0.75);backdrop-filter:blur(10px);
+  background:rgba(0,0,0,0.75);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
   align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto;
 }
 #admin-panel-overlay.show { display:flex; }
@@ -27207,7 +27227,7 @@ body.light-mode .theme-btn-light {
    ════════════════════════════════════ */
 #quiz-celebration-overlay {
   display:none;position:fixed;inset:0;z-index:9998;
-  background:rgba(0,0,0,0.88);backdrop-filter:blur(14px);
+  background:rgba(0,0,0,0.88);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
   align-items:center;justify-content:center;flex-direction:column;
 }
 #quiz-celebration-overlay.show { display:flex; }
@@ -27279,7 +27299,7 @@ body.light-mode .theme-btn-light {
 <!-- ══════════════════════════════════════════════════════════ -->
 <!-- SETTINGS PANEL MODAL -->
 <!-- ══════════════════════════════════════════════════════════ -->
-<div id="settings-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;backdrop-filter:blur(8px)" onclick="if(event.target===this)closeSettingsPanel()">
+<div id="settings-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)" onclick="if(event.target===this)closeSettingsPanel()">
   <div id="settings-panel" style="
     position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
     width:min(480px,95vw);max-height:90vh;overflow-y:auto;

@@ -15333,13 +15333,27 @@ function renderSubjectCards(containerId, limit) {
   var container = document.getElementById(containerId);
   if (!container) return;
 
+  // Collect ALL subject IDs: built-in + custom + uploaded
+  var allSids = Object.keys(CURRICULUM);
+  if (typeof ZAD_UPLOADS !== 'undefined') {
+    ZAD_UPLOADS.getAll().forEach(function(u) {
+      if (u.subjectId && allSids.indexOf(u.subjectId) === -1) allSids.push(u.subjectId);
+    });
+  }
+
   var subjects = [];
-  try { subjects = Object.values(CURRICULUM).slice(0, limit || 99); } catch(e) { return; }
+  allSids.forEach(function(sid) {
+    var merged = null;
+    try { merged = getSubjectWithUploads(sid); } catch(e) {}
+    var s = merged || CURRICULUM[sid];
+    if (!s) return;
+    subjects.push(s);
+  });
+  subjects = subjects.slice(0, limit || 99);
 
   container.innerHTML = subjects.map(function(s) {
     var prog = 0;
     var color = s.color || '#6C63FF';
-    var chapters = (s.chapters||[]).length;
     var totalDone = 0, totalLessons = 0;
     try {
       (s.chapters||[]).forEach(function(ch) {
@@ -15355,14 +15369,15 @@ function renderSubjectCards(containerId, limit) {
     } catch(e3) {}
 
     var isCustom = s.id && s.id.startsWith('custom_');
+    var chapters = (s.chapters||[]).length;
 
     return '<div class="subject-card" data-subject-id="'+s.id+'" onclick="showSubject(\''+s.id+'\')" style="border-color:'+color+'30;cursor:pointer">'
       + (isCustom ? '<button onclick="event.stopPropagation();deleteSubject(\''+s.id+'\')" style="position:absolute;top:8px;left:8px;background:rgba(255,82,82,0.12);border:none;border-radius:6px;color:#FF5252;cursor:pointer;padding:3px 7px;font-size:0.72rem;z-index:2">🗑️</button>' : '')
       + '<div class="subject-icon">'+(s.icon||'📚')+'</div>'
       + '<div class="subject-title">'+(s.title||s.id)+'</div>'
-      + '<div class="subject-chapters"><i class="fas fa-book-open"></i> '+chapters+' فصل</div>'
+      + '<div class="subject-chapters"><i class="fas fa-book-open"></i> '+chapters+' فصل • '+totalLessons+' درس</div>'
       + '<div style="font-size:0.72rem;color:var(--text-muted);margin:6px 0 4px;display:flex;justify-content:space-between">'
-        + '<span>'+totalDone+'/'+totalLessons+' درس</span>'
+        + '<span>'+totalDone+'/'+totalLessons+' مكتمل</span>'
         + '<span style="color:'+color+'">'+prog+'%</span>'
       + '</div>'
       + '<div class="progress-bar"><div class="progress-fill" style="width:'+prog+'%;background:'+color+'"></div></div>'
@@ -15901,6 +15916,16 @@ function showQuizResults() {
 
 function exitQuiz() {
   try {
+    // Clear inline display style that overrides CSS classes
+    var quizPage = document.getElementById('page-quiz');
+    if (quizPage) quizPage.style.display = '';
+    // Reset quiz UI
+    var qr = document.getElementById('quiz-results');
+    if (qr) qr.style.display = 'none';
+    var qc = document.getElementById('quiz-content');
+    if (qc) qc.style.display = '';
+    if (examState.timer) { clearInterval(examState.timer); examState.timer = null; }
+
     // Close any open overlays first
     ['zad-delete-confirm','zad-subject-picker','zad-add-subject-modal','zad-search-overlay'].forEach(function(id) {
       var el = document.getElementById(id);
@@ -15908,10 +15933,11 @@ function exitQuiz() {
     });
     showPage('page-app');
     showSection('dashboard');
-    if (typeof updateStats === 'function') updateStats();
-    if (typeof renderProgressChart === 'function') renderProgressChart();
+    if (typeof initDashboard === 'function') initDashboard();
   } catch(e) {
     // Force navigate to dashboard
+    var qp = document.getElementById('page-quiz');
+    if (qp) qp.style.display = '';
     showPage('page-app');
     var sec = document.getElementById('section-dashboard');
     if (sec) {
@@ -16225,6 +16251,18 @@ let examState = {
 
 function showExamGenerator() {
   if (window.innerWidth <= 768) closeSidebar();
+  // Exit quiz page if we're on it
+  var quizPage = document.getElementById('page-quiz');
+  if (quizPage) quizPage.style.display = '';
+  document.querySelectorAll('.page').forEach(function(p){ p.style.display=''; });
+  showPage('page-app');
+  // Reset quiz UI
+  var qr = document.getElementById('quiz-results');
+  if (qr) qr.style.display = 'none';
+  var qc = document.getElementById('quiz-content');
+  if (qc) qc.style.display = '';
+  if (examState && examState.timer) { clearInterval(examState.timer); examState.timer = null; }
+
   showSection('exam-generator');
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
 
@@ -16442,8 +16480,8 @@ async function startExam() {
     subj, count, diff, time
   };
 
-  document.querySelectorAll('.page').forEach(p => p.style.display='none');
-  document.getElementById('page-quiz').style.display='flex';
+  document.querySelectorAll('.page').forEach(p => p.style.display='');
+  showPage('page-quiz');
   
 
   renderExamQuestion();

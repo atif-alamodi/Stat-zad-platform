@@ -16268,48 +16268,30 @@ function showExamGenerator() {
 
   // ── Collect ALL subjects: built-in + custom + any with uploads ──
   var allSids = new Set(Object.keys(CURRICULUM));
-  // Add custom subjects
   if (typeof getCustomSubjects === 'function') {
     getCustomSubjects().forEach(function(s) { if (s && s.id) allSids.add(s.id); });
   }
-  // Add subjects that have uploaded lessons with quizzes
   if (typeof ZAD_UPLOADS !== 'undefined') {
-    ZAD_UPLOADS.getAll().forEach(function(u) {
-      if (u.subjectId && u.lesson && u.lesson.quiz && u.lesson.quiz.length > 0) allSids.add(u.subjectId);
-    });
+    ZAD_UPLOADS.getAll().forEach(function(u) { if (u.subjectId) allSids.add(u.subjectId); });
   }
 
-  // Build subject info array with question counts
+  // Build subject list — show any subject that has actual content (lessons/terms/definitions)
   var subjectList = Array.from(allSids).map(function(sid) {
     var s = CURRICULUM[sid];
     if (!s) {
       var custom = (typeof getCustomSubjects === 'function') ? getCustomSubjects().find(function(x){return x.id===sid;}) : null;
       s = custom || { id:sid, title:sid, icon:'📚', color:'#6C63FF' };
     }
-    var count = getQuestionCount(sid);
-    // Check if subject has uploaded content (terms/definitions) even without pre-made quiz
-    var hasContent = false;
-    if (typeof ZAD_UPLOADS !== 'undefined') {
-      hasContent = ZAD_UPLOADS.getAll().some(function(u) {
-        if (u.subjectId !== sid || !u.lesson) return false;
-        var l = u.lesson;
-        var kt = (l.content && l.content.keyTerms) || l.keyTerms || [];
-        var def = (l.content && l.content.definition) || l.definition || '';
-        var steps = (l.content && l.content.steps) || l.steps || [];
-        return kt.length > 0 || def.length > 20 || steps.length > 0;
-      });
-    }
-    return { id: sid, title: s.title || sid, icon: s.icon || '📚', color: s.color || '#6C63FF', count: count, hasContent: hasContent };
-  }).filter(function(s) { return s.count > 0 || s.hasContent; }); // Show subjects with questions OR uploaded content
+    var content = _collectSubjectContent(sid);
+    var lessonCount = content.parts.length;
+    return { id: sid, title: s.title || sid, icon: s.icon || '📚', color: s.color || '#6C63FF', lessons: lessonCount };
+  }).filter(function(s) { return s.lessons > 0; });
 
-  // Build stats HTML
+  // Build stats HTML — all subjects use AI generation
   const totalStats = subjectList.map(function(s) {
-    var badge = s.count > 0
-      ? '<span style="background:var(--primary);color:white;padding:2px 10px;border-radius:10px;font-size:0.75rem;font-weight:700;">' + s.count + ' سؤال</span>'
-      : '<span style="background:linear-gradient(135deg,#f59e0b,#d97706);color:white;padding:2px 10px;border-radius:10px;font-size:0.75rem;font-weight:700;">🤖 توليد تلقائي</span>';
     return '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:rgba(255,255,255,0.03);border-radius:10px;margin-bottom:6px;">'
       + '<span>' + s.icon + ' ' + s.title + '</span>'
-      + badge
+      + '<span style="background:linear-gradient(135deg,var(--primary),#9C8CFF);color:white;padding:2px 10px;border-radius:10px;font-size:0.75rem;font-weight:700;">🤖 ' + s.lessons + ' درس</span>'
       + '</div>';
   }).join('');
 
@@ -16319,16 +16301,18 @@ function showExamGenerator() {
   }).join('')
   + '<option value="mixed">🌐 مزيج من جميع المواد</option>';
 
-  // Total questions
-  var totalQ = subjectList.reduce(function(a,s){ return a + s.count; }, 0);
+  var totalLessons = subjectList.reduce(function(a,s){ return a + s.lessons; }, 0);
 
   document.getElementById('exam-generator-content').innerHTML = `
     <div style="max-width:700px;">
       <!-- Bank info -->
       <div style="background:rgba(108,99,255,0.08);border:1px solid rgba(108,99,255,0.2);border-radius:20px;padding:24px;margin-bottom:24px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-          <div style="font-size:1rem;font-weight:700;">📚 بنك الأسئلة المتاح</div>
-          <span style="background:linear-gradient(135deg,var(--primary),var(--secondary));color:white;padding:4px 12px;border-radius:10px;font-size:0.8rem;font-weight:700;">${totalQ} سؤال</span>
+          <div style="font-size:1rem;font-weight:700;">🤖 مولّد الاختبارات الذكي</div>
+          <span style="background:linear-gradient(135deg,var(--primary),var(--secondary));color:white;padding:4px 12px;border-radius:10px;font-size:0.8rem;font-weight:700;">${totalLessons} درس</span>
+        </div>
+        <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px;line-height:1.6">
+          الأسئلة تُولَّد تلقائياً بالذكاء الاصطناعي من محتوى دروسك الفعلي — أسئلة جديدة في كل مرة 🎲
         </div>
         ${totalStats}
         ${!subjectList.length ? '<div style="text-align:center;padding:20px;color:var(--text-muted)">لا توجد أسئلة بعد — ارفع ملفات لمادة أو ادرس الدروس المتاحة</div>' : ''}
@@ -16449,23 +16433,16 @@ async function startExam() {
   const diff  = window._examDiff || 'mixed';
   const time  = window._examTime || 0;
 
-  let questions;
-  if(subj === 'mixed') {
-    questions = generateMixedExam(count);
+  // ── ALWAYS generate fresh questions via AI from actual content ──
+  var questions = [];
+  if (subj === 'mixed') {
+    questions = await generateQuizFromContentAI_Mixed(count, diff);
   } else {
-    questions = generateQuiz(subj, count, diff);
+    questions = await generateQuizFromContentAI(subj, count, diff);
   }
 
-  // ── If no pre-made questions, generate from uploaded content via AI ──
   if (!questions.length) {
-    var aiQuestions = await generateQuizFromContentAI(subj, count);
-    if (aiQuestions && aiQuestions.length) {
-      questions = aiQuestions;
-    }
-  }
-
-  if(!questions.length) {
-    showToast('لا توجد أسئلة كافية — ارفع ملفات أكثر لهذه المادة', 'error');
+    showToast('لا توجد محتوى كافٍ لتوليد أسئلة — ارفع ملفات أكثر لهذه المادة', 'error');
     return;
   }
 
@@ -16482,21 +16459,21 @@ async function startExam() {
 
   document.querySelectorAll('.page').forEach(p => p.style.display='');
   showPage('page-quiz');
-  
 
   renderExamQuestion();
   if(time > 0) startExamTimer();
 }
 
-// ── Generate quiz questions from uploaded lesson content via AI ──────
-async function generateQuizFromContentAI(subjectId, count) {
-  count = count || 10;
+// ══════════════════════════════════════════════════════════════
+// AI QUIZ GENERATOR — Always fresh questions from actual content
+// ══════════════════════════════════════════════════════════════
 
-  // Collect content from uploaded lessons
+// Collect lesson content text for a subject
+function _collectSubjectContent(subjectId) {
   var subject = null;
   try { subject = getSubjectWithUploads(subjectId); } catch(e) {}
   if (!subject) subject = CURRICULUM[subjectId];
-  if (!subject || !subject.chapters) return [];
+  if (!subject || !subject.chapters) return { parts: [], title: subjectId, icon: '📚' };
 
   var contentParts = [];
   (subject.chapters || []).forEach(function(ch) {
@@ -16505,125 +16482,75 @@ async function generateQuizFromContentAI(subjectId, count) {
       var def = cnt.definition || l.definition || '';
       var terms = (cnt.keyTerms || l.keyTerms || []).map(function(k) { return k.term + ': ' + k.def; }).join('\n');
       var steps = (cnt.steps || l.steps || []).join('\n');
+      var types = (cnt.types || l.types || []).map(function(t) { return (t.name||'') + ': ' + (t.desc||''); }).join('\n');
       var title = l.title || '';
+      var summary = cnt.summary || l.summary || '';
       if (def || terms || steps) {
-        contentParts.push('## ' + title + '\n' + def + '\n' + terms + '\n' + steps);
+        contentParts.push('### ' + title + '\n' + def + '\n' + terms + '\n' + steps + '\n' + types + '\n' + summary);
       }
     });
   });
+  return { parts: contentParts, title: subject.title || subjectId, icon: subject.icon || '📚' };
+}
 
-  if (!contentParts.length) return [];
+async function generateQuizFromContentAI(subjectId, count, difficulty) {
+  count = count || 10;
+  difficulty = difficulty || 'mixed';
 
-  // Trim to fit in prompt
-  var fullContent = contentParts.join('\n\n').slice(0, 4000);
-  var subjectTitle = subject.title || subjectId;
+  var content = _collectSubjectContent(subjectId);
+  if (!content.parts.length) return [];
+
+  // Randomize content order so AI generates different questions each time
+  var shuffledParts = content.parts.slice().sort(function() { return Math.random() - 0.5; });
+  var fullContent = shuffledParts.join('\n\n').slice(0, 5000);
+
+  // Random seed for variety
+  var seed = Math.floor(Math.random() * 99999);
+
+  var diffInstruction = '';
+  if (difficulty === 'easy') diffInstruction = 'اجعل كل الأسئلة سهلة ومباشرة (تعريفات ومفاهيم أساسية).';
+  else if (difficulty === 'medium') diffInstruction = 'اجعل الأسئلة متوسطة الصعوبة (تطبيق وفهم).';
+  else if (difficulty === 'hard') diffInstruction = 'اجعل الأسئلة صعبة (تحليل ومقارنة وتطبيق متقدم).';
+  else diffInstruction = 'نوّع بين سهل ومتوسط وصعب.';
 
   // Show loading
   var btn = document.querySelector('[onclick="startExam()"]');
   var origBtnHTML = '';
   if (btn) {
     origBtnHTML = btn.innerHTML;
-    btn.innerHTML = '🤖 جاري توليد ' + count + ' سؤال بالذكاء الاصطناعي...';
+    btn.innerHTML = '🤖 جاري توليد ' + count + ' سؤال من المنهج...';
     btn.disabled = true;
     btn.style.opacity = '0.7';
   }
 
   try {
-    var prompt = 'أنشئ ' + count + ' سؤال اختيار من متعدد (4 خيارات) من المحتوى التالي.\n'
-      + 'لكل سؤال: خيار واحد صحيح + 3 خاطئة. نوّع بين سهل ومتوسط وصعب.\n'
-      + 'أجب بمصفوفة JSON فقط بدون أي نص إضافي.\n\n'
-      + 'المادة: ' + subjectTitle + '\n\n'
-      + 'المحتوى:\n' + fullContent + '\n\n'
-      + 'الصيغة المطلوبة:\n'
-      + '[{"q":"السؤال؟","options":["الإجابة الصحيحة","خطأ1","خطأ2","خطأ3"],"answer":0,"explanation":"شرح مختصر","difficulty":"easy"}]\n\n'
-      + 'أنشئ ' + count + ' سؤال متنوع:';
+    var prompt = 'أنت مولّد اختبارات تعليمية محترف. أنشئ ' + count + ' سؤال اختيار من متعدد (4 خيارات لكل سؤال).\n'
+      + '⚠️ الأسئلة يجب أن تكون حصرياً من المحتوى المعطى أدناه — لا تضف معلومات من خارجه.\n'
+      + diffInstruction + '\n'
+      + 'لكل سؤال: الخيار الأول هو الصحيح دائماً (answer=0).\n'
+      + 'أجب بمصفوفة JSON فقط — بدون أي نص أو شرح أو markdown قبلها أو بعدها.\n\n'
+      + '📚 المادة: ' + content.title + '\n'
+      + '🎲 رقم عشوائي: ' + seed + '\n\n'
+      + '── المحتوى الدراسي ──\n' + fullContent + '\n\n'
+      + 'الصيغة:\n[{"q":"السؤال؟","options":["الإجابة الصحيحة","خطأ1","خطأ2","خطأ3"],"answer":0,"explanation":"شرح مختصر"}]';
 
     var resp = await zadFetch({
       model: 'llama-3.3-70b-versatile',
       max_tokens: 4000,
-      system: 'أنت مولّد أسئلة تعليمية. أجب بمصفوفة JSON صالحة فقط. بدون markdown أو backticks.',
+      system: 'مولّد أسئلة اختبارات. أجب بمصفوفة JSON صالحة فقط. بدون markdown أو backticks أو أي نص إضافي.',
       messages: [{ role: 'user', content: prompt }]
     });
 
     var data = await resp.json();
     var text = (data.content && data.content[0] && data.content[0].text) || '';
-    console.log('[ZAD-QUIZ] AI response length:', text.length, 'preview:', text.slice(0,150));
+    console.log('[ZAD-QUIZ] AI response length:', text.length);
 
-    // Parse: try array-aware parsing
-    var qArr = [];
-    if (text.trim()) {
-      // Strip markdown
-      var cleanText = text.trim().replace(/^```[a-z]*\n?/m,'').replace(/\n?```$/m,'').trim();
-
-      // Try 1: direct parse
-      try {
-        var direct = JSON.parse(cleanText);
-        if (Array.isArray(direct)) qArr = direct;
-        else if (direct && direct.quiz) qArr = direct.quiz;
-        else if (direct && direct.questions) qArr = direct.questions;
-      } catch(e) {
-        console.log('[ZAD-QUIZ] Direct parse failed, trying repair...');
-      }
-
-      // Try 2: repairAndParseJSON
-      if (!qArr.length) {
-        var parsed = repairAndParseJSON(cleanText);
-        if (Array.isArray(parsed)) qArr = parsed;
-        else if (parsed && parsed.quiz) qArr = parsed.quiz;
-        else if (parsed && parsed.questions) qArr = parsed.questions;
-        else if (parsed && parsed.q) qArr = [parsed]; // single question object
-      }
-
-      // Try 3: extract objects with regex as last resort
-      if (!qArr.length) {
-        console.log('[ZAD-QUIZ] Repair failed, extracting objects...');
-        var objRegex = /\{[^{}]*"q"\s*:\s*"[^"]+[^{}]*\}/g;
-        var m;
-        while ((m = objRegex.exec(cleanText)) !== null) {
-          try { qArr.push(JSON.parse(m[0])); } catch(e2) {}
-        }
-      }
-    }
-
+    var qArr = _parseQuizResponse(text);
     console.log('[ZAD-QUIZ] Parsed questions:', qArr.length);
 
-    var questions = [];
-    qArr.forEach(function(q, qi) {
-      if (!q || !q.q || !q.options || !Array.isArray(q.options) || q.options.length < 2) return;
-
-      // Shuffle options
-      var origAnswer = typeof q.answer === 'number' ? q.answer : 0;
-      if (origAnswer < 0 || origAnswer >= q.options.length) origAnswer = 0;
-      var indices = q.options.map(function(_, i) { return i; });
-      for (var k = indices.length - 1; k > 0; k--) {
-        var j = Math.floor(Math.random() * (k + 1));
-        var tmp = indices[k]; indices[k] = indices[j]; indices[j] = tmp;
-      }
-
-      questions.push({
-        q: q.q,
-        options: indices.map(function(i) { return q.options[i]; }),
-        answer: indices.indexOf(origAnswer),
-        hint: q.hint || '',
-        explanation: q.explanation || '',
-        difficulty: q.difficulty || 'medium',
-        subjectId: subjectId,
-        subjectTitle: subjectTitle,
-        lesson: '',
-        chapter: '',
-        page: 'مولّد تلقائي 🤖',
-        id: subjectId + '_ai_q' + qi
-      });
-    });
-
-    // Cache generated questions in the subject's lessons for future use
-    if (questions.length > 0) {
-      _cacheGeneratedQuiz(subjectId, questions);
-    }
-
-    return questions.slice(0, count);
+    return _formatQuizQuestions(qArr, subjectId, content.title, count);
   } catch (err) {
-    console.error('[ZAD] AI quiz generation failed:', err);
+    console.error('[ZAD-QUIZ] Generation failed:', err);
     showToast('تعذّر توليد الأسئلة — تحقق من الاتصال', 'error');
     return [];
   } finally {
@@ -16635,32 +16562,150 @@ async function generateQuizFromContentAI(subjectId, count) {
   }
 }
 
-// Cache AI-generated quiz back into uploads for future use
-function _cacheGeneratedQuiz(subjectId, questions) {
-  try {
-    var uploads = ZAD_UPLOADS.getAll().filter(function(u) { return u.subjectId === subjectId && u.lesson; });
-    if (!uploads.length) return;
-    // Distribute questions across lessons
-    var perLesson = Math.ceil(questions.length / uploads.length);
-    uploads.forEach(function(u, i) {
-      var start = i * perLesson;
-      var chunk = questions.slice(start, start + perLesson);
-      if (!chunk.length) return;
-      var existingQuiz = (u.lesson.quiz || []);
-      var existingQs = new Set(existingQuiz.map(function(q) { return q.q; }));
-      chunk.forEach(function(q) {
-        if (!existingQs.has(q.q)) {
-          existingQuiz.push({ q: q.q, options: q.options, answer: q.answer, explanation: q.explanation, hint: q.hint || '' });
-        }
-      });
-      u.lesson.quiz = existingQuiz;
-      ZAD_UPLOADS.save(u);
-    });
-    // Re-inject into CURRICULUM
-    if (typeof restoreUserLessons === 'function') restoreUserLessons();
-  } catch (e) {
-    console.warn('[ZAD] Cache quiz error:', e);
+// Mixed exam: collect from ALL subjects
+async function generateQuizFromContentAI_Mixed(count, difficulty) {
+  count = count || 10;
+  difficulty = difficulty || 'mixed';
+
+  // Collect content from all subjects
+  var allSids = new Set(Object.keys(CURRICULUM));
+  if (typeof getCustomSubjects === 'function') {
+    getCustomSubjects().forEach(function(s) { if (s && s.id) allSids.add(s.id); });
   }
+  if (typeof ZAD_UPLOADS !== 'undefined') {
+    ZAD_UPLOADS.getAll().forEach(function(u) { if (u.subjectId) allSids.add(u.subjectId); });
+  }
+
+  var allContent = [];
+  Array.from(allSids).forEach(function(sid) {
+    var c = _collectSubjectContent(sid);
+    if (c.parts.length) {
+      allContent.push('═══ ' + c.icon + ' ' + c.title + ' ═══\n' + c.parts.slice(0, 3).join('\n'));
+    }
+  });
+
+  if (!allContent.length) return [];
+
+  var shuffled = allContent.sort(function() { return Math.random() - 0.5; });
+  var fullContent = shuffled.join('\n\n').slice(0, 5000);
+  var seed = Math.floor(Math.random() * 99999);
+
+  var diffInstruction = '';
+  if (difficulty === 'easy') diffInstruction = 'أسئلة سهلة ومباشرة.';
+  else if (difficulty === 'hard') diffInstruction = 'أسئلة صعبة تحليلية.';
+  else diffInstruction = 'نوّع بين سهل ومتوسط وصعب.';
+
+  var btn = document.querySelector('[onclick="startExam()"]');
+  var origBtnHTML = '';
+  if (btn) {
+    origBtnHTML = btn.innerHTML;
+    btn.innerHTML = '🤖 جاري توليد اختبار مزيج من كل المواد...';
+    btn.disabled = true;
+    btn.style.opacity = '0.7';
+  }
+
+  try {
+    var prompt = 'أنشئ ' + count + ' سؤال اختيار متعدد من مواد مختلفة. ' + diffInstruction + '\n'
+      + '⚠️ حصرياً من المحتوى المعطى.\n'
+      + 'الخيار الأول هو الصحيح دائماً (answer=0). أجب بمصفوفة JSON فقط.\n'
+      + '🎲 ' + seed + '\n\n'
+      + fullContent + '\n\n'
+      + '[{"q":"؟","options":["صحيح","خ1","خ2","خ3"],"answer":0,"explanation":"شرح"}]';
+
+    var resp = await zadFetch({
+      model: 'llama-3.3-70b-versatile',
+      max_tokens: 4000,
+      system: 'مولّد أسئلة. مصفوفة JSON فقط. بدون markdown.',
+      messages: [{ role: 'user', content: prompt }]
+    });
+
+    var data = await resp.json();
+    var text = (data.content && data.content[0] && data.content[0].text) || '';
+    var qArr = _parseQuizResponse(text);
+    return _formatQuizQuestions(qArr, 'mixed', 'مزيج من المواد', count);
+  } catch (err) {
+    console.error('[ZAD-QUIZ] Mixed generation failed:', err);
+    showToast('تعذّر توليد الأسئلة — تحقق من الاتصال', 'error');
+    return [];
+  } finally {
+    if (btn) {
+      btn.innerHTML = origBtnHTML || '🚀 ابدأ الاختبار الآن!';
+      btn.disabled = false;
+      btn.style.opacity = '1';
+    }
+  }
+}
+
+// Parse AI quiz response (handles all formats)
+function _parseQuizResponse(text) {
+  if (!text || !text.trim()) return [];
+  var clean = text.trim().replace(/^```[a-z]*\n?/m, '').replace(/\n?```$/m, '').trim();
+  var qArr = [];
+
+  // Try 1: direct JSON parse
+  try {
+    var d = JSON.parse(clean);
+    if (Array.isArray(d)) return d;
+    if (d && d.quiz) return d.quiz;
+    if (d && d.questions) return d.questions;
+  } catch (e) {}
+
+  // Try 2: find first balanced [...]
+  var depth = 0, start = -1;
+  for (var i = 0; i < clean.length; i++) {
+    if (clean[i] === '[') { if (depth === 0) start = i; depth++; }
+    else if (clean[i] === ']') { depth--; if (depth === 0 && start >= 0) {
+      try { return JSON.parse(clean.slice(start, i + 1)); } catch (e2) {} break;
+    }}
+  }
+
+  // Try 3: repairAndParseJSON
+  var repaired = repairAndParseJSON(clean);
+  if (Array.isArray(repaired)) return repaired;
+  if (repaired && repaired.quiz) return repaired.quiz;
+  if (repaired && repaired.q) return [repaired];
+
+  // Try 4: regex extract individual question objects
+  var rx = /\{[^{}]*"q"\s*:\s*"[^"]+[^{}]*\}/g;
+  var m;
+  while ((m = rx.exec(clean)) !== null) {
+    try { qArr.push(JSON.parse(m[0])); } catch (e3) {}
+  }
+  return qArr;
+}
+
+// Format and shuffle quiz questions
+function _formatQuizQuestions(qArr, subjectId, subjectTitle, count) {
+  var questions = [];
+  qArr.forEach(function(q, qi) {
+    if (!q || !q.q || !q.options || !Array.isArray(q.options) || q.options.length < 2) return;
+
+    var origAnswer = typeof q.answer === 'number' ? q.answer : 0;
+    if (origAnswer < 0 || origAnswer >= q.options.length) origAnswer = 0;
+
+    // Fisher-Yates shuffle options
+    var indices = q.options.map(function(_, i) { return i; });
+    for (var k = indices.length - 1; k > 0; k--) {
+      var j = Math.floor(Math.random() * (k + 1));
+      var tmp = indices[k]; indices[k] = indices[j]; indices[j] = tmp;
+    }
+
+    questions.push({
+      q: q.q,
+      options: indices.map(function(i) { return q.options[i]; }),
+      answer: indices.indexOf(origAnswer),
+      hint: q.hint || '',
+      explanation: q.explanation || '',
+      difficulty: q.difficulty || 'medium',
+      subjectId: subjectId,
+      subjectTitle: subjectTitle,
+      lesson: q.lesson || '',
+      chapter: q.chapter || '',
+      page: '🤖 مولّد تلقائي',
+      id: subjectId + '_ai_' + Date.now() + '_q' + qi
+    });
+  });
+  return questions.slice(0, count);
 }
 
 function renderExamQuestion() {

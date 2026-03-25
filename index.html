@@ -11295,8 +11295,8 @@ LANGUAGE FORMAT:
     // Compact template for CF Workers AI (fits within 2048 token limit)
     // Ultra-compact template fits within 1024 tokens output limit
     const jsonTemplateCompact = isEng
-      ? '{"lessonTitle":"English Title","definition":"4 Arabic sentences explaining the topic simply","keyTerms":[{"term":"English word","def":"المعنى بالعربية + example sentence"},{"term":"Word2","def":"المعنى + مثال"},{"term":"Word3","def":"المعنى + مثال"}],"steps":["Grammar rule 1: Arabic explanation — English example","Grammar rule 2: Arabic explanation — English example","Grammar rule 3: explanation"],"quiz":[{"q":"English question?","options":["A","B","C","D"],"answer":0,"explanation":"Arabic explanation"},{"q":"Question 2?","options":["A","B","C","D"],"answer":0,"explanation":"Arabic explanation"}],"summary":"2 Arabic sentences summarizing the lesson"}'
-      : '{"lessonTitle":"العنوان","definition":"جملتان","keyTerms":[{"term":"م1","def":"ت1"},{"term":"م2","def":"ت2"}],"steps":["خ1","خ2","خ3"],"quiz":[{"q":"س؟","options":["أ","ب","ج","د"],"answer":0,"explanation":"ش"},{"q":"س2؟","options":["أ","ب","ج","د"],"answer":0,"explanation":"ش"}],"summary":"ملخص"}';
+      ? '{"lessonTitle":"[REAL TITLE FROM TEXT]","definition":"[4 REAL Arabic sentences from the text]","keyTerms":[{"term":"[real term from text]","def":"[real Arabic definition]"},{"term":"[term2]","def":"[def2]"},{"term":"[term3]","def":"[def3]"}],"steps":["[real point from text 1]","[real point 2]","[real point 3]"],"quiz":[{"q":"[real question about the text content]?","options":["[correct answer from text]","[plausible wrong answer]","[another wrong]","[another wrong]"],"answer":0,"explanation":"[Arabic explanation why correct]"},{"q":"[second real question]?","options":["[correct]","[wrong1]","[wrong2]","[wrong3]"],"answer":0,"explanation":"[explanation]"}],"summary":"[2 Arabic sentences summarizing]"}'
+      : '{"lessonTitle":"[العنوان الحقيقي]","definition":"[تعريف حقيقي من النص]","keyTerms":[{"term":"[مصطلح حقيقي]","def":"[تعريف حقيقي]"},{"term":"[م2]","def":"[ت2]"}],"steps":["[نقطة حقيقية 1]","[نقطة 2]","[نقطة 3]"],"quiz":[{"q":"[سؤال حقيقي من المحتوى]؟","options":["[الإجابة الصحيحة]","[إجابة خاطئة 1]","[خاطئة 2]","[خاطئة 3]"],"answer":0,"explanation":"[شرح]"},{"q":"[سؤال 2]؟","options":["[صحيح]","[خطأ1]","[خطأ2]","[خطأ3]"],"answer":0,"explanation":"[شرح]"}],"summary":"[ملخص حقيقي]"}';
     const jsonTemplate = isEng ? jsonTemplateEN : jsonTemplateAR;
 
     // ── STEP 2: Process each topic/lesson ─────────────────────
@@ -11667,12 +11667,50 @@ function repairAndParseJSON(raw) {
 // ── Post-parse sanitizer: strip problematic emoji from quiz text ──
 function sanitizeLesson(lesson) {
   if (!lesson) return lesson;
-  // Remove non-BMP emoji (>U+FFFF) from quiz questions and options
-  // These render as Asian characters on some mobile browsers
+
+  // ── Placeholder detection: template text that AI echoed back ──
+  var PLACEHOLDERS = [
+    'English Title', 'English question', 'Arabic explanation', 'Arabic definition',
+    'English Term', 'English Example', 'Arabic importance', 'Arabic summary',
+    'Arabic point', 'Grammar rule', 'English hint', 'Arabic property',
+    '4 Arabic sentences', '2 Arabic sentences', 'Correct answer', 'Wrong 1',
+    'المعنى بالعربية + example', 'المعنى + مثال',
+    '[REAL TITLE', '[real term', '[real question', '[real point',
+    '[correct answer', '[plausible wrong', '[another wrong',
+    '[العنوان الحقيقي]', '[تعريف حقيقي]', '[مصطلح حقيقي]', '[سؤال حقيقي',
+    '[الإجابة الصحيحة]', '[إجابة خاطئة', '[نقطة حقيقية', '[ملخص حقيقي]',
+    'Question 2?', 'Question 3?', 'Question 4?', 'Question 5?',
+    'second real question'
+  ];
+  function isPlaceholder(str) {
+    if (!str || typeof str !== 'string') return false;
+    return PLACEHOLDERS.some(function(p) { return str.indexOf(p) >= 0; });
+  }
+
+  // Clean title
+  if (isPlaceholder(lesson.lessonTitle)) lesson.lessonTitle = '';
+
+  // Clean definition
+  if (isPlaceholder(lesson.definition)) lesson.definition = '';
+
+  // Clean keyTerms
+  if (lesson.keyTerms) {
+    lesson.keyTerms = lesson.keyTerms.filter(function(k) {
+      return k && k.term && !isPlaceholder(k.term) && !isPlaceholder(k.def);
+    });
+  }
+
+  // Clean steps
+  if (lesson.steps) {
+    lesson.steps = lesson.steps.filter(function(s) { return s && !isPlaceholder(s); });
+  }
+
+  // Remove non-BMP emoji from quiz questions
   function stripBadEmoji(str) {
     if (typeof str !== 'string') return str;
     return str.replace(/[\u{1F000}-\u{1FFFF}]/gu, '').replace(/\s+/g, ' ').trim();
   }
+
   if (lesson.quiz) {
     lesson.quiz = lesson.quiz.map(function(q) {
       return {
@@ -11682,7 +11720,19 @@ function sanitizeLesson(lesson) {
         hint:        stripBadEmoji(q.hint||''),
         explanation: q.explanation || ''
       };
-    }).filter(function(q){ return q.q && q.options && q.options.length === 4; });
+    }).filter(function(q) {
+      if (!q.q || !q.options || q.options.length < 4) return false;
+      // Remove placeholder quiz items
+      if (isPlaceholder(q.q)) return false;
+      // Remove if options are just A/B/C/D or Correct/Wrong
+      var optStr = q.options.join('|');
+      if (/^A\|B\|C\|D$/i.test(optStr)) return false;
+      if (/^A\|C\|B\|D$/i.test(optStr)) return false;
+      if (/Correct.*Wrong.*Wrong.*Wrong/i.test(optStr)) return false;
+      if (/^صحيح\|خطأ1\|خطأ2\|خطأ3$/.test(optStr)) return false;
+      if (/^أ\|ب\|ج\|د$/.test(optStr)) return false;
+      return true;
+    });
   }
   return lesson;
 }
@@ -16482,14 +16532,48 @@ function _collectSubjectContent(subjectId) {
       var def = cnt.definition || l.definition || '';
       var terms = (cnt.keyTerms || l.keyTerms || []).map(function(k) { return k.term + ': ' + k.def; }).join('\n');
       var steps = (cnt.steps || l.steps || []).join('\n');
-      var types = (cnt.types || l.types || []).map(function(t) { return (t.name||'') + ': ' + (t.desc||''); }).join('\n');
+      var types = (cnt.types || l.types || []).map(function(t) { return (t.name||t.term||'') + ': ' + (t.desc||t.def||''); }).join('\n');
       var title = l.title || '';
       var summary = cnt.summary || l.summary || '';
-      if (def || terms || steps) {
-        contentParts.push('### ' + title + '\n' + def + '\n' + terms + '\n' + steps + '\n' + types + '\n' + summary);
+      var examples = (cnt.realExamples || l.examples || []).map(function(e) { return (e.title||'') + ': ' + (e.desc||e.content||''); }).join('\n');
+
+      // Also extract from existing quiz questions (they contain real content)
+      var quizContent = (l.quiz || []).map(function(q) {
+        if (!q || !q.q) return '';
+        // Skip placeholder questions
+        if (/^English question|^Question \d/i.test(q.q)) return '';
+        if (q.options && q.options.join('|') === 'A|B|C|D') return '';
+        return q.q + ' → ' + (q.options||[])[q.answer||0] + ' (' + (q.explanation||'') + ')';
+      }).filter(Boolean).join('\n');
+
+      var text = [def, terms, steps, types, summary, examples, quizContent].filter(Boolean).join('\n');
+      if (text.length > 30) {
+        contentParts.push('### ' + title + '\n' + text);
       }
     });
   });
+
+  // Also check raw uploaded files for additional content
+  if (typeof ZAD_UPLOADS !== 'undefined') {
+    ZAD_UPLOADS.getAll().filter(function(u) { return u.subjectId === subjectId; }).forEach(function(u) {
+      // If lesson content is mostly placeholder, try reading raw lesson data
+      var l = u.lesson || {};
+      var rawDef = l.definition || (l.content && l.content.definition) || '';
+      var rawTerms = (l.keyTerms || (l.content && l.content.keyTerms) || []);
+      var rawSteps = (l.steps || (l.content && l.content.steps) || []);
+
+      // Check if content is real (not placeholder)
+      if (rawDef && rawDef.length > 30 && rawDef.indexOf('Arabic sentences') < 0) {
+        var alreadyExists = contentParts.some(function(p) { return p.indexOf(rawDef.slice(0,50)) >= 0; });
+        if (!alreadyExists) {
+          var extra = rawDef + '\n' + rawTerms.map(function(k){return (k.term||'')+': '+(k.def||'');}).join('\n')
+            + '\n' + rawSteps.join('\n');
+          contentParts.push('### ' + (u.title || u.fileName || '') + '\n' + extra);
+        }
+      }
+    });
+  }
+
   return { parts: contentParts, title: subject.title || subjectId, icon: subject.icon || '📚' };
 }
 

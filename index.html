@@ -16834,16 +16834,17 @@ async function _generateOneBatch(subjectId, batchSize, difficulty, existingQuest
   var resp = await zadFetch({
     model: 'llama-3.3-70b-versatile',
     max_tokens: tokens,
-    system: 'You are an expert quiz maker. Return ONLY a valid JSON array. No other text.',
+    system: 'You are an expert exam professor. For EACH question you create, you MUST mentally verify: "Is options[answer] truly the correct answer according to the source content?" If not, fix it before outputting. Return ONLY a valid JSON array.',
     messages: [{ role: 'user', content: 'Create ' + batchSize + ' Arabic MCQ (' + diffText + ') STRICTLY from the content below.\n\n'
-      + 'RULES:\n'
-      + '1. Each question has exactly 4 DISTINCT options that are clearly different from each other\n'
-      + '2. "answer" field = index (0-3) of the SCIENTIFICALLY CORRECT option\n'
-      + '3. The correct answer must be factually accurate based on the content\n'
-      + '4. Wrong options must be plausible but clearly wrong — NOT similar to the correct answer\n'
-      + '5. All text in Arabic. Never use filler options like "لا شيء مما سبق"\n\n'
+      + 'CRITICAL RULES:\n'
+      + '1. 4 DISTINCT options per question — each option must be clearly different in meaning\n'
+      + '2. "answer" = index (0-3) of the CORRECT option. VERIFY: does options[answer] match the definition in the content?\n'
+      + '3. "explanation" = explain WHY this is correct by referencing the content definition\n'
+      + '4. Wrong options must be plausible terms from the same field but CLEARLY WRONG for this question\n'
+      + '5. Arabic only. No filler options like "لا شيء مما سبق" or "جميع ما سبق"\n'
+      + '6. VERIFY STEP: For "ما هي العينة؟" → check content → العينة = جزء مختار من المجتمع → answer must point to that option\n\n'
       + '🎲' + seed + '\n📚 ' + content.title + ':\n' + batchContent + '\n\n'
-      + '[{"q":"ما تعريف العينة في الإحصاء؟","options":["جزء مختار من المجتمع الإحصائي","المجتمع الإحصائي بالكامل","أداة جمع البيانات","طريقة عرض البيانات"],"answer":0,"explanation":"العينة هي جزء يُختار من المجتمع لتمثيله"}]' }]
+      + '[{"q":"ما تعريف العينة؟","options":["جزء مختار من المجتمع الإحصائي","المجتمع الإحصائي بالكامل","أداة لجمع البيانات","طريقة لعرض النتائج"],"answer":0,"explanation":"حسب المحتوى: العينة = جزء مختار من المجتمع لتمثيله"}]' }]
   });
 
   var data = await resp.json();
@@ -16871,8 +16872,11 @@ async function _generateOneBatchMixed(batchSize, difficulty) {
 
   var resp = await zadFetch({
     model: 'llama-3.3-70b-versatile', max_tokens: tokens,
-    system: 'Expert quiz maker. Return ONLY a valid JSON array.',
-    messages: [{ role: 'user', content: batchSize + ' Arabic MCQ (' + diffText + ') from different subjects. 4 DISTINCT options. answer=index of correct. No filler options.\n🎲' + seed + '\n\n' + shuffled + '\n\n[{"q":"سؤال؟","options":["الإجابة الصحيحة","خاطئة واضحة 1","خاطئة واضحة 2","خاطئة واضحة 3"],"answer":0,"explanation":"لماذا هذا صحيح"}]' }]
+    system: 'Expert exam professor. VERIFY each answer: does options[answer] match the source content definition? Fix any mismatch. Return ONLY valid JSON array.',
+    messages: [{ role: 'user', content: batchSize + ' Arabic MCQ (' + diffText + ') from different subjects below.\n'
+      + 'RULES: 4 DISTINCT options. answer=index of VERIFIED correct option. explanation=WHY correct (reference content). No fillers.\n'
+      + '🎲' + seed + '\n\n' + shuffled + '\n\n'
+      + '[{"q":"ما تعريف الوسيط؟","options":["القيمة الوسطى بعد ترتيب البيانات","المتوسط الحسابي","القيمة الأكثر تكراراً","مقياس التشتت"],"answer":0,"explanation":"الوسيط = القيمة الوسطى بعد الترتيب حسب المحتوى"}]' }]
   });
   var data = await resp.json();
   var text = (data.content && data.content[0] && data.content[0].text) || '';
@@ -16927,7 +16931,7 @@ function _parseQuizResponse(text) {
   return qArr;
 }
 
-// Format and shuffle quiz questions
+// Format and shuffle quiz questions with answer verification
 function _formatQuizQuestions(qArr, subjectId, subjectTitle, count) {
   var questions = [];
   qArr.forEach(function(q, qi) {
@@ -16941,7 +16945,27 @@ function _formatQuizQuestions(qArr, subjectId, subjectTitle, count) {
     if (ansIdx < 0 || ansIdx >= opts.length) ansIdx = 0;
     var correctText = opts[ansIdx];
 
-    // 3. Remove duplicates
+    // 3. VERIFY: if explanation mentions a DIFFERENT option, fix the answer
+    var expl = (q.explanation || '').toLowerCase();
+    if (expl.length > 5) {
+      for (var vi = 0; vi < opts.length; vi++) {
+        if (vi === ansIdx) continue;
+        var optWords = opts[vi].toLowerCase().split(/\s+/).filter(function(w) { return w.length > 3; });
+        var matchCount = optWords.filter(function(w) { return expl.indexOf(w) >= 0; }).length;
+        // If explanation matches another option better (>60% of its words)
+        if (optWords.length >= 2 && matchCount / optWords.length > 0.6) {
+          var correctWords = correctText.toLowerCase().split(/\s+/).filter(function(w) { return w.length > 3; });
+          var correctMatch = correctWords.filter(function(w) { return expl.indexOf(w) >= 0; }).length;
+          // Only switch if the other option genuinely matches better
+          if (matchCount > correctMatch) {
+            correctText = opts[vi];
+            break;
+          }
+        }
+      }
+    }
+
+    // 4. Remove duplicates
     var seenOpt = {};
     var uniqueOpts = [];
     opts.forEach(function(o) {
@@ -16950,13 +16974,11 @@ function _formatQuizQuestions(qArr, subjectId, subjectTitle, count) {
     });
     opts = uniqueOpts;
 
-    // 4. Ensure correct answer survived
+    // 5. Ensure correct answer survived
     if (opts.indexOf(correctText) < 0) opts.unshift(correctText);
 
-    // 5. SKIP if less than 3 real options (don't pad with fillers)
+    // 6. Skip if less than 3 unique options
     if (opts.length < 3) return;
-
-    // 6. If exactly 3, add one related wrong option
     if (opts.length === 3) opts.push('لا ينطبق أي مما ذُكر');
     opts = opts.slice(0, 4);
 

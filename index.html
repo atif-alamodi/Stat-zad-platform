@@ -16636,15 +16636,16 @@ async function startExam() {
     console.log('[EXAM] Got ' + questions.length + ' from pool, need ' + (count - questions.length) + ' more');
   }
 
-  // If pool was empty, generate first batch (one call only — fast)
+  // If pool was empty, generate TINY first batch (3 questions = very fast!)
   if (!questions.length) {
     var btn = document.querySelector('[onclick="startExam()"]');
-    if (btn) { btn.innerHTML = '🤖 تحضير الأسئلة...'; btn.disabled = true; btn.style.opacity = '0.7'; }
+    if (btn) { btn.innerHTML = '🤖 ثانية واحدة...'; btn.disabled = true; btn.style.opacity = '0.7'; }
     try {
+      var FAST_BATCH = 3; // Only 3 questions = ~1-2 seconds
       if (subj === 'mixed') {
-        questions = await _generateOneBatchMixed(Math.min(10, count), diff);
+        questions = await _generateOneBatchMixed(FAST_BATCH, diff);
       } else {
-        questions = await _generateOneBatch(subj, Math.min(10, count), diff, [], 0);
+        questions = await _generateOneBatch(subj, FAST_BATCH, diff, [], 0);
       }
     } catch(e) { console.error('[EXAM] Gen error:', e); }
     if (btn) { btn.innerHTML = '🚀 ابدأ الاختبار الآن!'; btn.disabled = false; btn.style.opacity = '1'; }
@@ -16797,12 +16798,16 @@ async function _generateOneBatch(subjectId, batchSize, difficulty, existingQuest
   var parts = content.parts.slice().sort(function() { return Math.random() - 0.5; });
   var startIdx = ((batchNum || 0) * 2) % Math.max(parts.length, 1);
   var rotated = parts.slice(startIdx).concat(parts.slice(0, startIdx));
-  var batchContent = rotated.join('\n\n').slice(0, 3000);
+  // Scale content to batch size: 500 chars per question
+  var contentLen = Math.min(5000, Math.max(1000, batchSize * 500));
+  var batchContent = rotated.join('\n\n').slice(0, contentLen);
   var seed = Math.floor(Math.random() * 99999);
+  // Scale tokens: ~200 per question
+  var tokens = Math.min(4000, Math.max(600, batchSize * 200));
 
   var resp = await zadFetch({
     model: 'llama-3.1-8b-instant',
-    max_tokens: 2000,
+    max_tokens: tokens,
     system: 'Return a JSON array of quiz questions. Each has: q, options (4 strings), answer (index 0-3 of correct option), explanation. JSON only.',
     messages: [{ role: 'user', content: batchSize + ' Arabic MCQ (' + diffText + ') from this content. 4 unique options. Set answer to the INDEX of the correct option.\n\n🎲' + seed + '\n' + content.title + ':\n' + batchContent + '\n\n[{"q":"ما الوسيط؟","options":["المتوسط","القيمة الوسطى بعد الترتيب","الأكثر تكراراً","جذر التباين"],"answer":1,"explanation":"الوسيط هو القيمة الوسطى"}]' }]
   });
@@ -16825,12 +16830,14 @@ async function _generateOneBatchMixed(batchSize, difficulty) {
   });
   if (!allContent.length) return [];
 
-  var shuffled = allContent.sort(function(){return Math.random()-0.5;}).join('\n\n').slice(0,3000);
+  var contentLen = Math.min(5000, Math.max(1000, batchSize * 500));
+  var shuffled = allContent.sort(function(){return Math.random()-0.5;}).join('\n\n').slice(0, contentLen);
   var seed = Math.floor(Math.random() * 99999);
   var diffText = difficulty === 'easy' ? 'سهلة' : difficulty === 'hard' ? 'صعبة' : 'متنوعة';
+  var tokens = Math.min(4000, Math.max(600, batchSize * 200));
 
   var resp = await zadFetch({
-    model: 'llama-3.1-8b-instant', max_tokens: 2000,
+    model: 'llama-3.1-8b-instant', max_tokens: tokens,
     system: 'Return JSON array of quiz questions. Each: q, options (4 strings), answer (index 0-3 of correct), explanation. JSON only.',
     messages: [{ role: 'user', content: batchSize + ' Arabic MCQ (' + diffText + ') from different subjects. 4 unique options. answer=index of correct.\n🎲' + seed + '\n\n' + shuffled + '\n\n[{"q":"سؤال؟","options":["خيار أ","خيار ب","خيار ج","خيار د"],"answer":2,"explanation":"لماذا ج صحيح"}]' }]
   });

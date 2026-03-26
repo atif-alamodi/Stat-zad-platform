@@ -16655,32 +16655,18 @@ async function _generateOneBatch(subjectId, batchSize, difficulty, existingQuest
   var content = _collectSubjectContent(subjectId);
   if (!content.parts.length) return [];
 
-  var diffText = '';
-  if (difficulty === 'easy') diffText = 'أسئلة سهلة مباشرة.';
-  else if (difficulty === 'medium') diffText = 'أسئلة متوسطة.';
-  else if (difficulty === 'hard') diffText = 'أسئلة صعبة تحليلية.';
-  else diffText = 'نوّع بين سهل ومتوسط وصعب.';
-
-  // Rotate content
+  var diffText = difficulty === 'easy' ? 'سهلة' : difficulty === 'hard' ? 'صعبة' : 'متنوعة';
   var parts = content.parts.slice().sort(function() { return Math.random() - 0.5; });
   var startIdx = ((batchNum || 0) * 2) % Math.max(parts.length, 1);
   var rotated = parts.slice(startIdx).concat(parts.slice(0, startIdx));
-  var batchContent = rotated.join('\n\n').slice(0, 5000);
-
+  var batchContent = rotated.join('\n\n').slice(0, 3000);
   var seed = Math.floor(Math.random() * 99999);
-  var avoidText = existingQuestions && existingQuestions.length > 0
-    ? '\n⛔ لا تكرر: ' + existingQuestions.slice(-5).map(function(q){return q.q.slice(0,25);}).join(' | ')
-    : '';
 
   var resp = await zadFetch({
-    model: 'llama-3.3-70b-versatile',
-    max_tokens: 4000,
-    system: 'مولّد أسئلة. مصفوفة JSON فقط. بدون markdown.',
-    messages: [{ role: 'user', content: 'أنشئ ' + batchSize + ' سؤال اختيار متعدد حصرياً من المحتوى.\n'
-      + diffText + ' الخيار الأول صحيح (answer=0). JSON فقط.'
-      + avoidText + '\n🎲 ' + seed
-      + '\n\n── ' + content.title + ' ──\n' + batchContent
-      + '\n\n[{"q":"سؤال من المحتوى؟","options":["صحيح","خ1","خ2","خ3"],"answer":0,"explanation":"شرح"}]' }]
+    model: 'llama-3.1-8b-instant',
+    max_tokens: 2000,
+    system: 'أنت مولّد اختبارات. أجب بمصفوفة JSON فقط بدون أي نص آخر.',
+    messages: [{ role: 'user', content: batchSize + ' سؤال اختيار متعدد ' + diffText + ' من المحتوى.\n\nالقواعد:\n- 4 خيارات مختلفة لكل سؤال\n- الخيار الأول هو الصحيح (answer=0)\n- عربية فصحى سليمة إملائياً\n- لا تكرر خيارات\n\n🎲' + seed + '\n' + content.title + ':\n' + batchContent + '\n\n[{"q":"السؤال؟","options":["الجواب الصحيح","خاطئ 1","خاطئ 2","خاطئ 3"],"answer":0,"explanation":"التفسير"}]' }]
   });
 
   var data = await resp.json();
@@ -16697,18 +16683,18 @@ async function _generateOneBatchMixed(batchSize, difficulty) {
   var allContent = [];
   Array.from(allSids).forEach(function(sid) {
     var c = _collectSubjectContent(sid);
-    if (c.parts.length) allContent.push('═ ' + c.title + ' ═\n' + c.parts.sort(function(){return Math.random()-0.5;}).slice(0,2).join('\n'));
+    if (c.parts.length) allContent.push(c.title + ':\n' + c.parts.sort(function(){return Math.random()-0.5;}).slice(0,2).join('\n'));
   });
   if (!allContent.length) return [];
 
-  var shuffled = allContent.sort(function(){return Math.random()-0.5;}).join('\n\n').slice(0,5000);
+  var shuffled = allContent.sort(function(){return Math.random()-0.5;}).join('\n\n').slice(0,3000);
   var seed = Math.floor(Math.random() * 99999);
   var diffText = difficulty === 'easy' ? 'سهلة' : difficulty === 'hard' ? 'صعبة' : 'متنوعة';
 
   var resp = await zadFetch({
-    model: 'llama-3.3-70b-versatile', max_tokens: 4000,
-    system: 'مولّد أسئلة. مصفوفة JSON فقط.',
-    messages: [{ role: 'user', content: 'أنشئ ' + batchSize + ' سؤال ' + diffText + ' من مواد مختلفة.\nالخيار الأول صحيح (answer=0). JSON فقط.\n🎲 ' + seed + '\n\n' + shuffled + '\n\n[{"q":"?","options":["صحيح","خ1","خ2","خ3"],"answer":0,"explanation":"شرح"}]' }]
+    model: 'llama-3.1-8b-instant', max_tokens: 2000,
+    system: 'مولّد اختبارات. مصفوفة JSON فقط.',
+    messages: [{ role: 'user', content: batchSize + ' سؤال ' + diffText + ' من مواد مختلفة.\n4 خيارات مختلفة. answer=0. عربية سليمة.\n🎲' + seed + '\n\n' + shuffled + '\n\n[{"q":"؟","options":["صحيح","خطأ1","خطأ2","خطأ3"],"answer":0,"explanation":"لماذا"}]' }]
   });
   var data = await resp.json();
   var text = (data.content && data.content[0] && data.content[0].text) || '';
@@ -16726,7 +16712,9 @@ async function generateQuizFromContentAI_Mixed(count, difficulty) {
 // Parse AI quiz response (handles all formats)
 function _parseQuizResponse(text) {
   if (!text || !text.trim()) return [];
-  var clean = text.trim().replace(/^```[a-z]*\n?/m, '').replace(/\n?```$/m, '').trim();
+  // Strip control characters that break JSON.parse
+  var clean = text.replace(/[\x00-\x1F\x7F]/g, ' ').trim();
+  clean = clean.replace(/^```[a-z]*\n?/m, '').replace(/\n?```$/m, '').trim();
   var qArr = [];
 
   // Try 1: direct JSON parse
@@ -16765,29 +16753,61 @@ function _parseQuizResponse(text) {
 function _formatQuizQuestions(qArr, subjectId, subjectTitle, count) {
   var questions = [];
   qArr.forEach(function(q, qi) {
-    if (!q || !q.q || !q.options || !Array.isArray(q.options) || q.options.length < 2) return;
+    if (!q || !q.q || !q.options || !Array.isArray(q.options)) return;
 
-    var origAnswer = typeof q.answer === 'number' ? q.answer : 0;
-    if (origAnswer < 0 || origAnswer >= q.options.length) origAnswer = 0;
+    // 1. Clean options
+    var opts = q.options.map(function(o) { return String(o || '').trim(); }).filter(Boolean);
 
-    // Fisher-Yates shuffle options
-    var indices = q.options.map(function(_, i) { return i; });
-    for (var k = indices.length - 1; k > 0; k--) {
-      var j = Math.floor(Math.random() * (k + 1));
-      var tmp = indices[k]; indices[k] = indices[j]; indices[j] = tmp;
+    // 2. Find correct answer TEXT before any manipulation
+    var ansIdx = typeof q.answer === 'number' ? q.answer : 0;
+    if (ansIdx < 0 || ansIdx >= opts.length) ansIdx = 0;
+    var correctText = opts[ansIdx];
+
+    // 3. Remove duplicate options (case-insensitive)
+    var seenOpt = {};
+    opts = opts.filter(function(o) {
+      var key = o.toLowerCase().replace(/\s+/g, '');
+      if (seenOpt[key]) return false;
+      seenOpt[key] = true;
+      return true;
+    });
+
+    // 4. Ensure correctText is still in the list
+    if (opts.indexOf(correctText) < 0) opts.unshift(correctText);
+
+    // 5. Pad to 4 options if fewer
+    var fillers = ['لا شيء مما سبق', 'جميع ما سبق', 'لا يمكن التحديد', 'غير ذلك'];
+    var fIdx = 0;
+    while (opts.length < 4 && fIdx < fillers.length) {
+      var fKey = fillers[fIdx].toLowerCase().replace(/\s+/g, '');
+      if (!seenOpt[fKey]) {
+        opts.push(fillers[fIdx]);
+        seenOpt[fKey] = true;
+      }
+      fIdx++;
     }
+    opts = opts.slice(0, 4);
+
+    // 6. Shuffle options (Fisher-Yates)
+    for (var k = opts.length - 1; k > 0; k--) {
+      var j = Math.floor(Math.random() * (k + 1));
+      var tmp = opts[k]; opts[k] = opts[j]; opts[j] = tmp;
+    }
+
+    // 7. Find correct answer position after shuffle
+    var newCorrectIdx = opts.indexOf(correctText);
+    if (newCorrectIdx < 0) newCorrectIdx = 0;
 
     questions.push({
       q: q.q,
-      options: indices.map(function(i) { return q.options[i]; }),
-      answer: indices.indexOf(origAnswer),
+      options: opts,
+      answer: newCorrectIdx,
       hint: q.hint || '',
       explanation: q.explanation || '',
       difficulty: q.difficulty || 'medium',
       subjectId: subjectId,
       subjectTitle: subjectTitle,
-      lesson: q.lesson || '',
-      chapter: q.chapter || '',
+      lesson: '', chapter: '',
       page: '🤖 مولّد تلقائي',
       id: subjectId + '_ai_' + Date.now() + '_q' + qi
     });

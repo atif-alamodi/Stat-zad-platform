@@ -16803,8 +16803,8 @@ async function _generateOneBatch(subjectId, batchSize, difficulty, existingQuest
   var resp = await zadFetch({
     model: 'llama-3.1-8b-instant',
     max_tokens: 2000,
-    system: 'مولّد اختبارات تعليمية. القاعدة: الخيار الأول في options دائماً هو الإجابة الصحيحة. أجب بمصفوفة JSON فقط.',
-    messages: [{ role: 'user', content: batchSize + ' سؤال ' + diffText + ' من المحتوى.\n\n⚠️ الخيار الأول = الصحيح دائماً. الباقي = خاطئة.\n4 خيارات مختلفة لكل سؤال. عربية سليمة.\n\n🎲' + seed + '\n' + content.title + ':\n' + batchContent + '\n\nمثال:\n[{"q":"ما الوسيط؟","options":["القيمة الوسطى بعد الترتيب","المتوسط","الأكثر تكراراً","أصغر قيمة"],"answer":0,"explanation":"الوسيط = القيمة في المنتصف"}]' }]
+    system: 'Return a JSON array of quiz questions. Each has: q, options (4 strings), answer (index 0-3 of correct option), explanation. JSON only.',
+    messages: [{ role: 'user', content: batchSize + ' Arabic MCQ (' + diffText + ') from this content. 4 unique options. Set answer to the INDEX of the correct option.\n\n🎲' + seed + '\n' + content.title + ':\n' + batchContent + '\n\n[{"q":"ما الوسيط؟","options":["المتوسط","القيمة الوسطى بعد الترتيب","الأكثر تكراراً","جذر التباين"],"answer":1,"explanation":"الوسيط هو القيمة الوسطى"}]' }]
   });
 
   var data = await resp.json();
@@ -16831,8 +16831,8 @@ async function _generateOneBatchMixed(batchSize, difficulty) {
 
   var resp = await zadFetch({
     model: 'llama-3.1-8b-instant', max_tokens: 2000,
-    system: 'مولّد اختبارات. الخيار الأول في options دائماً صحيح. JSON فقط.',
-    messages: [{ role: 'user', content: batchSize + ' سؤال ' + diffText + ' من مواد مختلفة.\n⚠️ الخيار الأول = الصحيح. 4 خيارات مختلفة.\n🎲' + seed + '\n\n' + shuffled + '\n\n[{"q":"سؤال؟","options":["الإجابة الصحيحة","خاطئة1","خاطئة2","خاطئة3"],"answer":0,"explanation":"لماذا"}]' }]
+    system: 'Return JSON array of quiz questions. Each: q, options (4 strings), answer (index 0-3 of correct), explanation. JSON only.',
+    messages: [{ role: 'user', content: batchSize + ' Arabic MCQ (' + diffText + ') from different subjects. 4 unique options. answer=index of correct.\n🎲' + seed + '\n\n' + shuffled + '\n\n[{"q":"سؤال؟","options":["خيار أ","خيار ب","خيار ج","خيار د"],"answer":2,"explanation":"لماذا ج صحيح"}]' }]
   });
   var data = await resp.json();
   var text = (data.content && data.content[0] && data.content[0].text) || '';
@@ -16895,57 +16895,51 @@ function _formatQuizQuestions(qArr, subjectId, subjectTitle, count) {
 
     // 1. Clean options
     var opts = q.options.map(function(o) { return String(o || '').trim(); }).filter(Boolean);
+    if (opts.length < 2) return;
 
-    // 2. ALWAYS use first option as correct — our prompt says answer=0
-    //    We ignore q.answer because AI sometimes sets wrong index
-    var correctText = opts[0];
+    // 2. Find correct answer using q.answer index, fallback to 0
+    var ansIdx = typeof q.answer === 'number' ? q.answer : 0;
+    if (ansIdx < 0 || ansIdx >= opts.length) ansIdx = 0;
+    var correctText = opts[ansIdx];
 
     // 3. Remove duplicate options (case-insensitive)
     var seenOpt = {};
-    opts = opts.filter(function(o) {
+    var uniqueOpts = [];
+    opts.forEach(function(o) {
       var key = o.toLowerCase().replace(/\s+/g, '');
-      if (seenOpt[key]) return false;
-      seenOpt[key] = true;
-      return true;
+      if (!seenOpt[key]) { seenOpt[key] = true; uniqueOpts.push(o); }
     });
+    opts = uniqueOpts;
 
-    // 4. Ensure correctText is still in the list
+    // 4. Ensure correctText survived dedup
     if (opts.indexOf(correctText) < 0) opts.unshift(correctText);
 
-    // 5. Pad to 4 options if fewer
+    // 5. Pad to 4 options
     var fillers = ['لا شيء مما سبق', 'جميع ما سبق', 'لا يمكن التحديد', 'غير ذلك'];
     var fIdx = 0;
     while (opts.length < 4 && fIdx < fillers.length) {
       var fKey = fillers[fIdx].toLowerCase().replace(/\s+/g, '');
-      if (!seenOpt[fKey]) {
-        opts.push(fillers[fIdx]);
-        seenOpt[fKey] = true;
-      }
+      if (!seenOpt[fKey]) { opts.push(fillers[fIdx]); seenOpt[fKey] = true; }
       fIdx++;
     }
     opts = opts.slice(0, 4);
 
-    // 6. Shuffle options (Fisher-Yates)
+    // 6. Shuffle (Fisher-Yates)
     for (var k = opts.length - 1; k > 0; k--) {
       var j = Math.floor(Math.random() * (k + 1));
       var tmp = opts[k]; opts[k] = opts[j]; opts[j] = tmp;
     }
 
-    // 7. Find correct answer position after shuffle
-    var newCorrectIdx = opts.indexOf(correctText);
-    if (newCorrectIdx < 0) newCorrectIdx = 0;
+    // 7. Find correct answer after shuffle by TEXT match
+    var newIdx = opts.indexOf(correctText);
+    if (newIdx < 0) newIdx = 0;
 
     questions.push({
-      q: q.q,
-      options: opts,
-      answer: newCorrectIdx,
-      hint: q.hint || '',
-      explanation: q.explanation || '',
+      q: q.q, options: opts, answer: newIdx,
+      hint: q.hint || '', explanation: q.explanation || '',
       difficulty: q.difficulty || 'medium',
-      subjectId: subjectId,
-      subjectTitle: subjectTitle,
-      lesson: '', chapter: '',
-      page: '🤖 مولّد تلقائي',
+      subjectId: subjectId, subjectTitle: subjectTitle,
+      lesson: '', chapter: '', page: '🤖 مولّد تلقائي',
       id: subjectId + '_ai_' + Date.now() + '_q' + qi
     });
   });

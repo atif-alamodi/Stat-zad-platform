@@ -16636,17 +16636,31 @@ async function startExam() {
     console.log('[EXAM] Got ' + questions.length + ' from pool, need ' + (count - questions.length) + ' more');
   }
 
-  // If pool was empty, generate TINY first batch (3 questions = very fast!)
+  // If pool was empty, launch 3 PARALLEL calls → ~9 questions in ~2 seconds
   if (!questions.length) {
     var btn = document.querySelector('[onclick="startExam()"]');
     if (btn) { btn.innerHTML = '🤖 ثانية واحدة...'; btn.disabled = true; btn.style.opacity = '0.7'; }
     try {
-      var FAST_BATCH = 3; // Only 3 questions = ~1-2 seconds
+      var p1, p2, p3;
       if (subj === 'mixed') {
-        questions = await _generateOneBatchMixed(FAST_BATCH, diff);
+        p1 = _generateOneBatchMixed(5, diff);
+        p2 = _generateOneBatchMixed(5, diff);
+        p3 = _generateOneBatchMixed(5, diff);
       } else {
-        questions = await _generateOneBatch(subj, FAST_BATCH, diff, [], 0);
+        p1 = _generateOneBatch(subj, 5, diff, [], 0);
+        p2 = _generateOneBatch(subj, 5, diff, [], 1);
+        p3 = _generateOneBatch(subj, 5, diff, [], 2);
       }
+      var results = await Promise.allSettled([p1, p2, p3]);
+      var seenFirst = new Set();
+      results.forEach(function(r) {
+        if (r.status === 'fulfilled' && r.value) {
+          r.value.forEach(function(q) {
+            var key = q.q.slice(0, 40);
+            if (!seenFirst.has(key)) { seenFirst.add(key); questions.push(q); }
+          });
+        }
+      });
     } catch(e) { console.error('[EXAM] Gen error:', e); }
     if (btn) { btn.innerHTML = '🚀 ابدأ الاختبار الآن!'; btn.disabled = false; btn.style.opacity = '1'; }
   }
@@ -16681,46 +16695,60 @@ async function startExam() {
   }
 }
 
-// Fill remaining exam questions from pool or AI
+// Fill remaining exam questions from pool or AI (3 parallel calls)
 async function _fillExamInBackground() {
   var target = examState._targetCount || 10;
   var poolKey = examState._poolKey;
   var batchNum = 1;
+  var seenBg = new Set(examState.questions.map(function(q){ return q.q.slice(0,40); }));
 
   while (examState._generating && examState.questions.length < target) {
     var needed = target - examState.questions.length;
 
-    // Check pool first
+    // Check pool first (instant)
     var pool = _getPool(poolKey);
     if (pool.length > 0) {
       var fromPool = _takeFromPool(poolKey, Math.min(needed, pool.length));
       fromPool.forEach(function(q) {
-        if (examState.questions.length < target) {
+        var key = q.q.slice(0,40);
+        if (!seenBg.has(key) && examState.questions.length < target) {
+          seenBg.add(key);
           examState.questions.push(q);
           examState.answers.push(null);
         }
       });
-      console.log('[EXAM-BG] Added ' + fromPool.length + ' from pool → ' + examState.questions.length + '/' + target);
       continue;
     }
 
-    // Pool empty — generate
+    // Pool empty — 3 parallel AI calls
     try {
       var subj = examState.subj;
       var diff = examState.diff;
-      var batch = (subj === 'mixed')
-        ? await _generateOneBatchMixed(Math.min(10, needed), diff)
-        : await _generateOneBatch(subj, Math.min(10, needed), diff, examState.questions, batchNum++);
-
-      batch.forEach(function(q) {
-        if (examState.questions.length < target) {
-          examState.questions.push(q);
-          examState.answers.push(null);
+      var bSize = Math.min(5, Math.ceil(needed / 3));
+      var calls = [];
+      for (var ci = 0; ci < 3 && examState.questions.length < target; ci++) {
+        calls.push(subj === 'mixed'
+          ? _generateOneBatchMixed(bSize, diff)
+          : _generateOneBatch(subj, bSize, diff, [], batchNum + ci));
+      }
+      batchNum += 3;
+      var results = await Promise.allSettled(calls);
+      results.forEach(function(r) {
+        if (r.status === 'fulfilled' && r.value) {
+          r.value.forEach(function(q) {
+            var key = q.q.slice(0,40);
+            if (!seenBg.has(key) && examState.questions.length < target) {
+              seenBg.add(key);
+              examState.questions.push(q);
+              examState.answers.push(null);
+            }
+          });
         }
       });
+      console.log('[EXAM-BG] Now:', examState.questions.length + '/' + target);
     } catch(e) { console.warn('[EXAM-BG] Error:', e.message); }
 
-    await new Promise(function(r) { setTimeout(r, 300); });
+    await new Promise(function(r) { setTimeout(r, 100); });
   }
   examState._generating = false;
 }
@@ -16957,7 +16985,7 @@ function renderExamQuestion() {
   const state = examState;
   const q = state.questions[state.current];
   const idx = state.current;
-  const total = state.questions.length;
+  const total = state._targetCount || state.questions.length;
   const sid = state.subj;
 
   const pct = (idx / total) * 100;
@@ -17044,7 +17072,7 @@ function selectExamOption(i) {
   const nb = document.getElementById('exam-next-btn');
   if(nb) {
     nb.disabled = false; nb.style.opacity = '1';
-    const isLast = examState.current >= examState.questions.length - 1;
+    const isLast = examState.current >= (examState._targetCount || examState.questions.length) - 1;
     nb.textContent = isLast ? ZAD_LANG.ui('finish_exam',sid) : ZAD_LANG.ui('next_exam',sid);
   }
 }
@@ -17056,13 +17084,45 @@ function showExamHint() {
 }
 
 function nextExamQuestion() {
-  if(examState.current < examState.questions.length - 1) {
+  var target = examState._targetCount || examState.questions.length;
+
+  // If next question exists → go to it
+  if (examState.current < examState.questions.length - 1) {
     examState.current++;
     renderExamQuestion();
     if(examState.timeLimited) updateTimerDisplay();
-  } else {
-    finishExam();
+    return;
   }
+
+  // If we've reached target → finish
+  if (examState.current >= target - 1) {
+    finishExam();
+    return;
+  }
+
+  // If more questions are being generated → wait briefly
+  if (examState._generating) {
+    var nb = document.getElementById('exam-next-btn');
+    if (nb) { nb.textContent = '⏳ جاري تحميل السؤال التالي...'; nb.disabled = true; }
+    var _waitCount = 0;
+    var _waitTimer = setInterval(function() {
+      _waitCount++;
+      if (examState.current < examState.questions.length - 1) {
+        clearInterval(_waitTimer);
+        examState.current++;
+        renderExamQuestion();
+        return;
+      }
+      if (_waitCount > 30 || !examState._generating) { // 6 seconds max wait
+        clearInterval(_waitTimer);
+        finishExam();
+      }
+    }, 200);
+    return;
+  }
+
+  // No more generating → finish with what we have
+  finishExam();
 }
 
 function prevExamQuestion() {

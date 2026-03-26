@@ -16665,8 +16665,8 @@ async function _generateOneBatch(subjectId, batchSize, difficulty, existingQuest
   var resp = await zadFetch({
     model: 'llama-3.1-8b-instant',
     max_tokens: 2000,
-    system: 'أنت مولّد اختبارات. أجب بمصفوفة JSON فقط بدون أي نص آخر.',
-    messages: [{ role: 'user', content: batchSize + ' سؤال اختيار متعدد ' + diffText + ' من المحتوى.\n\nالقواعد:\n- 4 خيارات مختلفة لكل سؤال\n- الخيار الأول هو الصحيح (answer=0)\n- عربية فصحى سليمة إملائياً\n- لا تكرر خيارات\n\n🎲' + seed + '\n' + content.title + ':\n' + batchContent + '\n\n[{"q":"السؤال؟","options":["الجواب الصحيح","خاطئ 1","خاطئ 2","خاطئ 3"],"answer":0,"explanation":"التفسير"}]' }]
+    system: 'مولّد اختبارات تعليمية. القاعدة: الخيار الأول في options دائماً هو الإجابة الصحيحة. أجب بمصفوفة JSON فقط.',
+    messages: [{ role: 'user', content: batchSize + ' سؤال ' + diffText + ' من المحتوى.\n\n⚠️ الخيار الأول = الصحيح دائماً. الباقي = خاطئة.\n4 خيارات مختلفة لكل سؤال. عربية سليمة.\n\n🎲' + seed + '\n' + content.title + ':\n' + batchContent + '\n\nمثال:\n[{"q":"ما الوسيط؟","options":["القيمة الوسطى بعد الترتيب","المتوسط","الأكثر تكراراً","أصغر قيمة"],"answer":0,"explanation":"الوسيط = القيمة في المنتصف"}]' }]
   });
 
   var data = await resp.json();
@@ -16693,8 +16693,8 @@ async function _generateOneBatchMixed(batchSize, difficulty) {
 
   var resp = await zadFetch({
     model: 'llama-3.1-8b-instant', max_tokens: 2000,
-    system: 'مولّد اختبارات. مصفوفة JSON فقط.',
-    messages: [{ role: 'user', content: batchSize + ' سؤال ' + diffText + ' من مواد مختلفة.\n4 خيارات مختلفة. answer=0. عربية سليمة.\n🎲' + seed + '\n\n' + shuffled + '\n\n[{"q":"؟","options":["صحيح","خطأ1","خطأ2","خطأ3"],"answer":0,"explanation":"لماذا"}]' }]
+    system: 'مولّد اختبارات. الخيار الأول في options دائماً صحيح. JSON فقط.',
+    messages: [{ role: 'user', content: batchSize + ' سؤال ' + diffText + ' من مواد مختلفة.\n⚠️ الخيار الأول = الصحيح. 4 خيارات مختلفة.\n🎲' + seed + '\n\n' + shuffled + '\n\n[{"q":"سؤال؟","options":["الإجابة الصحيحة","خاطئة1","خاطئة2","خاطئة3"],"answer":0,"explanation":"لماذا"}]' }]
   });
   var data = await resp.json();
   var text = (data.content && data.content[0] && data.content[0].text) || '';
@@ -16758,10 +16758,9 @@ function _formatQuizQuestions(qArr, subjectId, subjectTitle, count) {
     // 1. Clean options
     var opts = q.options.map(function(o) { return String(o || '').trim(); }).filter(Boolean);
 
-    // 2. Find correct answer TEXT before any manipulation
-    var ansIdx = typeof q.answer === 'number' ? q.answer : 0;
-    if (ansIdx < 0 || ansIdx >= opts.length) ansIdx = 0;
-    var correctText = opts[ansIdx];
+    // 2. ALWAYS use first option as correct — our prompt says answer=0
+    //    We ignore q.answer because AI sometimes sets wrong index
+    var correctText = opts[0];
 
     // 3. Remove duplicate options (case-insensitive)
     var seenOpt = {};

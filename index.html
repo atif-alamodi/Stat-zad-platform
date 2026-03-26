@@ -11462,6 +11462,8 @@ LANGUAGE FORMAT:
     window._ZAD_LAST_UPLOAD_SUBJECT = subjectId;
     upd('✅', `تم! ${totalSaved} درس — ${totalTerms} مصطلح — ${totalQ} سؤال`, 100);
     showToast(`✅ تم إنشاء ${totalSaved} درس من الملف`, 'success');
+    // Start filling quiz pool for this subject immediately
+    if (typeof _fillQuizPool === 'function') setTimeout(function() { _fillQuizPool(subjectId); }, 1000);
     if (typeof logActivity === 'function') {
       logActivity({ type: 'upload', title: 'رُفع: ' + (detectedChapterTitle || fileName), subjectId: subjectId, tab: 'lessons' });
     }
@@ -16319,6 +16321,105 @@ let examState = {
   started: false
 };
 
+// ══════════════════════════════════════════════════════════════
+// QUIZ POOL — Pre-generated questions ready to serve instantly
+// ══════════════════════════════════════════════════════════════
+var _quizPool = {};     // { subjectId: [question, ...] }
+var _quizPoolFilling = new Set(); // subjects currently being filled
+var _quizPoolSeenQ = {};  // { subjectId: Set of q texts } for dedup
+
+function _getPool(sid) {
+  if (!_quizPool[sid]) _quizPool[sid] = [];
+  if (!_quizPoolSeenQ[sid]) _quizPoolSeenQ[sid] = new Set();
+  return _quizPool[sid];
+}
+
+// Fill pool for a subject (runs in background, 3 parallel calls)
+async function _fillQuizPool(subjectId) {
+  if (_quizPoolFilling.has(subjectId)) return;
+  _quizPoolFilling.add(subjectId);
+
+  var pool = _getPool(subjectId);
+  var seen = _quizPoolSeenQ[subjectId];
+  var TARGET = 100; // keep 100 questions in pool
+
+  try {
+    while (pool.length < TARGET && _quizPoolFilling.has(subjectId)) {
+      // Launch 3 parallel calls for speed
+      var promises = [];
+      for (var p = 0; p < 3 && pool.length + promises.length * 8 < TARGET + 30; p++) {
+        promises.push(_generateOneBatch(subjectId, 10, 'mixed', [], pool.length + p * 10));
+      }
+      var results = await Promise.allSettled(promises);
+
+      results.forEach(function(r) {
+        if (r.status === 'fulfilled' && r.value) {
+          r.value.forEach(function(q) {
+            var key = q.q.slice(0, 40);
+            if (!seen.has(key)) { seen.add(key); pool.push(q); }
+          });
+        }
+      });
+
+      console.log('[POOL] ' + subjectId + ': ' + pool.length + '/' + TARGET);
+      if (pool.length >= TARGET) break;
+      // Small pause between waves
+      await new Promise(function(r) { setTimeout(r, 200); });
+    }
+  } catch (e) {
+    console.warn('[POOL] Fill error:', e.message);
+  }
+  _quizPoolFilling.delete(subjectId);
+}
+
+// Fill pool for mixed (all subjects)
+async function _fillQuizPoolMixed() {
+  if (_quizPoolFilling.has('_mixed')) return;
+  _quizPoolFilling.add('_mixed');
+
+  var pool = _getPool('_mixed');
+  var seen = _quizPoolSeenQ['_mixed'] || (_quizPoolSeenQ['_mixed'] = new Set());
+  var TARGET = 100;
+
+  try {
+    while (pool.length < TARGET && _quizPoolFilling.has('_mixed')) {
+      var promises = [];
+      for (var p = 0; p < 3; p++) promises.push(_generateOneBatchMixed(10, 'mixed'));
+      var results = await Promise.allSettled(promises);
+      results.forEach(function(r) {
+        if (r.status === 'fulfilled' && r.value) {
+          r.value.forEach(function(q) {
+            var key = q.q.slice(0, 40);
+            if (!seen.has(key)) { seen.add(key); pool.push(q); }
+          });
+        }
+      });
+      console.log('[POOL] mixed: ' + pool.length + '/' + TARGET);
+      if (pool.length >= TARGET) break;
+      await new Promise(function(r) { setTimeout(r, 200); });
+    }
+  } catch (e) {}
+  _quizPoolFilling.delete('_mixed');
+}
+
+// Take N questions from pool (instant!) and trigger refill
+function _takeFromPool(subjectId, count) {
+  var pool = _getPool(subjectId);
+  // Shuffle pool first for randomness
+  for (var k = pool.length - 1; k > 0; k--) {
+    var j = Math.floor(Math.random() * (k + 1));
+    var tmp = pool[k]; pool[k] = pool[j]; pool[j] = tmp;
+  }
+  var taken = pool.splice(0, count);
+  // Trigger background refill
+  if (subjectId === '_mixed') {
+    _fillQuizPoolMixed();
+  } else {
+    _fillQuizPool(subjectId);
+  }
+  return taken;
+}
+
 function showExamGenerator() {
   if (window.innerWidth <= 768) closeSidebar();
   // Exit quiz page if we're on it
@@ -16326,7 +16427,6 @@ function showExamGenerator() {
   if (quizPage) quizPage.style.display = '';
   document.querySelectorAll('.page').forEach(function(p){ p.style.display=''; });
   showPage('page-app');
-  // Reset quiz UI
   var qr = document.getElementById('quiz-results');
   if (qr) qr.style.display = 'none';
   var qc = document.getElementById('quiz-content');
@@ -16335,6 +16435,19 @@ function showExamGenerator() {
 
   showSection('exam-generator');
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+
+  // ── START FILLING POOL IN BACKGROUND immediately ──
+  var allSids = new Set(Object.keys(CURRICULUM));
+  if (typeof getCustomSubjects === 'function') getCustomSubjects().forEach(function(s) { if (s && s.id) allSids.add(s.id); });
+  if (typeof ZAD_UPLOADS !== 'undefined') ZAD_UPLOADS.getAll().forEach(function(u) { if (u.subjectId) allSids.add(u.subjectId); });
+
+  Array.from(allSids).forEach(function(sid) {
+    var content = _collectSubjectContent(sid);
+    if (content.parts.length > 0 && _getPool(sid).length < 50) {
+      _fillQuizPool(sid);
+    }
+  });
+  _fillQuizPoolMixed();
 
   // ── Collect ALL subjects: built-in + custom + any with uploads ──
   var allSids = new Set(Object.keys(CURRICULUM));
@@ -16357,13 +16470,19 @@ function showExamGenerator() {
     return { id: sid, title: s.title || sid, icon: s.icon || '📚', color: s.color || '#6C63FF', lessons: lessonCount };
   }).filter(function(s) { return s.lessons > 0; });
 
-  // Build stats HTML — all subjects use AI generation
+  // Build stats HTML — show pool status
   const totalStats = subjectList.map(function(s) {
+    var poolCount = _getPool(s.id).length;
+    var badge = poolCount > 0
+      ? '<span style="background:linear-gradient(135deg,#00BFA5,#00E676);color:white;padding:2px 10px;border-radius:10px;font-size:0.75rem;font-weight:700;">✅ ' + poolCount + ' سؤال جاهز</span>'
+      : '<span style="background:linear-gradient(135deg,var(--primary),#9C8CFF);color:white;padding:2px 10px;border-radius:10px;font-size:0.75rem;font-weight:700;">🔄 يتم التحضير...</span>';
     return '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:rgba(255,255,255,0.03);border-radius:10px;margin-bottom:6px;">'
       + '<span>' + s.icon + ' ' + s.title + '</span>'
-      + '<span style="background:linear-gradient(135deg,var(--primary),#9C8CFF);color:white;padding:2px 10px;border-radius:10px;font-size:0.75rem;font-weight:700;">🤖 ' + s.lessons + ' درس</span>'
+      + badge
       + '</div>';
   }).join('');
+
+  var totalPool = subjectList.reduce(function(a,s){ return a + _getPool(s.id).length; }, 0);
 
   // Build dropdown options
   const subjectOptions = subjectList.map(function(s) {
@@ -16379,10 +16498,10 @@ function showExamGenerator() {
       <div style="background:rgba(108,99,255,0.08);border:1px solid rgba(108,99,255,0.2);border-radius:20px;padding:24px;margin-bottom:24px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
           <div style="font-size:1rem;font-weight:700;">🤖 مولّد الاختبارات الذكي</div>
-          <span style="background:linear-gradient(135deg,var(--primary),var(--secondary));color:white;padding:4px 12px;border-radius:10px;font-size:0.8rem;font-weight:700;">${totalLessons} درس</span>
+          <span id="pool-total-badge" style="background:linear-gradient(135deg,var(--primary),var(--secondary));color:white;padding:4px 12px;border-radius:10px;font-size:0.8rem;font-weight:700;">${totalPool > 0 ? totalPool + ' سؤال جاهز ⚡' : '🔄 يتم التحضير...'}</span>
         </div>
         <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px;line-height:1.6">
-          الأسئلة تُولَّد تلقائياً بالذكاء الاصطناعي من محتوى دروسك الفعلي — أسئلة جديدة في كل مرة 🎲
+          الأسئلة مُعدّة مسبقاً ⚡ — اضغط ابدأ والاختبار يبدأ فوراً بدون أي انتظار
         </div>
         ${totalStats}
         ${!subjectList.length ? '<div style="text-align:center;padding:20px;color:var(--text-muted)">لا توجد أسئلة بعد — ارفع ملفات لمادة أو ادرس الدروس المتاحة</div>' : ''}
@@ -16503,85 +16622,104 @@ async function startExam() {
   const diff  = window._examDiff || 'mixed';
   const time  = window._examTime || 0;
 
-  // Show loading on button
-  var btn = document.querySelector('[onclick="startExam()"]');
-  var origBtnHTML = btn ? btn.innerHTML : '';
-  if (btn) { btn.innerHTML = '🤖 جاري التحضير...'; btn.disabled = true; btn.style.opacity = '0.7'; }
+  var poolKey = subj === 'mixed' ? '_mixed' : subj;
+  var pool = _getPool(poolKey);
 
-  // ── Generate FIRST BATCH only (fast!) then start immediately ──
-  var firstBatch = [];
-  try {
-    if (subj === 'mixed') {
-      firstBatch = await _generateOneBatchMixed(Math.min(10, count), diff);
-    } else {
-      firstBatch = await _generateOneBatch(subj, Math.min(10, count), diff, [], 0);
-    }
-  } catch(e) { console.error('[ZAD-QUIZ] First batch error:', e); }
+  // ── Try to get questions from pre-generated pool (instant!) ──
+  var questions = [];
+  if (pool.length >= count) {
+    questions = _takeFromPool(poolKey, count);
+    console.log('[EXAM] Served ' + questions.length + ' from pool instantly!');
+  } else if (pool.length > 0) {
+    // Take what we have + generate the rest
+    questions = _takeFromPool(poolKey, pool.length);
+    console.log('[EXAM] Got ' + questions.length + ' from pool, need ' + (count - questions.length) + ' more');
+  }
 
-  if (btn) { btn.innerHTML = origBtnHTML || '🚀 ابدأ الاختبار الآن!'; btn.disabled = false; btn.style.opacity = '1'; }
+  // If pool was empty, generate first batch (one call only — fast)
+  if (!questions.length) {
+    var btn = document.querySelector('[onclick="startExam()"]');
+    if (btn) { btn.innerHTML = '🤖 تحضير الأسئلة...'; btn.disabled = true; btn.style.opacity = '0.7'; }
+    try {
+      if (subj === 'mixed') {
+        questions = await _generateOneBatchMixed(Math.min(10, count), diff);
+      } else {
+        questions = await _generateOneBatch(subj, Math.min(10, count), diff, [], 0);
+      }
+    } catch(e) { console.error('[EXAM] Gen error:', e); }
+    if (btn) { btn.innerHTML = '🚀 ابدأ الاختبار الآن!'; btn.disabled = false; btn.style.opacity = '1'; }
+  }
 
-  if (!firstBatch.length) {
-    showToast('لا توجد محتوى كافٍ لتوليد أسئلة — ارفع ملفات أكثر', 'error');
+  if (!questions.length) {
+    showToast('لا توجد محتوى كافٍ — ارفع ملفات أكثر أو انتظر قليلاً', 'error');
     return;
   }
 
-  // ── START EXAM IMMEDIATELY with first batch ──
   examState = {
-    questions: firstBatch,
+    questions: questions,
     current: 0,
-    answers: new Array(firstBatch.length).fill(null),
+    answers: new Array(questions.length).fill(null),
     timer: null,
     seconds: time * 60,
     started: true,
     timeLimited: time > 0,
-    subj, count, diff, time,
+    subj: subj, count: count, diff: diff, time: time,
     _targetCount: count,
-    _generating: count > firstBatch.length,
-    _seenQ: new Set(firstBatch.map(function(q){ return q.q.slice(0,40); }))
+    _generating: questions.length < count,
+    _poolKey: poolKey
   };
 
-  document.querySelectorAll('.page').forEach(p => p.style.display='');
+  document.querySelectorAll('.page').forEach(function(p) { p.style.display=''; });
   showPage('page-quiz');
   renderExamQuestion();
   if (time > 0) startExamTimer();
 
-  // ── BACKGROUND: generate remaining questions while student answers ──
-  if (count > firstBatch.length) {
-    _generateRemainingInBackground(subj, count, diff);
+  // ── If we need more questions, add from pool or generate in background ──
+  if (questions.length < count) {
+    _fillExamInBackground();
   }
 }
 
-// ── Background generator — adds questions while student is answering ──
-async function _generateRemainingInBackground(subj, totalCount, difficulty) {
+// Fill remaining exam questions from pool or AI
+async function _fillExamInBackground() {
+  var target = examState._targetCount || 10;
+  var poolKey = examState._poolKey;
   var batchNum = 1;
-  while (examState._generating && examState.questions.length < totalCount) {
-    try {
-      var needed = totalCount - examState.questions.length;
-      var batchSize = Math.min(10, needed);
-      if (batchSize <= 0) break;
 
-      var newBatch = [];
-      if (subj === 'mixed') {
-        newBatch = await _generateOneBatchMixed(batchSize, difficulty);
-      } else {
-        newBatch = await _generateOneBatch(subj, batchSize, difficulty, examState.questions, batchNum);
-      }
+  while (examState._generating && examState.questions.length < target) {
+    var needed = target - examState.questions.length;
 
-      // Add new questions (dedup)
-      newBatch.forEach(function(q) {
-        var key = q.q.slice(0, 40);
-        if (!examState._seenQ.has(key) && examState.questions.length < totalCount) {
-          examState._seenQ.add(key);
+    // Check pool first
+    var pool = _getPool(poolKey);
+    if (pool.length > 0) {
+      var fromPool = _takeFromPool(poolKey, Math.min(needed, pool.length));
+      fromPool.forEach(function(q) {
+        if (examState.questions.length < target) {
           examState.questions.push(q);
           examState.answers.push(null);
         }
       });
-
-      console.log('[ZAD-QUIZ] Background batch', batchNum, '→ total:', examState.questions.length + '/' + totalCount);
-      batchNum++;
-    } catch(e) {
-      console.warn('[ZAD-QUIZ] Background batch failed:', e.message);
+      console.log('[EXAM-BG] Added ' + fromPool.length + ' from pool → ' + examState.questions.length + '/' + target);
+      continue;
     }
+
+    // Pool empty — generate
+    try {
+      var subj = examState.subj;
+      var diff = examState.diff;
+      var batch = (subj === 'mixed')
+        ? await _generateOneBatchMixed(Math.min(10, needed), diff)
+        : await _generateOneBatch(subj, Math.min(10, needed), diff, examState.questions, batchNum++);
+
+      batch.forEach(function(q) {
+        if (examState.questions.length < target) {
+          examState.questions.push(q);
+          examState.answers.push(null);
+        }
+      });
+    } catch(e) { console.warn('[EXAM-BG] Error:', e.message); }
+
+    await new Promise(function(r) { setTimeout(r, 300); });
   }
   examState._generating = false;
 }

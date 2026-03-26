@@ -16503,35 +16503,87 @@ async function startExam() {
   const diff  = window._examDiff || 'mixed';
   const time  = window._examTime || 0;
 
-  // ── ALWAYS generate fresh questions via AI from actual content ──
-  var questions = [];
-  if (subj === 'mixed') {
-    questions = await generateQuizFromContentAI_Mixed(count, diff);
-  } else {
-    questions = await generateQuizFromContentAI(subj, count, diff);
-  }
+  // Show loading on button
+  var btn = document.querySelector('[onclick="startExam()"]');
+  var origBtnHTML = btn ? btn.innerHTML : '';
+  if (btn) { btn.innerHTML = '🤖 جاري التحضير...'; btn.disabled = true; btn.style.opacity = '0.7'; }
 
-  if (!questions.length) {
-    showToast('لا توجد محتوى كافٍ لتوليد أسئلة — ارفع ملفات أكثر لهذه المادة', 'error');
+  // ── Generate FIRST BATCH only (fast!) then start immediately ──
+  var firstBatch = [];
+  try {
+    if (subj === 'mixed') {
+      firstBatch = await _generateOneBatchMixed(Math.min(10, count), diff);
+    } else {
+      firstBatch = await _generateOneBatch(subj, Math.min(10, count), diff, [], 0);
+    }
+  } catch(e) { console.error('[ZAD-QUIZ] First batch error:', e); }
+
+  if (btn) { btn.innerHTML = origBtnHTML || '🚀 ابدأ الاختبار الآن!'; btn.disabled = false; btn.style.opacity = '1'; }
+
+  if (!firstBatch.length) {
+    showToast('لا توجد محتوى كافٍ لتوليد أسئلة — ارفع ملفات أكثر', 'error');
     return;
   }
 
+  // ── START EXAM IMMEDIATELY with first batch ──
   examState = {
-    questions,
+    questions: firstBatch,
     current: 0,
-    answers: new Array(questions.length).fill(null),
+    answers: new Array(firstBatch.length).fill(null),
     timer: null,
     seconds: time * 60,
     started: true,
     timeLimited: time > 0,
-    subj, count, diff, time
+    subj, count, diff, time,
+    _targetCount: count,
+    _generating: count > firstBatch.length,
+    _seenQ: new Set(firstBatch.map(function(q){ return q.q.slice(0,40); }))
   };
 
   document.querySelectorAll('.page').forEach(p => p.style.display='');
   showPage('page-quiz');
-
   renderExamQuestion();
-  if(time > 0) startExamTimer();
+  if (time > 0) startExamTimer();
+
+  // ── BACKGROUND: generate remaining questions while student answers ──
+  if (count > firstBatch.length) {
+    _generateRemainingInBackground(subj, count, diff);
+  }
+}
+
+// ── Background generator — adds questions while student is answering ──
+async function _generateRemainingInBackground(subj, totalCount, difficulty) {
+  var batchNum = 1;
+  while (examState._generating && examState.questions.length < totalCount) {
+    try {
+      var needed = totalCount - examState.questions.length;
+      var batchSize = Math.min(10, needed);
+      if (batchSize <= 0) break;
+
+      var newBatch = [];
+      if (subj === 'mixed') {
+        newBatch = await _generateOneBatchMixed(batchSize, difficulty);
+      } else {
+        newBatch = await _generateOneBatch(subj, batchSize, difficulty, examState.questions, batchNum);
+      }
+
+      // Add new questions (dedup)
+      newBatch.forEach(function(q) {
+        var key = q.q.slice(0, 40);
+        if (!examState._seenQ.has(key) && examState.questions.length < totalCount) {
+          examState._seenQ.add(key);
+          examState.questions.push(q);
+          examState.answers.push(null);
+        }
+      });
+
+      console.log('[ZAD-QUIZ] Background batch', batchNum, '→ total:', examState.questions.length + '/' + totalCount);
+      batchNum++;
+    } catch(e) {
+      console.warn('[ZAD-QUIZ] Background batch failed:', e.message);
+    }
+  }
+  examState._generating = false;
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -16597,157 +16649,78 @@ function _collectSubjectContent(subjectId) {
   return { parts: contentParts, title: subject.title || subjectId, icon: subject.icon || '📚' };
 }
 
-async function generateQuizFromContentAI(subjectId, count, difficulty) {
-  count = count || 10;
-  difficulty = difficulty || 'mixed';
-
+// ── Single batch generator (one AI call) ──────────────────────
+async function _generateOneBatch(subjectId, batchSize, difficulty, existingQuestions, batchNum) {
+  batchSize = batchSize || 10;
   var content = _collectSubjectContent(subjectId);
   if (!content.parts.length) return [];
 
-  var diffInstruction = '';
-  if (difficulty === 'easy') diffInstruction = 'أسئلة سهلة مباشرة (تعريفات ومفاهيم).';
-  else if (difficulty === 'medium') diffInstruction = 'أسئلة متوسطة (تطبيق وفهم).';
-  else if (difficulty === 'hard') diffInstruction = 'أسئلة صعبة (تحليل ومقارنة متقدم).';
-  else diffInstruction = 'نوّع: 30% سهل، 40% متوسط، 30% صعب.';
+  var diffText = '';
+  if (difficulty === 'easy') diffText = 'أسئلة سهلة مباشرة.';
+  else if (difficulty === 'medium') diffText = 'أسئلة متوسطة.';
+  else if (difficulty === 'hard') diffText = 'أسئلة صعبة تحليلية.';
+  else diffText = 'نوّع بين سهل ومتوسط وصعب.';
 
-  // Show loading
-  var btn = document.querySelector('[onclick="startExam()"]');
-  var origBtnHTML = btn ? btn.innerHTML : '';
-  if (btn) { btn.disabled = true; btn.style.opacity = '0.7'; }
+  // Rotate content
+  var parts = content.parts.slice().sort(function() { return Math.random() - 0.5; });
+  var startIdx = ((batchNum || 0) * 2) % Math.max(parts.length, 1);
+  var rotated = parts.slice(startIdx).concat(parts.slice(0, startIdx));
+  var batchContent = rotated.join('\n\n').slice(0, 5000);
 
-  var allQuestions = [];
-  var seenQ = new Set();
-  var BATCH = 10; // questions per AI call
-  var batches = Math.ceil(count / BATCH);
-  var parts = content.parts.slice();
+  var seed = Math.floor(Math.random() * 99999);
+  var avoidText = existingQuestions && existingQuestions.length > 0
+    ? '\n⛔ لا تكرر: ' + existingQuestions.slice(-5).map(function(q){return q.q.slice(0,25);}).join(' | ')
+    : '';
 
-  try {
-    for (var b = 0; b < batches; b++) {
-      var remaining = count - allQuestions.length;
-      if (remaining <= 0) break;
-      var batchSize = Math.min(BATCH, remaining);
+  var resp = await zadFetch({
+    model: 'llama-3.3-70b-versatile',
+    max_tokens: 4000,
+    system: 'مولّد أسئلة. مصفوفة JSON فقط. بدون markdown.',
+    messages: [{ role: 'user', content: 'أنشئ ' + batchSize + ' سؤال اختيار متعدد حصرياً من المحتوى.\n'
+      + diffText + ' الخيار الأول صحيح (answer=0). JSON فقط.'
+      + avoidText + '\n🎲 ' + seed
+      + '\n\n── ' + content.title + ' ──\n' + batchContent
+      + '\n\n[{"q":"سؤال من المحتوى؟","options":["صحيح","خ1","خ2","خ3"],"answer":0,"explanation":"شرح"}]' }]
+  });
 
-      // Update button
-      if (btn) btn.innerHTML = '🤖 توليد... (' + allQuestions.length + '/' + count + ')';
-
-      // Rotate & shuffle content for each batch — different section each time
-      parts.sort(function() { return Math.random() - 0.5; });
-      // Use different slice of content for each batch
-      var startIdx = (b * 2) % parts.length;
-      var batchParts = parts.slice(startIdx).concat(parts.slice(0, startIdx));
-      var batchContent = batchParts.join('\n\n').slice(0, 5000);
-
-      var seed = Math.floor(Math.random() * 99999);
-      var avoidText = allQuestions.length > 0
-        ? '\n⛔ لا تكرر هذه الأسئلة: ' + allQuestions.slice(-5).map(function(q){return q.q.slice(0,30);}).join(' | ')
-        : '';
-
-      var prompt = 'أنشئ ' + batchSize + ' سؤال اختيار متعدد (4 خيارات) حصرياً من المحتوى أدناه.\n'
-        + diffInstruction + '\n'
-        + 'الخيار الأول صحيح دائماً (answer=0). أجب بمصفوفة JSON فقط.\n'
-        + avoidText + '\n'
-        + '🎲 ' + seed + '\n\n'
-        + '── ' + content.title + ' ──\n' + batchContent + '\n\n'
-        + '[{"q":"سؤال حقيقي من المحتوى؟","options":["إجابة صحيحة","خاطئة1","خاطئة2","خاطئة3"],"answer":0,"explanation":"شرح"}]';
-
-      try {
-        var resp = await zadFetch({
-          model: 'llama-3.3-70b-versatile',
-          max_tokens: 4000,
-          system: 'مولّد أسئلة اختبارات. مصفوفة JSON فقط. بدون markdown.',
-          messages: [{ role: 'user', content: prompt }]
-        });
-        var data = await resp.json();
-        var text = (data.content && data.content[0] && data.content[0].text) || '';
-        var qArr = _parseQuizResponse(text);
-        var formatted = _formatQuizQuestions(qArr, subjectId, content.title, batchSize * 2);
-
-        // Deduplicate
-        formatted.forEach(function(q) {
-          var key = q.q.slice(0, 40);
-          if (!seenQ.has(key) && allQuestions.length < count) {
-            seenQ.add(key);
-            allQuestions.push(q);
-          }
-        });
-        console.log('[ZAD-QUIZ] Batch', b+1, ':', qArr.length, 'parsed,', allQuestions.length, 'total');
-      } catch (batchErr) {
-        console.warn('[ZAD-QUIZ] Batch', b+1, 'failed:', batchErr.message);
-      }
-    }
-
-    return allQuestions.slice(0, count);
-  } catch (err) {
-    console.error('[ZAD-QUIZ] Generation failed:', err);
-    showToast('تعذّر توليد الأسئلة — تحقق من الاتصال', 'error');
-    return allQuestions; // return whatever we got
-  } finally {
-    if (btn) { btn.innerHTML = origBtnHTML || '🚀 ابدأ الاختبار الآن!'; btn.disabled = false; btn.style.opacity = '1'; }
-  }
+  var data = await resp.json();
+  var text = (data.content && data.content[0] && data.content[0].text) || '';
+  return _formatQuizQuestions(_parseQuizResponse(text), subjectId, content.title, batchSize * 2);
 }
 
-// Mixed exam: collect from ALL subjects in batches
-async function generateQuizFromContentAI_Mixed(count, difficulty) {
-  count = count || 10;
-  difficulty = difficulty || 'mixed';
-
+// ── Single batch for mixed (one AI call across subjects) ──────
+async function _generateOneBatchMixed(batchSize, difficulty) {
   var allSids = new Set(Object.keys(CURRICULUM));
   if (typeof getCustomSubjects === 'function') getCustomSubjects().forEach(function(s) { if (s && s.id) allSids.add(s.id); });
   if (typeof ZAD_UPLOADS !== 'undefined') ZAD_UPLOADS.getAll().forEach(function(u) { if (u.subjectId) allSids.add(u.subjectId); });
 
-  // Collect content per subject
-  var subjectsWithContent = [];
+  var allContent = [];
   Array.from(allSids).forEach(function(sid) {
     var c = _collectSubjectContent(sid);
-    if (c.parts.length) subjectsWithContent.push({ id: sid, content: c });
+    if (c.parts.length) allContent.push('═ ' + c.title + ' ═\n' + c.parts.sort(function(){return Math.random()-0.5;}).slice(0,2).join('\n'));
   });
-  if (!subjectsWithContent.length) return [];
+  if (!allContent.length) return [];
 
-  var btn = document.querySelector('[onclick="startExam()"]');
-  var origBtnHTML = btn ? btn.innerHTML : '';
-  if (btn) { btn.disabled = true; btn.style.opacity = '0.7'; }
+  var shuffled = allContent.sort(function(){return Math.random()-0.5;}).join('\n\n').slice(0,5000);
+  var seed = Math.floor(Math.random() * 99999);
+  var diffText = difficulty === 'easy' ? 'سهلة' : difficulty === 'hard' ? 'صعبة' : 'متنوعة';
 
-  var allQuestions = [];
-  var seenQ = new Set();
-  var perSubject = Math.max(3, Math.ceil(count / subjectsWithContent.length));
+  var resp = await zadFetch({
+    model: 'llama-3.3-70b-versatile', max_tokens: 4000,
+    system: 'مولّد أسئلة. مصفوفة JSON فقط.',
+    messages: [{ role: 'user', content: 'أنشئ ' + batchSize + ' سؤال ' + diffText + ' من مواد مختلفة.\nالخيار الأول صحيح (answer=0). JSON فقط.\n🎲 ' + seed + '\n\n' + shuffled + '\n\n[{"q":"?","options":["صحيح","خ1","خ2","خ3"],"answer":0,"explanation":"شرح"}]' }]
+  });
+  var data = await resp.json();
+  var text = (data.content && data.content[0] && data.content[0].text) || '';
+  return _formatQuizQuestions(_parseQuizResponse(text), 'mixed', 'مزيج', batchSize * 2);
+}
 
-  try {
-    for (var si = 0; si < subjectsWithContent.length && allQuestions.length < count; si++) {
-      var sc = subjectsWithContent[si];
-      if (btn) btn.innerHTML = '🤖 ' + sc.content.title + '... (' + allQuestions.length + '/' + count + ')';
-
-      var parts = sc.content.parts.slice().sort(function() { return Math.random() - 0.5; });
-      var fullContent = parts.join('\n\n').slice(0, 4000);
-      var seed = Math.floor(Math.random() * 99999);
-      var batchSize = Math.min(perSubject, count - allQuestions.length);
-
-      var diffText = difficulty === 'easy' ? 'سهلة' : difficulty === 'hard' ? 'صعبة' : 'متنوعة';
-
-      try {
-        var resp = await zadFetch({
-          model: 'llama-3.3-70b-versatile', max_tokens: 4000,
-          system: 'مولّد أسئلة. مصفوفة JSON فقط.',
-          messages: [{ role: 'user', content: 'أنشئ ' + batchSize + ' سؤال ' + diffText + ' من:\n🎲 ' + seed + '\n\n── ' + sc.content.title + ' ──\n' + fullContent + '\n\nالخيار الأول صحيح (answer=0).\n[{"q":"?","options":["صحيح","خ1","خ2","خ3"],"answer":0,"explanation":"شرح"}]' }]
-        });
-        var data = await resp.json();
-        var text = (data.content && data.content[0] && data.content[0].text) || '';
-        var formatted = _formatQuizQuestions(_parseQuizResponse(text), sc.id, sc.content.title, batchSize * 2);
-        formatted.forEach(function(q) {
-          var key = q.q.slice(0, 40);
-          if (!seenQ.has(key) && allQuestions.length < count) { seenQ.add(key); allQuestions.push(q); }
-        });
-      } catch (e) { console.warn('[ZAD-QUIZ] Mixed batch', si, 'failed:', e.message); }
-    }
-
-    // Shuffle final mix
-    allQuestions.sort(function() { return Math.random() - 0.5; });
-    return allQuestions.slice(0, count);
-  } catch (err) {
-    console.error('[ZAD-QUIZ] Mixed failed:', err);
-    return allQuestions;
-  } finally {
-    if (btn) { btn.innerHTML = origBtnHTML || '🚀 ابدأ الاختبار الآن!'; btn.disabled = false; btn.style.opacity = '1'; }
-  }
+// Legacy wrappers (for any remaining calls)
+async function generateQuizFromContentAI(subjectId, count, difficulty) {
+  return await _generateOneBatch(subjectId, count, difficulty, [], 0);
+}
+async function generateQuizFromContentAI_Mixed(count, difficulty) {
+  return await _generateOneBatchMixed(count, difficulty);
 }
 
 // Parse AI quiz response (handles all formats)
@@ -16969,6 +16942,7 @@ function formatTime(secs) {
 
 function finishExam(timeUp = false) {
   if(examState.timer) clearInterval(examState.timer);
+  examState._generating = false; // Stop background generation
   
   const qs = examState.questions;
   const ans = examState.answers;

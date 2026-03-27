@@ -8934,6 +8934,8 @@ function handleUploadDrop(event, subjectId) {
 async function handleUploadFile(event, subjectId) {
   const file = event.target?.files?.[0];
   if (!file) return;
+  // Reset input so same file can be re-selected for retry
+  try { event.target.value = ''; } catch(e) {}
   showUploadStatus('loading', '⏳ جاري تحليل "' + file.name + '"...');
   try {
     await processUploadedFile(file, subjectId);
@@ -23344,9 +23346,17 @@ function showUploadStatus(type, msg) {
       'border-radius:inherit;transition:width linear 80ms"></div></div>'
     : '';
 
+  /* retry button for errors */
+  var retryHtml = type === 'error'
+    ? '<button onclick="hideUploadStatus();var inp=document.getElementById(\'upload-file-input\')||document.getElementById(\'curriculum-file-input\');if(inp){inp.click();}else{triggerCurriculumUpload();}" ' +
+      'style="flex-shrink:0;padding:4px 12px;border-radius:8px;border:1px solid ' + c.text + '66;' +
+      'background:transparent;color:' + c.text + ';cursor:pointer;font-size:0.75rem;font-weight:700;font-family:Cairo,sans-serif">🔄 أعد المحاولة</button>'
+    : '';
+
   el.innerHTML =
     iconHtml +
     '<span style="flex:1;line-height:1.4">' + msg + '</span>' +
+    retryHtml +
     '<button onclick="hideUploadStatus()" title="إغلاق" ' +
       'style="flex-shrink:0;background:transparent;border:none;color:' + c.text +
       ';opacity:0.7;cursor:pointer;font-size:1.1rem;line-height:1;padding:0 2px">' +
@@ -23363,7 +23373,7 @@ function showUploadStatus(type, msg) {
 
   /* loading stays until replaced — all others auto-dismiss in 5s */
   if (type !== 'loading') {
-    var TOTAL = 5000, TICK = 80, elapsed = 0;
+    var TOTAL = type === 'error' ? 10000 : 5000, TICK = 80, elapsed = 0;
     el._ustBar = setInterval(function() {
       elapsed += TICK;
       var f = document.getElementById('ust-bar-fill');

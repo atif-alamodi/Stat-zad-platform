@@ -11370,9 +11370,9 @@ LANGUAGE FORMAT:
       // Single lesson - process in chunks
       // Keep chunks small (5000 chars) for Pollinations compatibility
       upd('📡', 'تحليل الملف...', 30);
-      // Single chunk, max 4000 chars = ~1000 tokens = fast CF AI response
-      const chunkSize = 4000;
-      const numChunks = 1; // always single chunk for speed
+      // Single chunk, max 2500 chars for FAST processing
+      const chunkSize = 2500;
+      const numChunks = 1;
       console.log('[ZAD] numChunks:', numChunks, 'chunkSize:', chunkSize);
       const allResults = [];
 
@@ -11382,8 +11382,8 @@ LANGUAGE FORMAT:
         const isFirst = ci === 0;
         const prompt = isFirst
           ? (isEng
-              ? 'Educational lesson from text. JSON only:\n\n' + chunk.slice(0,3500) + '\n\nJSON:\n' + jsonTemplateCompact
-              : 'استخرج درساً تعليمياً. JSON فقط:\n\n' + chunk.slice(0,3500) + '\n\nJSON:\n' + jsonTemplateCompact)
+              ? 'Educational lesson from text. JSON only:\n\n' + chunk.slice(0,2000) + '\n\nJSON:\n' + jsonTemplateCompact
+              : 'استخرج درساً تعليمياً. JSON فقط:\n\n' + chunk.slice(0,2000) + '\n\nJSON:\n' + jsonTemplateCompact)
           : isEng
           ? `${langNote}\n\nAdditional source text (extract from this only):\n${chunk}\n\nReturn JSON with extra content only — from this text only:\n{"keyTerms":[{"term":"English term","def":"Arabic definition"}],"steps":["Arabic point"],"quiz":[{"q":"English question?","options":["Correct English","Wrong 1","Wrong 2","Wrong 3"],"answer":0,"hint":"English hint","explanation":"Arabic explanation"}]}`
           : `${langNote}\n\n⚠️ نص إضافي (استخرج منه فقط، لا تضف معلومات خارجه):\n${chunk}\n\nأجب بـ JSON مع مصطلحات وأسئلة مستخرجة من هذا النص فقط:\n{"keyTerms":[{"term":"...","def":"..."}],"steps":["..."],"quiz":[{"q":"...","options":["صحيح","خطأ1","خطأ2","خطأ3"],"answer":0,"explanation":"..."}]}`;
@@ -11422,7 +11422,7 @@ LANGUAGE FORMAT:
             system: 'Educational extractor. Reply with valid JSON only. No markdown.',
             messages: [{ role: 'user', content:
               (isEng?'Lesson about: ':'درس عن: ') + fileName
-              + '\n\nText:\n' + clean.slice(0,3000)
+              + '\n\nText:\n' + clean.slice(0,2000)
               + '\n\nReturn compact JSON:\n' + jsonTemplateCompact
             }]
           });
@@ -22723,7 +22723,7 @@ async function zadFetch(body) {
       var wResp = await fetch(BACKEND_URL + '/ai', {
         method: 'POST', headers: {'Content-Type':'application/json'},
         body: JSON.stringify({model:model, messages:messages, max_tokens:body.max_tokens||4000}),
-        signal: AbortSignal.timeout ? AbortSignal.timeout(20000) : undefined
+        signal: AbortSignal.timeout ? AbortSignal.timeout(8000) : undefined
       });
       if (wResp.ok) {
         var wData = await wResp.json();
@@ -22756,7 +22756,7 @@ async function zadFetch(body) {
         messages: messages,
         seed: Math.floor(Math.random()*99999)
       }),
-      signal: AbortSignal.timeout ? AbortSignal.timeout(15000) : undefined
+      signal: AbortSignal.timeout ? AbortSignal.timeout(10000) : undefined
     });
     if (pollResp.ok) {
       var pollText = await pollResp.text();

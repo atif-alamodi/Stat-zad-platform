@@ -9501,19 +9501,24 @@ function saveAILesson(lesson, subjectId) {
 
 function renderAutoSummary(text, subjectId) {
   const words = text.split(/\s+/).filter(Boolean);
-  const sentences = text.split(/[.!?،؟]+/).filter(s=>s.trim().length>20).slice(0,5);
+  const sentences = text.split(/[.!?،؟]+/).filter(s => s.trim().length > 25).slice(0, 6);
   const keywordsFound = [];
-  const fp = SUBJECT_FINGERPRINTS[subjectId];
+  const fp = SUBJECT_FINGERPRINTS && SUBJECT_FINGERPRINTS[subjectId];
   if (fp) {
     fp.keywords.forEach(kw => { if (text.toLowerCase().includes(kw.toLowerCase())) keywordsFound.push(kw); });
   }
+  const topKws = keywordsFound.slice(0, 8);
   return `
-    <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:12px;padding:14px;margin-top:8px">
-      <div style="font-weight:800;margin-bottom:10px">📋 ملخص تلقائي</div>
-      <div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:8px">
-        عدد الكلمات: ${words.length} | الكلمات المفتاحية: ${keywordsFound.slice(0,8).join('، ')}
+    <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(108,99,255,0.2);border-radius:14px;padding:16px;margin-top:8px;direction:rtl">
+      <div style="font-weight:900;margin-bottom:12px;display:flex;align-items:center;gap:8px;font-size:0.95rem">📋 <span>ملخص تلقائي</span></div>
+      ${topKws.length ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">${topKws.map(kw=>`<span style="padding:3px 10px;background:rgba(108,99,255,0.12);border:1px solid rgba(108,99,255,0.25);border-radius:20px;font-size:0.72rem;font-weight:700;color:#6C63FF">${kw}</span>`).join('')}</div>` : ''}
+      <div style="display:flex;flex-direction:column;gap:6px">
+        ${sentences.map((s,i)=>`<div style="display:flex;gap:8px;padding:8px 10px;background:rgba(255,255,255,0.02);border-right:3px solid rgba(108,99,255,${0.4+i*0.08});border-radius:0 8px 8px 0">
+          <span style="color:#6C63FF;font-weight:900;flex-shrink:0;font-size:0.9rem">${i+1}</span>
+          <span style="font-size:0.83rem;line-height:1.7">${s.trim()}</span>
+        </div>`).join('')}
       </div>
-      ${sentences.map(s=>`<div style="font-size:0.83rem;line-height:1.7;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.04)">• ${s.trim()}</div>`).join('')}
+      <div style="font-size:0.7rem;color:var(--text-muted);margin-top:10px;text-align:center">${words.length.toLocaleString()} كلمة في المحتوى الأصلي</div>
     </div>`;
 }
 
@@ -10135,13 +10140,17 @@ function buildAllMindMaps(subject, subjectId) {
   window._ZAD_MM = window._ZAD_MM || {};
   let out = '<div style="display:flex;flex-direction:column;gap:20px">';
   let found = 0;
+  let noMmLessons = [];
   const PALETTE = ['#6C63FF','#00BFA5','#FF7043','#FFD600','#E91E63','#00B0FF'];
 
   subject.chapters.forEach(ch => {
     ch.lessons.forEach(lesson => {
       if (selectedLessonId && lesson.id !== selectedLessonId) return;
       const mm = lesson.content && lesson.content.mindMap;
-      if (!mm || !mm.branches || !mm.branches.length) return;
+      if (!mm || !mm.branches || !mm.branches.length) {
+        if (lesson.aiGenerated) noMmLessons.push({ lesson, ch });
+        return;
+      }
       found++;
       const col = PALETTE[found % PALETTE.length];
       const safeId = 'mm_' + lesson.id.replace(/[^a-z0-9]/gi,'_') + '_' + found;
@@ -10170,19 +10179,302 @@ function buildAllMindMaps(subject, subjectId) {
     });
   });
 
+  // Show "generate" cards for AI lessons without mind maps
+  noMmLessons.forEach(({ lesson, ch }) => {
+    const safeId = 'gen_mm_' + lesson.id.replace(/[^a-z0-9]/gi,'_');
+    out += `<div id="card-${safeId}" style="background:rgba(108,99,255,0.04);border:1.5px dashed rgba(108,99,255,0.25);border-radius:18px;padding:20px;text-align:center">
+      <div style="font-size:0.68rem;color:var(--text-muted);margin-bottom:4px;text-align:right">${ch.title}</div>
+      <div style="font-size:0.92rem;font-weight:800;margin-bottom:12px;text-align:right">${lesson.title}</div>
+      <div style="font-size:2rem;margin-bottom:8px">🧠</div>
+      <div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:14px">لا توجد خريطة ذهنية — اضغط لتوليدها بالذكاء الاصطناعي</div>
+      <button id="btn-${safeId}" onclick="generateMindMapForLesson('${lesson.id}','${subjectId}','${safeId}')"
+        style="padding:10px 22px;border-radius:12px;border:none;cursor:pointer;
+          background:linear-gradient(135deg,#6C63FF,#FF6584);color:white;
+          font-family:var(--font);font-weight:800;font-size:0.88rem">
+        ✨ توليد الخريطة الذهنية
+      </button>
+    </div>`;
+    found++;
+  });
+
   out += '</div>';
   if (!found) return `
     <div style="text-align:center;padding:60px 20px">
       <div style="font-size:3rem;margin-bottom:12px">🧠</div>
-      <div style="font-weight:700;margin-bottom:6px">لا توجد خرائط ذهنية لهذه المادة</div>
+      <div style="font-weight:700;margin-bottom:6px">لا توجد خرائط ذهنية لهذه المادة بعد</div>
+      <div style="font-size:0.82rem;color:var(--text-muted);margin-top:6px">ارفع ملفاً دراسياً من تبويب "رفع محتوى" لتوليد الخرائط الذهنية تلقائياً</div>
     </div>`;
   return out;
+}
+
+async function generateMindMapForLesson(lessonId, subjectId, safeId) {
+  const btn = document.getElementById('btn-' + safeId);
+  const card = document.getElementById('card-' + safeId);
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ جارٍ التوليد...'; }
+
+  const subject = getSubjectWithUploads(subjectId) || CURRICULUM[subjectId];
+  let lesson = null;
+  for (const ch of (subject?.chapters || [])) {
+    lesson = ch.lessons.find(l => l.id === lessonId);
+    if (lesson) break;
+  }
+  if (!lesson) { if (btn) { btn.disabled=false; btn.textContent='خطأ — لم يُعثر على الدرس'; } return; }
+
+  const contentSrc = [
+    lesson.content?.definition || '',
+    (lesson.content?.keyTerms || lesson.keyTerms || []).map(k => k.term + ': ' + k.def).join(' | '),
+    (lesson.content?.steps || lesson.steps || []).join(' | '),
+    lesson.summary || ''
+  ].filter(Boolean).join('\n');
+
+  try {
+    const resp = await zadFetch({
+      model: 'llama-3.3-70b-versatile',
+      max_tokens: 800,
+      system: 'أنت خبير تعليمي. أنتج خريطة ذهنية تعليمية احترافية. JSON فقط بدون markdown.',
+      messages: [{ role: 'user', content:
+        `اصنع خريطة ذهنية تعليمية قوية للموضوع: "${lesson.title}"\n\nالمحتوى:\n${contentSrc.slice(0,1500)}\n\nأنتج JSON:\n{"branches":[{"label":"محور 1","color":"#6C63FF","children":["فكرة1","فكرة2","فكرة3"]},{"label":"محور 2","color":"#FF7043","children":["فكرة1","فكرة2","فكرة3"]},{"label":"محور 3","color":"#00BFA5","children":["فكرة1","فكرة2","فكرة3"]},{"label":"محور 4","color":"#FFD600","children":["فكرة1","فكرة2"]}]}\n\nالقواعد: كل محور = مفهوم رئيسي، كل فرع = معلومة محددة وقصيرة (3-5 كلمات). لا تضع أرقام في بداية الفروع.`
+      }]
+    });
+    const data = await resp.json();
+    const raw = (data.content?.[0]?.text || '').replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+    let parsed;
+    try { parsed = JSON.parse(raw); } catch(e) { const m = raw.match(/\{[\s\S]+\}/); if(m) parsed = JSON.parse(m[0]); }
+    if (!parsed?.branches?.length) throw new Error('استجابة غير صالحة');
+
+    const mm = { center: lesson.title, branches: parsed.branches };
+
+    // Persist to IndexedDB
+    const uploads = ZAD_UPLOADS.getAll();
+    const bundle = uploads.find(u => (u.lessonId || 'ai-'+u.id) === lessonId);
+    if (bundle) {
+      if (!bundle.lesson.content) bundle.lesson.content = {};
+      bundle.lesson.content.mindMap = mm;
+      await ZAD_UPLOADS.save(bundle);
+    }
+
+    // Update live subject
+    for (const ch of (subject?.chapters || [])) {
+      const l = ch.lessons.find(l => l.id === lessonId);
+      if (l) { if (!l.content) l.content = {}; l.content.mindMap = mm; break; }
+    }
+
+    if (card) {
+      const col = '#6C63FF';
+      const newSafeId = 'mm_gen_' + lessonId.replace(/[^a-z0-9]/gi,'_');
+      window._ZAD_MM = window._ZAD_MM || {};
+      window._ZAD_MM[newSafeId] = { mm, title: lesson.title, col };
+      card.style.background = 'rgba(255,255,255,0.03)';
+      card.style.border = '1px solid var(--border)';
+      card.style.textAlign = 'right';
+      card.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
+        <div><div style="font-size:0.92rem;font-weight:800">${lesson.title}</div></div>
+        <button onclick="openMindMapById('${newSafeId}')" style="padding:7px 16px;border-radius:10px;border:1px solid ${col}40;background:${col}12;color:${col};font-family:var(--font);font-size:0.78rem;font-weight:700;cursor:pointer">🔍 عرض موسّع</button>
+      </div>
+      <div style="cursor:pointer" onclick="openMindMapById('${newSafeId}')">${buildEnhancedMindMap(mm, lesson.title)}</div>
+      <div style="font-size:0.72rem;color:var(--text-muted);text-align:center;margin-top:8px">👆 اضغط على الخريطة لعرضها بشكل موسّع</div>`;
+    }
+  } catch(e) {
+    if (btn) { btn.disabled=false; btn.textContent='❌ فشل التوليد — أعد المحاولة'; }
+    console.error('generateMindMapForLesson:', e);
+  }
 }
 
 function openMindMapById(safeId) {
   const entry = (window._ZAD_MM || {})[safeId];
   if (!entry) return;
   openMindMapModal(entry.mm, entry.title, entry.col);
+}
+
+// ══════════════════════════════════════════════════════════════
+// SUMMARIES TAB — ملخصات ذكية قوية
+// ══════════════════════════════════════════════════════════════
+function buildAllSummaries(subject, subjectId) {
+  if (subjectId) subject = getSubjectWithUploads(subjectId) || subject;
+  const COLORS = ['#6C63FF','#00BFA5','#FF7043','#FFD600','#E91E63','#00B0FF','#FF9800','#9C27B0'];
+  let out = '<div style="display:flex;flex-direction:column;gap:20px;direction:rtl">';
+  let count = 0;
+
+  subject.chapters.forEach(ch => {
+    ch.lessons.forEach(lesson => {
+      count++;
+      const col = COLORS[count % COLORS.length];
+      const content = lesson.content || {};
+      const definition = content.definition || lesson.definition || '';
+      const keyTerms = content.keyTerms || lesson.keyTerms || [];
+      const steps = content.steps || lesson.steps || [];
+      const examples = content.realExamples || content.examples || lesson.examples || [];
+      const whyLearn = content.whyLearn || lesson.whyLearn || [];
+      const summary = lesson.summary || '';
+      const safeId = 'sum_' + lesson.id.replace(/[^a-z0-9]/gi,'_') + '_' + count;
+
+      out += `<div id="sumcard-${safeId}" style="background:rgba(255,255,255,0.03);border:1px solid ${col}30;border-radius:20px;overflow:hidden">
+        <!-- Header -->
+        <div style="background:linear-gradient(135deg,${col}18,${col}08);padding:16px 18px;border-bottom:1px solid ${col}20;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+          <div>
+            <div style="font-size:0.68rem;color:${col};font-weight:700;margin-bottom:3px;letter-spacing:0.5px">${ch.title}</div>
+            <div style="font-size:1rem;font-weight:900">${lesson.title}</div>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            ${keyTerms.length ? `<span style="padding:3px 10px;background:${col}18;border-radius:20px;font-size:0.7rem;font-weight:700;color:${col}">📖 ${keyTerms.length} مصطلح</span>` : ''}
+            ${steps.length ? `<span style="padding:3px 10px;background:rgba(255,255,255,0.06);border-radius:20px;font-size:0.7rem;font-weight:700;color:var(--text-muted)">📋 ${steps.length} نقطة</span>` : ''}
+          </div>
+        </div>
+        <div style="padding:16px 18px">`;
+
+      // Definition block
+      if (definition) {
+        out += `<div style="background:linear-gradient(135deg,${col}10,transparent);border-right:4px solid ${col};border-radius:0 12px 12px 0;padding:14px 16px;margin-bottom:14px;font-size:0.9rem;line-height:1.85;font-weight:500">${definition}</div>`;
+      }
+
+      // Why learn - quick anchors
+      if (whyLearn.length) {
+        out += `<div style="margin-bottom:14px"><div style="font-size:0.78rem;font-weight:800;color:${col};margin-bottom:8px;display:flex;align-items:center;gap:6px"><span>💡</span> لماذا يهمك هذا؟</div>
+          <div style="display:flex;flex-direction:column;gap:5px">
+          ${whyLearn.map(w => `<div style="display:flex;gap:8px;font-size:0.82rem;line-height:1.65"><span style="color:${col};flex-shrink:0;margin-top:2px">◆</span><span>${w}</span></div>`).join('')}
+          </div></div>`;
+      }
+
+      // Key terms - visual grid
+      if (keyTerms.length) {
+        out += `<div style="margin-bottom:14px"><div style="font-size:0.78rem;font-weight:800;color:${col};margin-bottom:8px;display:flex;align-items:center;gap:6px"><span>🔑</span> المصطلحات الأساسية</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:7px">
+          ${keyTerms.map(k => `<div style="background:rgba(255,255,255,0.03);border:1px solid ${col}25;border-radius:10px;padding:9px 12px">
+            <div style="font-weight:800;font-size:0.83rem;color:${col};margin-bottom:3px">${k.term}</div>
+            <div style="font-size:0.78rem;color:var(--text-muted);line-height:1.55">${k.def}</div>
+          </div>`).join('')}
+          </div></div>`;
+      }
+
+      // Steps / key points - numbered
+      if (steps.length) {
+        out += `<div style="margin-bottom:14px"><div style="font-size:0.78rem;font-weight:800;color:${col};margin-bottom:8px;display:flex;align-items:center;gap:6px"><span>📌</span> النقاط الجوهرية</div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+          ${steps.map((s,i) => `<div style="display:flex;gap:10px;align-items:flex-start;padding:8px 10px;background:rgba(255,255,255,0.02);border-radius:9px;border-right:3px solid ${col}40">
+            <span style="background:${col};color:white;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.68rem;font-weight:900;flex-shrink:0;margin-top:1px">${i+1}</span>
+            <span style="font-size:0.83rem;line-height:1.65">${s}</span>
+          </div>`).join('')}
+          </div></div>`;
+      }
+
+      // Examples
+      if (examples.length) {
+        out += `<div style="margin-bottom:14px"><div style="font-size:0.78rem;font-weight:800;color:${col};margin-bottom:8px;display:flex;align-items:center;gap:6px"><span>⚡</span> أمثلة تطبيقية</div>
+          ${examples.slice(0,3).map(ex => `<div style="background:rgba(255,255,255,0.02);border-radius:10px;padding:10px 12px;margin-bottom:6px;display:flex;gap:10px;align-items:flex-start">
+            <span style="font-size:1.3rem;flex-shrink:0">${ex.icon||'💡'}</span>
+            <div><div style="font-weight:700;font-size:0.84rem;margin-bottom:3px">${ex.title||''}</div>
+            <div style="font-size:0.78rem;color:var(--text-muted);line-height:1.6">${ex.desc||ex.content||''}</div></div>
+          </div>`).join('')}
+          </div>`;
+      }
+
+      // Summary or Generate button
+      if (summary) {
+        out += `<div style="background:linear-gradient(135deg,rgba(108,99,255,0.1),rgba(0,191,165,0.06));border:1px solid rgba(108,99,255,0.2);border-radius:14px;padding:14px 16px;margin-top:6px">
+          <div style="font-size:0.75rem;font-weight:800;color:#6C63FF;margin-bottom:8px;display:flex;align-items:center;gap:5px">✨ الملخص الذكي</div>
+          <div id="sumtext-${safeId}" style="font-size:0.85rem;line-height:1.85;white-space:pre-line">${summary}</div>
+        </div>`;
+      } else {
+        out += `<div id="sumgen-${safeId}" style="border:1.5px dashed rgba(108,99,255,0.25);border-radius:14px;padding:14px;text-align:center;margin-top:6px">
+          <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:10px">✨ لا يوجد ملخص ذكي — اضغط لتوليده بالذكاء الاصطناعي</div>
+          <button id="sumbtn-${safeId}" onclick="generateRichSummaryForLesson('${lesson.id}','${subjectId}','${safeId}')"
+            style="padding:9px 20px;border-radius:10px;border:none;cursor:pointer;
+              background:linear-gradient(135deg,#6C63FF,#FF6584);color:white;
+              font-family:var(--font);font-weight:800;font-size:0.85rem">
+            🧠 توليد ملخص ذكي
+          </button>
+        </div>`;
+      }
+
+      out += `</div></div>`;
+    });
+  });
+
+  out += '</div>';
+  if (!count) return `
+    <div style="text-align:center;padding:60px 20px">
+      <div style="font-size:3rem;margin-bottom:12px">📋</div>
+      <div style="font-weight:700;margin-bottom:6px">لا توجد دروس بعد</div>
+      <div style="font-size:0.82rem;color:var(--text-muted);margin-top:6px">ارفع ملفاً دراسياً من تبويب "رفع محتوى" لتوليد الملخصات تلقائياً</div>
+    </div>`;
+  return out;
+}
+
+async function generateRichSummaryForLesson(lessonId, subjectId, safeId) {
+  const btn = document.getElementById('sumbtn-' + safeId);
+  const box = document.getElementById('sumgen-' + safeId);
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ الذكاء الاصطناعي يعالج...'; }
+
+  const subject = getSubjectWithUploads(subjectId) || CURRICULUM[subjectId];
+  let lesson = null;
+  for (const ch of (subject?.chapters || [])) {
+    lesson = ch.lessons.find(l => l.id === lessonId);
+    if (lesson) break;
+  }
+  if (!lesson) { if (btn) { btn.disabled=false; btn.textContent='خطأ'; } return; }
+
+  const content = lesson.content || {};
+  const keyTerms = (content.keyTerms || lesson.keyTerms || []).map(k => `• ${k.term}: ${k.def}`).join('\n');
+  const steps = (content.steps || lesson.steps || []).map((s,i) => `${i+1}. ${s}`).join('\n');
+  const definition = content.definition || lesson.definition || '';
+  const examples = (content.realExamples || content.examples || lesson.examples || []).map(ex => `- ${ex.title}: ${ex.desc||ex.content||''}`).join('\n');
+
+  const prompt = `أنت معلم خبير ومتخصص في التبسيط التعليمي العميق.
+الموضوع: "${lesson.title}"
+
+المحتوى المتاح:
+${definition ? 'التعريف:\n' + definition + '\n' : ''}${keyTerms ? 'المصطلحات:\n' + keyTerms + '\n' : ''}${steps ? 'النقاط الرئيسية:\n' + steps + '\n' : ''}${examples ? 'الأمثلة:\n' + examples : ''}
+
+اكتب ملخصاً تعليمياً احترافياً يدخل المعلومة للعقل بقوة وبساطة، بالتنسيق التالي:
+
+🎯 الجوهر:
+[جملة واحدة قوية ومركزة تلخص الفكرة الكاملة]
+
+📌 أبرز النقاط:
+• [نقطة 1 - محددة وقصيرة]
+• [نقطة 2]
+• [نقطة 3]
+• [نقطة 4 إن وجدت]
+
+⚡ قاعدة ذهبية:
+[قاعدة أو معادلة بسيطة تسهل الحفظ - إن وجدت]
+
+🔗 كيف تتذكرها:
+[جملة مساعدة على الربط أو التذكر]
+
+اكتب بالعربية الفصحى المبسطة. كن مباشراً ودقيقاً وقوياً.`;
+
+  try {
+    const resp = await zadFetch({
+      model: 'llama-3.3-70b-versatile',
+      max_tokens: 700,
+      system: 'أنت معلم خبير في التبسيط. اكتب بالعربية الفصحى المبسطة.',
+      messages: [{ role: 'user', content: prompt }]
+    });
+    const data = await resp.json();
+    const summaryText = (data.content?.[0]?.text || '').trim();
+    if (!summaryText) throw new Error('استجابة فارغة');
+
+    // Persist
+    const uploads = ZAD_UPLOADS.getAll();
+    const bundle = uploads.find(u => (u.lessonId || 'ai-'+u.id) === lessonId);
+    if (bundle) {
+      bundle.lesson.summary = summaryText;
+      await ZAD_UPLOADS.save(bundle);
+    }
+    if (lesson) lesson.summary = summaryText;
+
+    if (box) {
+      box.style.border = '1px solid rgba(108,99,255,0.25)';
+      box.style.background = 'linear-gradient(135deg,rgba(108,99,255,0.1),rgba(0,191,165,0.06))';
+      box.style.textAlign = 'right';
+      box.innerHTML = `<div style="font-size:0.75rem;font-weight:800;color:#6C63FF;margin-bottom:8px;display:flex;align-items:center;gap:5px">✨ الملخص الذكي</div>
+        <div style="font-size:0.85rem;line-height:1.85;white-space:pre-line">${summaryText}</div>`;
+    }
+  } catch(e) {
+    if (btn) { btn.disabled=false; btn.textContent='❌ فشل — أعد المحاولة'; }
+    console.error('generateRichSummaryForLesson:', e);
+  }
 }
 
 function addTypeCardClickHandlers() {
@@ -11299,10 +11591,9 @@ LANGUAGE FORMAT:
     const jsonTemplateEN = "{\n  \"lessonTitle\": \"Accurate English Title\",\n  \"definition\": \"Arabic explanation (4-6 simple sentences)\",\n  \"whyLearn\": [\"Arabic importance 1\", \"Importance 2\", \"Importance 3\"],\n  \"keyTerms\": [{\"term\":\"English Term\",\"def\":\"Arabic definition\"},{\"term\":\"Term 2\",\"def\":\"def\"},{\"term\":\"Term 3\",\"def\":\"def\"},{\"term\":\"Term 4\",\"def\":\"def\"},{\"term\":\"Term 5\",\"def\":\"def\"}],\n  \"examples\": [{\"icon\":\"💡\",\"title\":\"English Example 1\",\"content\":\"Arabic explanation\"},{\"icon\":\"📌\",\"title\":\"Example 2\",\"content\":\"explanation\"},{\"icon\":\"🔍\",\"title\":\"Example 3\",\"content\":\"explanation\"}],\n  \"steps\": [\"Arabic point 1\",\"Point 2\",\"Point 3\",\"Point 4\",\"Point 5\"],\n  \"properties\": [\"Arabic property 1\",\"Property 2\",\"Property 3\"],\n  \"types\": [\"Arabic type 1\",\"Type 2\",\"Type 3\"],\n  \"mindMapBranches\": [{\"label\":\"Branch 1\",\"color\":\"#6C63FF\",\"children\":[\"Sub 1\",\"Sub 2\",\"Sub 3\"]},{\"label\":\"Branch 2\",\"color\":\"#FF6584\",\"children\":[\"Sub 1\",\"Sub 2\",\"Sub 3\"]},{\"label\":\"Branch 3\",\"color\":\"#00BFA5\",\"children\":[\"Sub 1\",\"Sub 2\"]},{\"label\":\"Branch 4\",\"color\":\"#FFD600\",\"children\":[\"Sub 1\",\"Sub 2\"]}],\n  \"quiz\": [{\"q\":\"Question 1 in English?\",\"options\":[\"Correct answer\",\"Wrong 1\",\"Wrong 2\",\"Wrong 3\"],\"answer\":0,\"hint\":\"English hint\",\"explanation\":\"Arabic explanation of correct answer\"},{\"q\":\"Question 2?\",\"options\":[\"Correct\",\"Wrong 1\",\"Wrong 2\",\"Wrong 3\"],\"answer\":0,\"hint\":\"Hint\",\"explanation\":\"Arabic explanation\"},{\"q\":\"Question 3?\",\"options\":[\"Correct\",\"Wrong 1\",\"Wrong 2\",\"Wrong 3\"],\"answer\":0,\"hint\":\"Hint\",\"explanation\":\"Arabic explanation\"},{\"q\":\"Question 4?\",\"options\":[\"Correct\",\"Wrong 1\",\"Wrong 2\",\"Wrong 3\"],\"answer\":0,\"hint\":\"Hint\",\"explanation\":\"Arabic explanation\"},{\"q\":\"Question 5?\",\"options\":[\"Correct\",\"Wrong 1\",\"Wrong 2\",\"Wrong 3\"],\"answer\":0,\"hint\":\"Hint\",\"explanation\":\"Arabic explanation\"}],\n  \"summary\": \"Arabic summary\"\n}";
 
     // Compact template for CF Workers AI (fits within 2048 token limit)
-    // Ultra-compact template fits within 1024 tokens output limit
     const jsonTemplateCompact = isEng
-      ? '{"lessonTitle":"[REAL TITLE FROM TEXT]","definition":"[4 REAL Arabic sentences from the text]","keyTerms":[{"term":"[real term from text]","def":"[real Arabic definition]"},{"term":"[term2]","def":"[def2]"},{"term":"[term3]","def":"[def3]"}],"steps":["[real point from text 1]","[real point 2]","[real point 3]"],"quiz":[{"q":"[real question about the text content]?","options":["[correct answer from text]","[plausible wrong answer]","[another wrong]","[another wrong]"],"answer":0,"explanation":"[Arabic explanation why correct]"},{"q":"[second real question]?","options":["[correct]","[wrong1]","[wrong2]","[wrong3]"],"answer":0,"explanation":"[explanation]"}],"summary":"[2 Arabic sentences summarizing]"}'
-      : '{"lessonTitle":"[العنوان الحقيقي]","definition":"[تعريف حقيقي من النص]","keyTerms":[{"term":"[مصطلح حقيقي]","def":"[تعريف حقيقي]"},{"term":"[م2]","def":"[ت2]"}],"steps":["[نقطة حقيقية 1]","[نقطة 2]","[نقطة 3]"],"quiz":[{"q":"[سؤال حقيقي من المحتوى]؟","options":["[الإجابة الصحيحة]","[إجابة خاطئة 1]","[خاطئة 2]","[خاطئة 3]"],"answer":0,"explanation":"[شرح]"},{"q":"[سؤال 2]؟","options":["[صحيح]","[خطأ1]","[خطأ2]","[خطأ3]"],"answer":0,"explanation":"[شرح]"}],"summary":"[ملخص حقيقي]"}';
+      ? '{"lessonTitle":"[REAL TITLE FROM TEXT]","definition":"[4 REAL Arabic sentences from the text]","keyTerms":[{"term":"[real term from text]","def":"[real Arabic definition]"},{"term":"[term2]","def":"[def2]"},{"term":"[term3]","def":"[def3]"}],"steps":["[real point from text 1]","[real point 2]","[real point 3]"],"mindMapBranches":[{"label":"[Main Topic 1]","color":"#6C63FF","children":["[subtopic1]","[subtopic2]","[subtopic3]"]},{"label":"[Main Topic 2]","color":"#FF7043","children":["[subtopic1]","[subtopic2]"]},{"label":"[Main Topic 3]","color":"#00BFA5","children":["[subtopic1]","[subtopic2]"]}],"quiz":[{"q":"[real question about the text content]?","options":["[correct answer from text]","[plausible wrong answer]","[another wrong]","[another wrong]"],"answer":0,"explanation":"[Arabic explanation why correct]"},{"q":"[second real question]?","options":["[correct]","[wrong1]","[wrong2]","[wrong3]"],"answer":0,"explanation":"[explanation]"}],"summary":"[comprehensive Arabic summary: 1 main rule + 2 key points + 1 practical application]"}'
+      : '{"lessonTitle":"[العنوان الحقيقي]","definition":"[تعريف حقيقي من النص]","keyTerms":[{"term":"[مصطلح حقيقي]","def":"[تعريف حقيقي]"},{"term":"[م2]","def":"[ت2]"},{"term":"[م3]","def":"[ت3]"}],"steps":["[نقطة حقيقية 1]","[نقطة 2]","[نقطة 3]"],"mindMapBranches":[{"label":"[المحور الرئيسي 1]","color":"#6C63FF","children":["[فرع 1]","[فرع 2]","[فرع 3]"]},{"label":"[المحور 2]","color":"#FF7043","children":["[فرع 1]","[فرع 2]","[فرع 3]"]},{"label":"[المحور 3]","color":"#00BFA5","children":["[فرع 1]","[فرع 2]"]},{"label":"[المحور 4]","color":"#FFD600","children":["[فرع 1]","[فرع 2]"]}],"quiz":[{"q":"[سؤال حقيقي من المحتوى]؟","options":["[الإجابة الصحيحة]","[إجابة خاطئة 1]","[خاطئة 2]","[خاطئة 3]"],"answer":0,"explanation":"[شرح مفصل]"},{"q":"[سؤال 2]؟","options":["[صحيح]","[خطأ1]","[خطأ2]","[خطأ3]"],"answer":0,"explanation":"[شرح]"}],"summary":"[ملخص شامل: القاعدة الأساسية + أبرز نقطتين + تطبيق عملي]"}';
     const jsonTemplate = isEng ? jsonTemplateEN : jsonTemplateAR;
 
     // ── STEP 2: Process each topic/lesson ─────────────────────
@@ -11392,9 +11683,9 @@ LANGUAGE FORMAT:
         console.log('[ZAD] chunk', ci, 'sending prompt length:', prompt.length);
         try {
           const resp = await zadFetch({
-            model: 'llama-3.1-8b-instant',
-            max_tokens: 800,
-            system: 'JSON only. No markdown.',
+            model: 'llama-3.3-70b-versatile',
+            max_tokens: 1800,
+            system: 'JSON only. No markdown. Always include mindMapBranches array with 3-4 branches.',
             messages: [{ role: 'user', content: prompt }]
           });
           const data = await resp.json();
@@ -15124,9 +15415,9 @@ function buildLessonContentHTML(lesson, subject, chapter, subjectId, prev, next,
 
   // ── Summary ──────────────────────────────────────────────
   if (cnt.summary || lesson.summary) {
-    html += '<div style="background:rgba(255,255,255,0.04);border-radius:14px;padding:14px;margin-bottom:16px">'
-      + '<div style="font-weight:800;font-size:0.82rem;margin-bottom:6px">📝 الملخص</div>'
-      + '<div style="font-size:0.85rem;line-height:1.8">'+(cnt.summary||lesson.summary||'')+'</div>'
+    html += '<div style="background:linear-gradient(135deg,rgba(108,99,255,0.1),rgba(0,191,165,0.06));border:1px solid rgba(108,99,255,0.2);border-radius:16px;padding:16px;margin-bottom:16px">'
+      + '<div style="font-weight:900;font-size:0.88rem;margin-bottom:10px;display:flex;align-items:center;gap:6px;color:#6C63FF">✨ <span>الملخص الذكي</span></div>'
+      + '<div style="font-size:0.87rem;line-height:1.9;white-space:pre-line">'+(cnt.summary||lesson.summary||'')+'</div>'
     + '</div>';
   }
 
@@ -15189,14 +15480,15 @@ function showSubject(subjectId, activeTab) {
   try { history.pushState({ zad: 'subject', sid: subjectId, tab: activeTab }, '', '#subject-' + subjectId); } catch(ex) {}
 
   var TABS = [
-    { id: 'lessons',  icon: '📖', label: 'الدروس'         },
-    { id: 'cards',    icon: '🃏', label: 'بطاقات المعلومات'},
-    { id: 'mindmaps', icon: '🧠', label: 'الخرائط الذهنية'},
-    { id: 'quiz',     icon: '❓', label: 'الاختبارات'      },
-    { id: 'lab',      icon: '🔬', label: 'المختبر'         },
-    { id: 'adaptive', icon: '🧬', label: 'مستواك الذكي'   },
-    { id: 'homework', icon: '✏️', label: 'تصحيح الواجبات' },
-    { id: 'upload',   icon: '📤', label: 'رفع محتوى'      }
+    { id: 'lessons',   icon: '📖', label: 'الدروس'          },
+    { id: 'summaries', icon: '📋', label: 'الملخصات'         },
+    { id: 'mindmaps',  icon: '🧠', label: 'الخرائط الذهنية' },
+    { id: 'cards',     icon: '🃏', label: 'بطاقات المعلومات'},
+    { id: 'quiz',      icon: '❓', label: 'الاختبارات'       },
+    { id: 'lab',       icon: '🔬', label: 'المختبر'          },
+    { id: 'adaptive',  icon: '🧬', label: 'مستواك الذكي'    },
+    { id: 'homework',  icon: '✏️', label: 'تصحيح الواجبات'  },
+    { id: 'upload',    icon: '📤', label: 'رفع محتوى'       }
   ];
 
   var tabsHTML = '<div style="display:flex;flex-direction:row;gap:8px;overflow-x:auto;padding:4px 2px 12px;-webkit-overflow-scrolling:touch;scrollbar-width:none;margin-bottom:8px;justify-content:center">'
@@ -15220,9 +15512,10 @@ function showSubject(subjectId, activeTab) {
 
   var body = '';
   try {
-    if (activeTab === 'lessons')  body = buildLessonsTab(subject, subjectId);
-    if (activeTab === 'cards')    body = buildInfoCards(subject, subjectId);
-    if (activeTab === 'mindmaps') body = buildAllMindMaps(subject, subjectId);
+    if (activeTab === 'lessons')   body = buildLessonsTab(subject, subjectId);
+    if (activeTab === 'summaries') body = buildAllSummaries(subject, subjectId);
+    if (activeTab === 'cards')     body = buildInfoCards(subject, subjectId);
+    if (activeTab === 'mindmaps')  body = buildAllMindMaps(subject, subjectId);
     if (activeTab === 'adaptive') body = buildAdaptiveDashboard(subjectId);
     if (activeTab === 'lab') {
       var _labUps = ZAD_UPLOADS.getAll().filter(function(u){ return u.subjectId===subjectId&&u.lesson; });
